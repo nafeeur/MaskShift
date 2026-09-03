@@ -431,7 +431,7 @@ async function showCapabilityDetail(kind, name) {
 function showDetail(title, content) {
   const dialog = document.createElement('dialog');
   dialog.className = 'modal wide-modal';
-  dialog.innerHTML = `<div class="modal-shell"><div class="modal-head"><div><small>CAPABILITY DETAIL</small><h2>${escapeHtml(title)}</h2></div><button class="close-button">×</button></div><pre style="max-height:65vh;overflow:auto;padding:14px;background:#07070a;color:#c9c5ca;font:10px/1.55 var(--mono);white-space:pre-wrap">${escapeHtml(content || '')}</pre></div>`;
+  dialog.innerHTML = `<div class="modal-shell"><div class="modal-head"><div><small>CAPABILITY DETAIL</small><h2>${escapeHtml(title)}</h2></div><button class="close-button">×</button></div><pre style="max-height:65vh;overflow:auto;padding:14px;background:#141414;color:#b7b7b7;font:10px/1.55 var(--mono);white-space:pre-wrap">${escapeHtml(content || '')}</pre></div>`;
   document.body.append(dialog);
   dialog.querySelector('button').addEventListener('click', () => dialog.close());
   dialog.addEventListener('close', () => dialog.remove());
