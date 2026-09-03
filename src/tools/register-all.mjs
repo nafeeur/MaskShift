@@ -1,0 +1,38 @@
+import { registerFilesystemTools } from './filesystem-tools.mjs';
+import { registerShellTools } from './shell-tools.mjs';
+import { registerSearchTools } from './search-tools.mjs';
+import { registerGitTools } from './git-tools.mjs';
+import { registerMemorySkillTools } from './memory-skill-tools.mjs';
+import { registerMcpTools } from './mcp-tools.mjs';
+import { registerWebTools } from './web-tools.mjs';
+import { registerProjectTools } from './project-tools.mjs';
+import { registerCapabilityTools } from './capability-tools.mjs';
+import { registerPlanTools } from './plan-tools.mjs';
+import { registerAgentTools } from './agent-tools.mjs';
+import { registerLspTools } from './lsp-tools.mjs';
+import { registerBridgeTools } from './bridge-tools.mjs';
+import { registerPluginTools } from './plugin-tools.mjs';
+import { registerAutomationTools } from './automation-tools.mjs';
+import { registerBrowserTools } from './browser-tools.mjs';
+import { registerPlatformTools } from './platform-tools.mjs';
+
+export function registerAllTools(registry, dependencies) {
+  registerFilesystemTools(registry, dependencies);
+  registerShellTools(registry, dependencies);
+  registerSearchTools(registry, dependencies);
+  registerGitTools(registry, dependencies);
+  registerMemorySkillTools(registry, dependencies);
+  registerMcpTools(registry, dependencies);
+  registerWebTools(registry, dependencies);
+  registerProjectTools(registry, dependencies);
+  registerCapabilityTools(registry, dependencies);
+  registerPlanTools(registry, dependencies);
+  registerAgentTools(registry, dependencies);
+  registerLspTools(registry, dependencies);
+  registerBridgeTools(registry, dependencies);
+  registerPluginTools(registry, dependencies);
+  registerAutomationTools(registry, dependencies);
+  registerBrowserTools(registry, dependencies);
+  registerPlatformTools(registry, dependencies);
+  return registry;
+}

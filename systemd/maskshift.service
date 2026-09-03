@@ -1,0 +1,21 @@
+[Unit]
+Description=MaskShift maximalist coding harness
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h
+Environment=MASKSHIFT_HOME=%h/.maskshift
+EnvironmentFile=-%h/.config/maskshift/env
+ExecStart=%h/.local/bin/maskshift serve --workspace %h --host 127.0.0.1 --port 4242 --no-open
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=30
+KillMode=mixed
+
+# Deliberately no ProtectSystem/PrivateNetwork sandboxing: overdrive tools need the
+# same host authority as the user running this service.
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,1971 @@
+{
+  "generatedAt": "2026-09-02T20:26:27.416Z",
+  "version": "1.0.0",
+  "nativeToolCount": 143,
+  "bundledSkillCount": 36,
+  "curatedMcpCount": 8,
+  "tools": [
+    {
+      "name": "agent_bridge_discover",
+      "title": "Discover external coding agents",
+      "description": "Detect locally installed Claude Code, Codex, OpenCode, Copilot, Hermes, Aider, and configured coding-agent CLIs.",
+      "category": "agent-bridge",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "agent_bridge_help",
+      "title": "Inspect coding-agent CLI",
+      "description": "Read the installed command help for an external coding-agent bridge before delegating.",
+      "category": "agent-bridge",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "agent_bridge_run",
+      "title": "Delegate to external coding agent",
+      "description": "Run an installed Claude Code, Codex, OpenCode, Copilot, Hermes, Aider, or configured agent against the current workspace. Can wait or return a persistent process.",
+      "category": "agent-bridge",
+      "readOnly": false,
+      "risk": "host-exec",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "external_agent_run",
+      "title": "Run arbitrary external agent",
+      "description": "Execute any configured or ad-hoc coding-agent command with placeholder arguments such as {prompt}, {cwd}, and {workspace}.",
+      "category": "agent-bridge",
+      "readOnly": false,
+      "risk": "host-exec",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "archive_create",
+      "title": "Create archive",
+      "description": "Create tar.gz, tar.zst, tar, or zip archives from arbitrary host paths.",
+      "category": "artifacts",
+      "readOnly": false,
+      "risk": "write",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "archive_extract",
+      "title": "Extract archive",
+      "description": "Extract zip, tar.gz, tar.zst, tar, and common compressed archives.",
+      "category": "artifacts",
+      "readOnly": false,
+      "risk": "write",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "file_hash",
+      "title": "Hash file",
+      "description": "Calculate SHA-256, SHA-512, SHA-1, or MD5 for a file without loading it all into model context.",
+      "category": "artifacts",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "automation_create",
+      "title": "Create automation",
+      "description": "Schedule a recurring or one-time autonomous agent prompt, tool call, or unrestricted shell command. Schedules accept cron, ISO timestamps, or strings like every 15m.",
+      "category": "automation",
+      "readOnly": false,
+      "risk": "persistent-exec",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "automation_delete",
+      "title": "Delete automation",
+      "description": "Permanently remove a scheduled automation.",
+      "category": "automation",
+      "readOnly": false,
+      "risk": "write",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "automation_list",
+      "title": "List automations",
+      "description": "List scheduled agent, tool, and shell automations with next/last run state.",
+      "category": "automation",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "automation_pause",
+      "title": "Pause automation",
+      "description": "Disable an automation without deleting it.",
+      "category": "automation",
+      "readOnly": false,
+      "risk": "persistent-exec",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "automation_resume",
+      "title": "Resume automation",
+      "description": "Enable an automation and compute its next run.",
+      "category": "automation",
+      "readOnly": false,
+      "risk": "persistent-exec",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "automation_run_now",
+      "title": "Run automation now",
+      "description": "Immediately execute an automation regardless of its next scheduled time.",
+      "category": "automation",
+      "readOnly": false,
+      "risk": "host-exec",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "automation_update",
+      "title": "Update automation",
+      "description": "Edit an automation schedule, action, name, metadata, or enabled state.",
+      "category": "automation",
+      "readOnly": false,
+      "risk": "persistent-exec",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "browser_accessibility",
+      "title": "Browser accessibility tree",
+      "description": "Return the Chrome accessibility tree for semantic page understanding.",
+      "category": "browser",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "browser_click",
+      "title": "Click browser element",
+      "description": "Click a CSS selector or page coordinate through the Chrome input pipeline.",
+      "category": "browser",
+      "readOnly": false,
+      "risk": "external-action",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "browser_close",
+      "title": "Close browser",
+      "description": "Terminate a MaskShift browser instance and its CDP connections.",
+      "category": "browser",
+      "readOnly": false,
+      "risk": "process",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "browser_close_tab",
+      "title": "Close browser tab",
+      "description": "Close one browser page target.",
+      "category": "browser",
+      "readOnly": false,
+      "risk": "process",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "browser_console",
+      "title": "Read browser console",
+      "description": "Read recent console messages, exceptions, and browser log entries from the page.",
+      "category": "browser",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "browser_discover",
+      "title": "Discover browser",
+      "description": "Detect an installed Chromium, Chrome, or Edge executable for dependency-free CDP automation.",
+      "category": "browser",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "browser_evaluate",
+      "title": "Evaluate browser JavaScript",
+      "description": "Execute arbitrary JavaScript in the active page and return a serializable value.",
+      "category": "browser",
+      "readOnly": false,
+      "risk": "external-action",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "browser_instances",
+      "title": "List browser instances",
+      "description": "List browser processes launched by MaskShift.",
+      "category": "browser",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "browser_launch",
+      "title": "Launch browser",
+      "description": "Launch a persistent-profile Chromium browser with DevTools automation. Headless by default; visible mode supports interactive logins.",
+      "category": "browser",
+      "readOnly": false,
+      "risk": "process",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "browser_navigate",
+      "title": "Navigate browser",
+      "description": "Navigate a browser tab and wait for the document to load.",
+      "category": "browser",
+      "readOnly": false,
+      "risk": "network",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "browser_network",
+      "title": "Read browser network trace",
+      "description": "Read recent Chrome DevTools Network events for the page.",
+      "category": "browser",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "browser_new_tab",
+      "title": "Open browser tab",
+      "description": "Create a new browser tab at a URL.",
+      "category": "browser",
+      "readOnly": false,
+      "risk": "network",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "browser_print_pdf",
+      "title": "Print page to PDF",
+      "description": "Render the current browser page to a PDF artifact using Chrome print layout.",
+      "category": "browser",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "browser_screenshot",
+      "title": "Capture browser screenshot",
+      "description": "Capture a viewport or full-page screenshot to a workspace artifact file.",
+      "category": "browser",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "browser_snapshot",
+      "title": "Read browser page",
+      "description": "Return page title, URL, visible text, and a selector map of interactive elements.",
+      "category": "browser",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "browser_tabs",
+      "title": "List browser tabs",
+      "description": "List all page targets in a browser instance.",
+      "category": "browser",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "browser_type",
+      "title": "Type in browser",
+      "description": "Focus an optional CSS selector, type text, and optionally submit with Enter.",
+      "category": "browser",
+      "readOnly": false,
+      "risk": "external-action",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "browser_wait_for",
+      "title": "Wait for browser element",
+      "description": "Wait for a CSS selector to become visible, hidden, attached, or detached.",
+      "category": "browser",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "lsp_definition",
+      "title": "Go to definition",
+      "description": "Resolve the definition location for a symbol at a source position.",
+      "category": "code-intelligence",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "lsp_diagnostics",
+      "title": "Language diagnostics",
+      "description": "Return language-server errors, warnings, hints, and related information for a file.",
+      "category": "code-intelligence",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "lsp_discover",
+      "title": "Discover language servers",
+      "description": "Detect installed language servers for TypeScript, Python, C/C++, Rust, Go, Java, Ruby, Lua, JSON, HTML, CSS, and YAML.",
+      "category": "code-intelligence",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "lsp_format",
+      "title": "Language-aware format",
+      "description": "Ask the language server to format a document and optionally apply the edits.",
+      "category": "code-intelligence",
+      "readOnly": false,
+      "risk": "write",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "lsp_hover",
+      "title": "LSP hover",
+      "description": "Get type, signature, and documentation information at a 1-based source position.",
+      "category": "code-intelligence",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "lsp_references",
+      "title": "Find semantic references",
+      "description": "Find language-aware references for a symbol at a source position.",
+      "category": "code-intelligence",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "lsp_rename",
+      "title": "Semantic rename",
+      "description": "Compute and optionally apply a workspace-wide language-aware symbol rename.",
+      "category": "code-intelligence",
+      "readOnly": false,
+      "risk": "write",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "lsp_status",
+      "title": "Language server status",
+      "description": "List active workspace language server processes and capabilities.",
+      "category": "code-intelligence",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "lsp_stop",
+      "title": "Stop language servers",
+      "description": "Stop one or all lazy language server processes for the workspace.",
+      "category": "code-intelligence",
+      "readOnly": false,
+      "risk": "process",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "lsp_symbols",
+      "title": "Document symbols",
+      "description": "Return language-server document symbols and hierarchy for a source file.",
+      "category": "code-intelligence",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "container_build",
+      "title": "Build container image",
+      "description": "Build a Docker/Podman image from a Dockerfile or Containerfile with build args and tags.",
+      "category": "containers",
+      "readOnly": false,
+      "risk": "host-exec",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "container_compose",
+      "title": "Run Compose",
+      "description": "Run Docker Compose or Podman Compose actions such as up, down, build, logs, ps, and config.",
+      "category": "containers",
+      "readOnly": false,
+      "risk": "host-exec",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "container_engine",
+      "title": "Inspect container engine",
+      "description": "Detect Docker or Podman and return version and runtime information.",
+      "category": "containers",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "container_exec",
+      "title": "Execute in container",
+      "description": "Execute a command in an existing Docker/Podman container.",
+      "category": "containers",
+      "readOnly": false,
+      "risk": "host-exec",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "container_list",
+      "title": "List containers",
+      "description": "List running or stopped Docker/Podman containers as structured records.",
+      "category": "containers",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "container_logs",
+      "title": "Read container logs",
+      "description": "Read recent container logs with timestamps, tail, and since controls.",
+      "category": "containers",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "container_run",
+      "title": "Run container",
+      "description": "Run any Docker/Podman image with ports, volumes, environment, network, privilege, and detach controls.",
+      "category": "containers",
+      "readOnly": false,
+      "risk": "host-exec",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "container_stop",
+      "title": "Stop or remove container",
+      "description": "Stop, kill, restart, pause, unpause, or remove a container.",
+      "category": "containers",
+      "readOnly": false,
+      "risk": "host-exec",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "kubernetes_exec",
+      "title": "Run kubectl",
+      "description": "Execute any kubectl operation with a structured argument list and optional context, namespace, and kubeconfig.",
+      "category": "containers",
+      "readOnly": false,
+      "risk": "remote-exec",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "database_cli",
+      "title": "Run database CLI",
+      "description": "Execute a command through psql, mysql, redis-cli, mongosh, duckdb, or another installed database client.",
+      "category": "database",
+      "readOnly": false,
+      "risk": "database-write",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "sqlite_query",
+      "title": "Query SQLite database",
+      "description": "Open any SQLite database directly through Node native SQLite, execute parameterized SQL, and return structured rows. Write statements are allowed.",
+      "category": "database",
+      "readOnly": false,
+      "risk": "database-write",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "sqlite_schema",
+      "title": "Inspect SQLite schema",
+      "description": "Return tables, views, indexes, triggers, and CREATE statements from a SQLite database.",
+      "category": "database",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "fs_apply_patch",
+      "title": "Apply unified diff",
+      "description": "Apply a unified diff using git apply. The patch can update multiple files and is checked before application.",
+      "category": "filesystem",
+      "readOnly": false,
+      "risk": "write",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "fs_delete",
+      "title": "Delete path",
+      "description": "Delete a file or directory recursively. Overdrive mode executes immediately without an approval prompt.",
+      "category": "filesystem",
+      "readOnly": false,
+      "risk": "destructive",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "fs_list",
+      "title": "List files and directories",
+      "description": "List a directory tree with file sizes and types. Paths may be workspace-relative or absolute in overdrive mode.",
+      "category": "filesystem",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": true
+    },
+    {
+      "name": "fs_mkdir",
+      "title": "Create directory",
+      "description": "Create a directory and missing parent directories.",
+      "category": "filesystem",
+      "readOnly": false,
+      "risk": "write",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "fs_move",
+      "title": "Move or rename path",
+      "description": "Move or rename a file or directory, optionally replacing the destination.",
+      "category": "filesystem",
+      "readOnly": false,
+      "risk": "write",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "fs_patch",
+      "title": "Apply exact text edits",
+      "description": "Apply one or more exact oldText/newText replacements to a file atomically. Fails on missing or ambiguous text unless replaceAll is requested.",
+      "category": "filesystem",
+      "readOnly": false,
+      "risk": "write",
+      "alwaysAvailable": true
+    },
+    {
+      "name": "fs_read",
+      "title": "Read text file",
+      "description": "Read a UTF-8 text file with optional 1-based line range and hard output bounds.",
+      "category": "filesystem",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": true
+    },
+    {
+      "name": "fs_read_binary",
+      "title": "Read binary file",
+      "description": "Read a bounded binary file as base64 with MIME-relevant metadata.",
+      "category": "filesystem",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "fs_stat",
+      "title": "Inspect path metadata",
+      "description": "Return file type, size, timestamps, mode, target and hash metadata.",
+      "category": "filesystem",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "fs_write",
+      "title": "Write file",
+      "description": "Create or overwrite a file atomically. Parent directories are created automatically.",
+      "category": "filesystem",
+      "readOnly": false,
+      "risk": "write",
+      "alwaysAvailable": true
+    },
+    {
+      "name": "git_branch",
+      "title": "Manage Git branches",
+      "description": "List, create, switch, rename, or delete branches. MaskShift runs these directly without permission prompts.",
+      "category": "git",
+      "readOnly": false,
+      "risk": "write",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "git_checkpoint_create",
+      "title": "Create reversible checkpoint",
+      "description": "Snapshot tracked and untracked workspace changes so an agent run can be rolled back without interrupting normal Git history.",
+      "category": "git",
+      "readOnly": false,
+      "risk": "local-snapshot",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "git_checkpoint_list",
+      "title": "List checkpoints",
+      "description": "List reversible MaskShift workspace checkpoints.",
+      "category": "git",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "git_checkpoint_restore",
+      "title": "Restore checkpoint",
+      "description": "Restore a prior MaskShift checkpoint. This is destructive to current workspace changes.",
+      "category": "git",
+      "readOnly": false,
+      "risk": "destructive",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "git_commit",
+      "title": "Create Git commit",
+      "description": "Stage selected or all changes and create a commit. Optional amend and no-verify modes are supported.",
+      "category": "git",
+      "readOnly": false,
+      "risk": "write",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "git_diff",
+      "title": "Git diff",
+      "description": "Show working-tree, staged, commit-range, or selected-file diffs with configurable context and output bounds.",
+      "category": "git",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": true
+    },
+    {
+      "name": "git_log",
+      "title": "Git history",
+      "description": "Read compact commit history, optionally for a branch, range, author, grep expression, or path.",
+      "category": "git",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "git_show",
+      "title": "Show Git object",
+      "description": "Show a commit, tag, tree, or file at a revision.",
+      "category": "git",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "git_status",
+      "title": "Git status",
+      "description": "Inspect branch, upstream, staged, modified, deleted, renamed, conflicted, and untracked files.",
+      "category": "git",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": true
+    },
+    {
+      "name": "git_worktree_create",
+      "title": "Create isolated worktree",
+      "description": "Create a branch-backed Git worktree for isolated subagent or experimental work.",
+      "category": "git",
+      "readOnly": false,
+      "risk": "write",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "mcp_add",
+      "title": "Add arbitrary MCP server",
+      "description": "Add any stdio or HTTP MCP server definition, including command, arguments, environment, URL, headers, and lazy loading settings.",
+      "category": "mcp",
+      "readOnly": false,
+      "risk": "install",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "mcp_call",
+      "title": "Call MCP tool by qualified name",
+      "description": "Invoke a connected MCP tool directly. Prefer activating its qualified tool so the model can call it natively on later turns.",
+      "category": "mcp",
+      "readOnly": false,
+      "risk": "external-tool",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "mcp_connect",
+      "title": "Connect MCP server",
+      "description": "Lazily start or connect an MCP server, negotiate modern or legacy protocol, and discover its tools.",
+      "category": "mcp",
+      "readOnly": false,
+      "risk": "external-connect",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "mcp_disconnect",
+      "title": "Disconnect MCP server",
+      "description": "Close a workspace-scoped MCP connection and unload its tool schemas.",
+      "category": "mcp",
+      "readOnly": false,
+      "risk": "external-connect",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "mcp_list",
+      "title": "List MCP servers",
+      "description": "List curated, imported, project, and configured MCP servers with live connection status and tool counts.",
+      "category": "mcp",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "mcp_prompts",
+      "title": "List MCP prompts",
+      "description": "List prompt templates provided by an MCP server.",
+      "category": "mcp",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "mcp_registry_install",
+      "title": "Install MCP Registry server",
+      "description": "Resolve a server from the official registry and add its remote or package transport to MaskShift configuration.",
+      "category": "mcp",
+      "readOnly": false,
+      "risk": "install",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "mcp_registry_search",
+      "title": "Search official MCP Registry",
+      "description": "Search the live official MCP Registry instead of relying on a stale built-in server list.",
+      "category": "mcp",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "mcp_resource_read",
+      "title": "Read MCP resource",
+      "description": "Read a URI exposed by an MCP server.",
+      "category": "mcp",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "mcp_resources",
+      "title": "List MCP resources",
+      "description": "Connect to a server and list its MCP resources.",
+      "category": "mcp",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "mcp_search",
+      "title": "Search MCP capabilities",
+      "description": "Search discovered MCP servers and tools already known to MaskShift. Servers remain lazy until connected.",
+      "category": "mcp",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": true
+    },
+    {
+      "name": "memory_delete",
+      "title": "Delete persistent memory",
+      "description": "Delete a memory by ID.",
+      "category": "memory",
+      "readOnly": false,
+      "risk": "write",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "memory_list",
+      "title": "List persistent memories",
+      "description": "List the highest-priority project and global memories.",
+      "category": "memory",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "memory_save",
+      "title": "Save persistent memory",
+      "description": "Save a durable project or global fact, architectural decision, convention, result, or reusable lesson.",
+      "category": "memory",
+      "readOnly": false,
+      "risk": "write",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "memory_search",
+      "title": "Search persistent memory",
+      "description": "Search project and global long-term memory using SQLite full-text ranking.",
+      "category": "memory",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": true
+    },
+    {
+      "name": "agent_cancel",
+      "title": "Cancel agent run",
+      "description": "Cancel a running subagent or other active MaskShift run.",
+      "category": "orchestration",
+      "readOnly": false,
+      "risk": "agent",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "agent_delegate",
+      "title": "Delegate to subagent",
+      "description": "Run a focused subagent with its own session and capability context. Optionally isolate editing in a Git worktree and branch.",
+      "category": "orchestration",
+      "readOnly": false,
+      "risk": "agent",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "agent_parallel",
+      "title": "Run parallel subagents",
+      "description": "Delegate multiple independent research, review, test, or implementation tasks concurrently and aggregate their final results.",
+      "category": "orchestration",
+      "readOnly": false,
+      "risk": "agent",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "agent_run_status",
+      "title": "Inspect agent runs",
+      "description": "Inspect active and recent agent runs, including parent/subagent relationships.",
+      "category": "orchestration",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "capability_activate",
+      "title": "Activate tools, skills, or MCP",
+      "description": "Load selected capabilities into the current model context. Local tools add schemas, skills add instructions, and MCP servers connect lazily and expose their tools.",
+      "category": "orchestration",
+      "readOnly": false,
+      "risk": "dynamic-load",
+      "alwaysAvailable": true
+    },
+    {
+      "name": "capability_search",
+      "title": "Search all capabilities",
+      "description": "Search local tools, reusable skills, imported MCP servers, and discovered MCP tools. Use this whenever the current tool set is insufficient.",
+      "category": "orchestration",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": true
+    },
+    {
+      "name": "capability_state",
+      "title": "Inspect active capabilities",
+      "description": "Show the exact tools, skills, and MCP servers currently loaded for this run.",
+      "category": "orchestration",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": true
+    },
+    {
+      "name": "plan_get",
+      "title": "Read execution plan",
+      "description": "Return the current run plan and progress.",
+      "category": "orchestration",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": true
+    },
+    {
+      "name": "plan_update",
+      "title": "Update execution plan",
+      "description": "Create or update the run plan with concise steps and statuses. Use it for multi-step work and keep it synchronized with actual progress.",
+      "category": "orchestration",
+      "readOnly": false,
+      "risk": "state",
+      "alwaysAvailable": true
+    },
+    {
+      "name": "plugin_activate",
+      "title": "Activate plugin",
+      "description": "Load a plugin directly into the MaskShift process with full tool registration access.",
+      "category": "plugins",
+      "readOnly": false,
+      "risk": "host-exec",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "plugin_deactivate",
+      "title": "Deactivate plugin",
+      "description": "Run a plugin cleanup hook and remove its registered tools.",
+      "category": "plugins",
+      "readOnly": false,
+      "risk": "process",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "plugin_install",
+      "title": "Install plugin",
+      "description": "Install a plugin from a local directory, Git repository, or npm package and activate it.",
+      "category": "plugins",
+      "readOnly": false,
+      "risk": "host-exec",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "plugin_list",
+      "title": "List MaskShift plugins",
+      "description": "List discovered runtime plugins, their status, tools, and skill directories.",
+      "category": "plugins",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "plugin_reload",
+      "title": "Hot reload plugin",
+      "description": "Deactivate and re-import one plugin, or every discovered plugin, without restarting MaskShift.",
+      "category": "plugins",
+      "readOnly": false,
+      "risk": "host-exec",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "plugin_scaffold",
+      "title": "Create plugin",
+      "description": "Generate and activate a complete single-tool MaskShift plugin scaffold.",
+      "category": "plugins",
+      "readOnly": false,
+      "risk": "write",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "plugin_scan",
+      "title": "Scan plugins",
+      "description": "Rescan user and workspace plugin directories and activate newly discovered plugins.",
+      "category": "plugins",
+      "readOnly": false,
+      "risk": "host-exec",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "project_index_status",
+      "title": "Repository index status",
+      "description": "Show local indexed file, chunk, character, and freshness statistics.",
+      "category": "project",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "project_inspect",
+      "title": "Inspect project",
+      "description": "Summarize repository shape, dominant languages, build manifests, instructions, Git state, and local index health.",
+      "category": "project",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": true
+    },
+    {
+      "name": "project_instructions",
+      "title": "Load hierarchical instructions",
+      "description": "Load AGENTS.md, CLAUDE.md, MASKSHIFT.md, Copilot instructions, and other configured context files from repository root through the working directory.",
+      "category": "project",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "project_read_manifest",
+      "title": "Read project manifest",
+      "description": "Read and optionally parse a package/build manifest such as package.json, pyproject.toml, Cargo.toml, go.mod, or CMakeLists.txt.",
+      "category": "project",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "project_tree",
+      "title": "Render project tree",
+      "description": "Render a bounded source tree for any workspace subdirectory.",
+      "category": "project",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": true
+    },
+    {
+      "name": "provider_list",
+      "title": "List model providers",
+      "description": "Inspect configured model providers, connectivity status, and discovered models.",
+      "category": "project",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "session_history",
+      "title": "Read session history",
+      "description": "Read messages and recent runs from the current MaskShift session.",
+      "category": "project",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "rsync_transfer",
+      "title": "Transfer files with rsync",
+      "description": "Synchronize local and remote files with rsync over SSH.",
+      "category": "remote",
+      "readOnly": false,
+      "risk": "remote-exec",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "ssh_exec",
+      "title": "Execute over SSH",
+      "description": "Run a command on any SSH host with user, port, identity, jump host, environment, and timeout controls.",
+      "category": "remote",
+      "readOnly": false,
+      "risk": "remote-exec",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "node_cell",
+      "title": "Execute Node.js cell",
+      "description": "Execute arbitrary JavaScript as an ES module in a temporary script with workspace cwd.",
+      "category": "runtimes",
+      "readOnly": false,
+      "risk": "host-exec",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "python_cell",
+      "title": "Execute Python cell",
+      "description": "Execute an arbitrary Python code cell in a temporary script with workspace cwd and return stdout/stderr.",
+      "category": "runtimes",
+      "readOnly": false,
+      "risk": "host-exec",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "dependency_scan",
+      "title": "Scan source dependencies",
+      "description": "Inspect imports across selected source files and return a compact file-to-dependency graph without installing parsers.",
+      "category": "search",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "repo_index",
+      "title": "Index repository",
+      "description": "Build or refresh MaskShift’s local SQLite FTS code index for structure-aware context retrieval.",
+      "category": "search",
+      "readOnly": false,
+      "risk": "local-index",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "repo_search",
+      "title": "Search indexed code context",
+      "description": "Search the local repository index for semantically adjacent code using full-text ranking and return bounded source chunks.",
+      "category": "search",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": true
+    },
+    {
+      "name": "search_files",
+      "title": "Find files",
+      "description": "Find files by fuzzy substring or glob across a workspace while respecting common repository ignores.",
+      "category": "search",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": true
+    },
+    {
+      "name": "search_text",
+      "title": "Search repository text",
+      "description": "Fast recursive source search using ripgrep when available, with regex, glob, case, hidden-file, and context controls.",
+      "category": "search",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": true
+    },
+    {
+      "name": "symbol_outline",
+      "title": "Extract file symbols",
+      "description": "Extract a lightweight outline of classes, functions, interfaces, structs, methods, and test blocks from source files.",
+      "category": "search",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "command_lookup",
+      "title": "Locate executables",
+      "description": "Find whether one or more commands are installed and return their executable paths.",
+      "category": "shell",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "shell_exec",
+      "title": "Execute shell command",
+      "description": "Run any Unix shell command on the host with the full user environment. Use for builds, tests, package managers, compilers, scripts, system inspection, and repository automation.",
+      "category": "shell",
+      "readOnly": false,
+      "risk": "host-exec",
+      "alwaysAvailable": true
+    },
+    {
+      "name": "shell_exec_parallel",
+      "title": "Execute commands in parallel",
+      "description": "Run multiple independent shell commands concurrently and return every result.",
+      "category": "shell",
+      "readOnly": false,
+      "risk": "host-exec",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "shell_process_list",
+      "title": "List background processes",
+      "description": "List processes launched by MaskShift, optionally limited to the current workspace or active processes.",
+      "category": "shell",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "shell_process_read",
+      "title": "Read background process",
+      "description": "Read current status and incremental output from a persistent process.",
+      "category": "shell",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "shell_process_stop",
+      "title": "Stop background process",
+      "description": "Terminate a persistent process and its Unix process group.",
+      "category": "shell",
+      "readOnly": false,
+      "risk": "host-exec",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "shell_process_write",
+      "title": "Write to process stdin",
+      "description": "Send text or control sequences to a persistent process stdin.",
+      "category": "shell",
+      "readOnly": false,
+      "risk": "host-exec",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "shell_start",
+      "title": "Start background process",
+      "description": "Start a persistent host process with live stdout/stderr streaming. Returns a process ID for later reads, input, or termination.",
+      "category": "shell",
+      "readOnly": false,
+      "risk": "host-exec",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "system_info",
+      "title": "Inspect host system",
+      "description": "Return operating system, CPU, memory, process, shell, runtime, and workspace information.",
+      "category": "shell",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "skill_create",
+      "title": "Create reusable skill",
+      "description": "Create a durable user skill from a successful workflow so future runs can discover it automatically.",
+      "category": "skills",
+      "readOnly": false,
+      "risk": "write",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "skill_improve",
+      "title": "Improve reusable skill",
+      "description": "Append a validated lesson or refinement to an existing skill.",
+      "category": "skills",
+      "readOnly": false,
+      "risk": "write",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "skill_load",
+      "title": "Load agent skill",
+      "description": "Load the full instructions and metadata for a selected skill into the current run.",
+      "category": "skills",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "skill_read_reference",
+      "title": "Read skill reference",
+      "description": "Read a file referenced by a skill while preventing path escape from the skill directory.",
+      "category": "skills",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "skill_search",
+      "title": "Search agent skills",
+      "description": "Search all bundled, project, Claude, Codex, Copilot, and user skill catalogs. Skill bodies are loaded only when selected.",
+      "category": "skills",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": true
+    },
+    {
+      "name": "environment_list",
+      "title": "Read environment",
+      "description": "List process environment variable names and optionally values. MaskShift overdrive mode permits direct secret-bearing environment access.",
+      "category": "system",
+      "readOnly": true,
+      "risk": "secrets",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "environment_set",
+      "title": "Set runtime environment",
+      "description": "Set or delete environment variables for this running MaskShift daemon and future child processes.",
+      "category": "system",
+      "readOnly": false,
+      "risk": "secrets",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "port_inspect",
+      "title": "Inspect network ports",
+      "description": "Inspect listening sockets and processes using ss, netstat, or lsof.",
+      "category": "system",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "system_service",
+      "title": "Control system service",
+      "description": "Inspect, start, stop, restart, reload, enable, or disable a systemd service on the host.",
+      "category": "system",
+      "readOnly": false,
+      "risk": "host-exec",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "web_download",
+      "title": "Download URL to file",
+      "description": "Download an HTTP(S) response directly to a host or workspace file, creating parent directories.",
+      "category": "web",
+      "readOnly": false,
+      "risk": "write",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "web_fetch",
+      "title": "Fetch web content",
+      "description": "Fetch any HTTP(S) URL with custom method, headers, and body. Returns bounded text, JSON, or readable text extracted from HTML.",
+      "category": "web",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "web_search",
+      "title": "Search the web",
+      "description": "Search the public web through DuckDuckGo HTML and return result titles, URLs, and snippets. For specialized search, activate an MCP search provider.",
+      "category": "web",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    }
+  ],
+  "skills": [
+    {
+      "name": "architecture",
+      "description": "Design system architecture with explicit requirements, boundaries, data flows, tradeoffs, failure modes, and evolution paths.",
+      "path": "skills/architecture",
+      "file": "skills/architecture/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "architecture",
+        "description": "Design system architecture with explicit requirements, boundaries, data flows, tradeoffs, failure modes, and evolution paths."
+      },
+      "bodyChars": 615,
+      "updatedAt": "2026-09-02T19:41:25.675Z"
+    },
+    {
+      "name": "backend-api",
+      "description": "Design and implement reliable local or network APIs with validation, streaming, cancellation, observability, and stable contracts.",
+      "path": "skills/backend-api",
+      "file": "skills/backend-api/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "backend-api",
+        "description": "Design and implement reliable local or network APIs with validation, streaming, cancellation, observability, and stable contracts."
+      },
+      "bodyChars": 535,
+      "updatedAt": "2026-09-02T19:41:25.674Z"
+    },
+    {
+      "name": "browser-automation",
+      "description": "Automate and verify browser workflows using accessibility-first locators, deterministic waits, screenshots, and failure artifacts.",
+      "path": "skills/browser-automation",
+      "file": "skills/browser-automation/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "browser-automation",
+        "description": "Automate and verify browser workflows using accessibility-first locators, deterministic waits, screenshots, and failure artifacts."
+      },
+      "bodyChars": 450,
+      "updatedAt": "2026-09-02T19:41:25.675Z"
+    },
+    {
+      "name": "build-repair",
+      "description": "Repair broken builds, type checks, packaging, and startup paths across environments with minimal, verifiable changes.",
+      "path": "skills/build-repair",
+      "file": "skills/build-repair/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "build-repair",
+        "description": "Repair broken builds, type checks, packaging, and startup paths across environments with minimal, verifiable changes."
+      },
+      "bodyChars": 496,
+      "updatedAt": "2026-09-02T19:41:25.674Z"
+    },
+    {
+      "name": "ci-cd",
+      "description": "Create and repair CI/CD pipelines with caching, parallelism, reproducibility, artifacts, and actionable failures.",
+      "path": "skills/ci-cd",
+      "file": "skills/ci-cd/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "ci-cd",
+        "description": "Create and repair CI/CD pipelines with caching, parallelism, reproducibility, artifacts, and actionable failures."
+      },
+      "bodyChars": 509,
+      "updatedAt": "2026-09-02T19:41:25.674Z"
+    },
+    {
+      "name": "code-review",
+      "description": "Review changes for real correctness, maintainability, regressions, missing tests, and integration defects with low-noise findings.",
+      "path": "skills/code-review",
+      "file": "skills/code-review/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "code-review",
+        "description": "Review changes for real correctness, maintainability, regressions, missing tests, and integration defects with low-noise findings."
+      },
+      "bodyChars": 586,
+      "updatedAt": "2026-09-02T19:41:25.673Z"
+    },
+    {
+      "name": "codebase-indexing",
+      "description": "Build and maintain scalable repository indexes for lexical, structural, symbol, and semantic retrieval with bounded context.",
+      "path": "skills/codebase-indexing",
+      "file": "skills/codebase-indexing/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "codebase-indexing",
+        "description": "Build and maintain scalable repository indexes for lexical, structural, symbol, and semantic retrieval with bounded context."
+      },
+      "bodyChars": 611,
+      "updatedAt": "2026-09-02T19:41:25.675Z"
+    },
+    {
+      "name": "cpp-qt",
+      "description": "Implement and debug modern C++ and Qt applications, including signals/slots, models, threading, CMake, rendering, and ownership.",
+      "path": "skills/cpp-qt",
+      "file": "skills/cpp-qt/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "cpp-qt",
+        "description": "Implement and debug modern C++ and Qt applications, including signals/slots, models, threading, CMake, rendering, and ownership."
+      },
+      "bodyChars": 588,
+      "updatedAt": "2026-09-02T19:41:25.674Z"
+    },
+    {
+      "name": "data-analysis",
+      "description": "Analyze datasets reproducibly, validate quality, calculate defensible metrics, and produce clear artifacts.",
+      "path": "skills/data-analysis",
+      "file": "skills/data-analysis/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "data-analysis",
+        "description": "Analyze datasets reproducibly, validate quality, calculate defensible metrics, and produce clear artifacts."
+      },
+      "bodyChars": 490,
+      "updatedAt": "2026-09-02T19:41:25.675Z"
+    },
+    {
+      "name": "database-migrations",
+      "description": "Evolve persistent schemas safely with compatible migrations, backfills, rollback strategy, and integrity checks.",
+      "path": "skills/database-migrations",
+      "file": "skills/database-migrations/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "database-migrations",
+        "description": "Evolve persistent schemas safely with compatible migrations, backfills, rollback strategy, and integrity checks."
+      },
+      "bodyChars": 527,
+      "updatedAt": "2026-09-02T19:41:25.674Z"
+    },
+    {
+      "name": "debugging",
+      "description": "Diagnose and repair software failures using evidence, reproduction, instrumentation, and regression tests rather than speculative edits.",
+      "path": "skills/debugging",
+      "file": "skills/debugging/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "debugging",
+        "description": "Diagnose and repair software failures using evidence, reproduction, instrumentation, and regression tests rather than speculative edits."
+      },
+      "bodyChars": 549,
+      "updatedAt": "2026-09-02T19:41:25.673Z"
+    },
+    {
+      "name": "dependency-upgrade",
+      "description": "Upgrade libraries and runtimes with compatibility research, focused changes, lockfile integrity, and regression verification.",
+      "path": "skills/dependency-upgrade",
+      "file": "skills/dependency-upgrade/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "dependency-upgrade",
+        "description": "Upgrade libraries and runtimes with compatibility research, focused changes, lockfile integrity, and regression verification."
+      },
+      "bodyChars": 520,
+      "updatedAt": "2026-09-02T19:41:25.674Z"
+    },
+    {
+      "name": "docker-kubernetes",
+      "description": "Containerize and operate development services with reproducible images, health checks, persistent state, and clear networking.",
+      "path": "skills/docker-kubernetes",
+      "file": "skills/docker-kubernetes/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "docker-kubernetes",
+        "description": "Containerize and operate development services with reproducible images, health checks, persistent state, and clear networking."
+      },
+      "bodyChars": 520,
+      "updatedAt": "2026-09-02T19:41:25.674Z"
+    },
+    {
+      "name": "documentation",
+      "description": "Write accurate user, operator, API, and architecture documentation grounded in the implemented product.",
+      "path": "skills/documentation",
+      "file": "skills/documentation/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "documentation",
+        "description": "Write accurate user, operator, API, and architecture documentation grounded in the implemented product."
+      },
+      "bodyChars": 530,
+      "updatedAt": "2026-09-02T19:41:25.674Z"
+    },
+    {
+      "name": "feature-implementation",
+      "description": "Implement production features end to end, including integration, error states, tests, documentation, and verification.",
+      "path": "skills/feature-implementation",
+      "file": "skills/feature-implementation/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "feature-implementation",
+        "description": "Implement production features end to end, including integration, error states, tests, documentation, and verification."
+      },
+      "bodyChars": 602,
+      "updatedAt": "2026-09-02T19:41:25.673Z"
+    },
+    {
+      "name": "frontend-redline-ui",
+      "description": "Build MaskShift interfaces in the high-velocity black/red racing design language with sharp geometry, dense information, and clear hierarchy.",
+      "path": "skills/frontend-redline-ui",
+      "file": "skills/frontend-redline-ui/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "frontend-redline-ui",
+        "description": "Build MaskShift interfaces in the high-velocity black/red racing design language with sharp geometry, dense information, and clear hierarchy."
+      },
+      "bodyChars": 742,
+      "updatedAt": "2026-09-02T19:41:25.673Z"
+    },
+    {
+      "name": "git-worktrees",
+      "description": "Use Git worktrees and checkpoints for parallel agents, isolated changes, review, integration, and recovery.",
+      "path": "skills/git-worktrees",
+      "file": "skills/git-worktrees/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "git-worktrees",
+        "description": "Use Git worktrees and checkpoints for parallel agents, isolated changes, review, integration, and recovery."
+      },
+      "bodyChars": 506,
+      "updatedAt": "2026-09-02T19:41:25.674Z"
+    },
+    {
+      "name": "go-engineering",
+      "description": "Implement idiomatic Go services and tools with context propagation, interfaces, concurrency discipline, and tests.",
+      "path": "skills/go-engineering",
+      "file": "skills/go-engineering/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "go-engineering",
+        "description": "Implement idiomatic Go services and tools with context propagation, interfaces, concurrency discipline, and tests."
+      },
+      "bodyChars": 487,
+      "updatedAt": "2026-09-02T19:41:25.674Z"
+    },
+    {
+      "name": "incident-response",
+      "description": "Diagnose and stabilize production incidents, preserve evidence, restore service, and produce actionable follow-up work.",
+      "path": "skills/incident-response",
+      "file": "skills/incident-response/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "incident-response",
+        "description": "Diagnose and stabilize production incidents, preserve evidence, restore service, and produce actionable follow-up work."
+      },
+      "bodyChars": 490,
+      "updatedAt": "2026-09-02T19:41:25.675Z"
+    },
+    {
+      "name": "mcp-authoring",
+      "description": "Build and integrate MCP servers and clients across modern 2026 stateless and legacy initialization-based protocol revisions.",
+      "path": "skills/mcp-authoring",
+      "file": "skills/mcp-authoring/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "mcp-authoring",
+        "description": "Build and integrate MCP servers and clients across modern 2026 stateless and legacy initialization-based protocol revisions."
+      },
+      "bodyChars": 635,
+      "updatedAt": "2026-09-02T19:41:25.675Z"
+    },
+    {
+      "name": "migration-modernization",
+      "description": "Modernize legacy code or frameworks incrementally while preserving behavior, interoperability, and delivery velocity.",
+      "path": "skills/migration-modernization",
+      "file": "skills/migration-modernization/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "migration-modernization",
+        "description": "Modernize legacy code or frameworks incrementally while preserving behavior, interoperability, and delivery velocity."
+      },
+      "bodyChars": 509,
+      "updatedAt": "2026-09-02T19:41:25.675Z"
+    },
+    {
+      "name": "performance",
+      "description": "Profile and optimize latency, throughput, memory, context usage, and startup costs using measured bottlenecks.",
+      "path": "skills/performance",
+      "file": "skills/performance/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "performance",
+        "description": "Profile and optimize latency, throughput, memory, context usage, and startup costs using measured bottlenecks."
+      },
+      "bodyChars": 579,
+      "updatedAt": "2026-09-02T19:41:25.673Z"
+    },
+    {
+      "name": "plugin-authoring",
+      "description": "Create modular MaskShift plugins that add tools, skills, providers, hooks, UI panels, or MCP catalog sources without coupling core policy.",
+      "path": "skills/plugin-authoring",
+      "file": "skills/plugin-authoring/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "plugin-authoring",
+        "description": "Create modular MaskShift plugins that add tools, skills, providers, hooks, UI panels, or MCP catalog sources without coupling core policy."
+      },
+      "bodyChars": 513,
+      "updatedAt": "2026-09-02T19:41:25.675Z"
+    },
+    {
+      "name": "prompt-evals",
+      "description": "Create evaluations for agent prompts, tool routing, context retrieval, and coding outcomes using reproducible tasks and scoring.",
+      "path": "skills/prompt-evals",
+      "file": "skills/prompt-evals/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "prompt-evals",
+        "description": "Create evaluations for agent prompts, tool routing, context retrieval, and coding outcomes using reproducible tasks and scoring."
+      },
+      "bodyChars": 634,
+      "updatedAt": "2026-09-02T19:41:25.675Z"
+    },
+    {
+      "name": "python-engineering",
+      "description": "Build maintainable Python applications and automation with typed boundaries, packaging, environments, tests, and robust subprocess handling.",
+      "path": "skills/python-engineering",
+      "file": "skills/python-engineering/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "python-engineering",
+        "description": "Build maintainable Python applications and automation with typed boundaries, packaging, environments, tests, and robust subprocess handling."
+      },
+      "bodyChars": 512,
+      "updatedAt": "2026-09-02T19:41:25.674Z"
+    },
+    {
+      "name": "refactoring",
+      "description": "Restructure code safely while preserving behavior, reducing duplication, clarifying ownership, and maintaining compatibility.",
+      "path": "skills/refactoring",
+      "file": "skills/refactoring/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "refactoring",
+        "description": "Restructure code safely while preserving behavior, reducing duplication, clarifying ownership, and maintaining compatibility."
+      },
+      "bodyChars": 471,
+      "updatedAt": "2026-09-02T19:41:25.673Z"
+    },
+    {
+      "name": "release",
+      "description": "Prepare reproducible production releases with versioning, changelogs, packaging, smoke tests, and rollback notes.",
+      "path": "skills/release",
+      "file": "skills/release/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "release",
+        "description": "Prepare reproducible production releases with versioning, changelogs, packaging, smoke tests, and rollback notes."
+      },
+      "bodyChars": 543,
+      "updatedAt": "2026-09-02T19:41:25.674Z"
+    },
+    {
+      "name": "repo-cartography",
+      "description": "Map unfamiliar repositories and identify the correct files, dependency paths, conventions, and verification commands before implementation.",
+      "path": "skills/repo-cartography",
+      "file": "skills/repo-cartography/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "repo-cartography",
+        "description": "Map unfamiliar repositories and identify the correct files, dependency paths, conventions, and verification commands before implementation."
+      },
+      "bodyChars": 610,
+      "updatedAt": "2026-09-02T19:41:25.673Z"
+    },
+    {
+      "name": "rust-engineering",
+      "description": "Implement reliable Rust systems with ownership-aware design, errors, async cancellation, tests, and workspace conventions.",
+      "path": "skills/rust-engineering",
+      "file": "skills/rust-engineering/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "rust-engineering",
+        "description": "Implement reliable Rust systems with ownership-aware design, errors, async cancellation, tests, and workspace conventions."
+      },
+      "bodyChars": 404,
+      "updatedAt": "2026-09-02T19:41:25.674Z"
+    },
+    {
+      "name": "scientific-computing",
+      "description": "Implement numerically sound scientific and engineering software with units, validation, reproducibility, and performance awareness.",
+      "path": "skills/scientific-computing",
+      "file": "skills/scientific-computing/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "scientific-computing",
+        "description": "Implement numerically sound scientific and engineering software with units, validation, reproducibility, and performance awareness."
+      },
+      "bodyChars": 540,
+      "updatedAt": "2026-09-02T19:41:25.675Z"
+    },
+    {
+      "name": "security-audit",
+      "description": "Audit code and dependencies for concrete exploitable weaknesses while preserving MaskShift’s intentionally permissive local execution philosophy.",
+      "path": "skills/security-audit",
+      "file": "skills/security-audit/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "security-audit",
+        "description": "Audit code and dependencies for concrete exploitable weaknesses while preserving MaskShift’s intentionally permissive local execution philosophy."
+      },
+      "bodyChars": 683,
+      "updatedAt": "2026-09-02T19:41:25.674Z"
+    },
+    {
+      "name": "self-improving-skills",
+      "description": "Capture durable, non-obvious workflow knowledge as reusable skills and improve it from verified outcomes.",
+      "path": "skills/self-improving-skills",
+      "file": "skills/self-improving-skills/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "self-improving-skills",
+        "description": "Capture durable, non-obvious workflow knowledge as reusable skills and improve it from verified outcomes."
+      },
+      "bodyChars": 592,
+      "updatedAt": "2026-09-02T19:41:25.675Z"
+    },
+    {
+      "name": "test-engineering",
+      "description": "Design and implement high-signal unit, integration, end-to-end, property, and regression tests for changed behavior.",
+      "path": "skills/test-engineering",
+      "file": "skills/test-engineering/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "test-engineering",
+        "description": "Design and implement high-signal unit, integration, end-to-end, property, and regression tests for changed behavior."
+      },
+      "bodyChars": 625,
+      "updatedAt": "2026-09-02T19:41:25.673Z"
+    },
+    {
+      "name": "typescript-engineering",
+      "description": "Build strict TypeScript applications with stable runtime validation, modular architecture, and browser/server correctness.",
+      "path": "skills/typescript-engineering",
+      "file": "skills/typescript-engineering/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "typescript-engineering",
+        "description": "Build strict TypeScript applications with stable runtime validation, modular architecture, and browser/server correctness."
+      },
+      "bodyChars": 484,
+      "updatedAt": "2026-09-02T19:41:25.674Z"
+    },
+    {
+      "name": "ui-visual-qa",
+      "description": "Inspect web user interfaces for clipping, overlap, responsiveness, focus, loading, empty, error, and interaction-state defects.",
+      "path": "skills/ui-visual-qa",
+      "file": "skills/ui-visual-qa/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "ui-visual-qa",
+        "description": "Inspect web user interfaces for clipping, overlap, responsiveness, focus, loading, empty, error, and interaction-state defects."
+      },
+      "bodyChars": 500,
+      "updatedAt": "2026-09-02T19:41:25.673Z"
+    },
+    {
+      "name": "web-research",
+      "description": "Research changing technical facts from primary sources and convert findings into implementation decisions with traceability.",
+      "path": "skills/web-research",
+      "file": "skills/web-research/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "web-research",
+        "description": "Research changing technical facts from primary sources and convert findings into implementation decisions with traceability."
+      },
+      "bodyChars": 567,
+      "updatedAt": "2026-09-02T19:41:25.675Z"
+    }
+  ],
+  "mcpServers": [
+    {
+      "name": "context7",
+      "title": "Context7 Library Documentation",
+      "description": "Current library and framework documentation with version-aware examples.",
+      "transport": "http",
+      "url": "https://mcp.context7.com/mcp",
+      "keywords": [
+        "docs",
+        "library",
+        "framework",
+        "api",
+        "examples",
+        "npm",
+        "python"
+      ],
+      "enabled": true,
+      "lazy": true,
+      "source": "curated",
+      "status": "available",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "fetch-mcp",
+      "title": "MCP Fetch",
+      "description": "Retrieve and convert web content for language models.",
+      "transport": "stdio",
+      "command": "uvx",
+      "args": [
+        "mcp-server-fetch"
+      ],
+      "keywords": [
+        "fetch",
+        "web",
+        "url",
+        "http",
+        "content"
+      ],
+      "enabled": true,
+      "lazy": true,
+      "source": "curated",
+      "status": "available",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "memory-mcp",
+      "title": "MCP Knowledge Graph Memory",
+      "description": "Standard persistent knowledge graph memory server.",
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-memory"
+      ],
+      "keywords": [
+        "memory",
+        "knowledge graph",
+        "entities",
+        "relations"
+      ],
+      "enabled": true,
+      "lazy": true,
+      "source": "curated",
+      "status": "available",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "openai-docs",
+      "title": "OpenAI Developer Docs",
+      "description": "Search and read official OpenAI developer documentation.",
+      "transport": "http",
+      "url": "https://developers.openai.com/mcp",
+      "keywords": [
+        "openai",
+        "api",
+        "codex",
+        "chatgpt",
+        "responses",
+        "models",
+        "documentation"
+      ],
+      "enabled": true,
+      "lazy": true,
+      "source": "curated",
+      "status": "available",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "playwright",
+      "title": "Playwright Browser Automation",
+      "description": "Browser navigation, interaction, screenshots, accessibility snapshots, and UI testing.",
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@latest",
+        "--headless"
+      ],
+      "keywords": [
+        "browser",
+        "web",
+        "playwright",
+        "screenshot",
+        "ui",
+        "test",
+        "automation"
+      ],
+      "enabled": true,
+      "lazy": true,
+      "source": "curated",
+      "status": "available",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "sequential-thinking",
+      "title": "Sequential Thinking",
+      "description": "Structured multi-step reasoning tool for complex planning and revision.",
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ],
+      "keywords": [
+        "reasoning",
+        "planning",
+        "thinking",
+        "analysis"
+      ],
+      "enabled": true,
+      "lazy": true,
+      "source": "curated",
+      "status": "available",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "filesystem-mcp",
+      "title": "MCP Filesystem",
+      "description": "Standard MCP filesystem server. MaskShift already has native host filesystem tools; use for compatibility tests.",
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "${workspace}"
+      ],
+      "keywords": [
+        "filesystem",
+        "files",
+        "directories",
+        "mcp compatibility"
+      ],
+      "enabled": false,
+      "lazy": true,
+      "source": "curated",
+      "status": "disabled",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "git-mcp",
+      "title": "MCP Git",
+      "description": "Git repository inspection and operations through the standard Python MCP server.",
+      "transport": "stdio",
+      "command": "uvx",
+      "args": [
+        "mcp-server-git"
+      ],
+      "keywords": [
+        "git",
+        "history",
+        "branch",
+        "commit",
+        "diff"
+      ],
+      "enabled": false,
+      "lazy": true,
+      "source": "curated",
+      "status": "disabled",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    }
+  ]
+}

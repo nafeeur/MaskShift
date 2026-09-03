@@ -1,0 +1,34 @@
+{
+  "name": "maskshift",
+  "version": "1.0.0",
+  "description": "A maximalist, model-agnostic coding harness with lazy skills, tools, MCP and multi-agent orchestration.",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "maskshift": "./bin/maskshift.mjs"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "start": "node --no-warnings ./bin/maskshift.mjs",
+    "dev": "node --no-warnings --watch ./bin/maskshift.mjs --no-open",
+    "check": "node --no-warnings ./scripts/check.mjs",
+    "test": "node --no-warnings --test ./tests/*.test.mjs",
+    "smoke": "node --no-warnings ./scripts/smoke-test.mjs",
+    "verify": "npm run check && npm test && npm run smoke",
+    "docs": "node --no-warnings ./scripts/generate-docs.mjs",
+    "doctor": "node --no-warnings ./bin/maskshift.mjs doctor"
+  },
+  "keywords": [
+    "coding-agent",
+    "mcp",
+    "agent-skills",
+    "ai",
+    "developer-tools",
+    "ollama",
+    "openai",
+    "anthropic"
+  ],
+  "license": "MIT"
+}

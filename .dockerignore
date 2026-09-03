@@ -1,0 +1,11 @@
+.git
+.maskshift
+node_modules
+dist
+coverage
+*.log
+*.pid
+.env
+docs/screenshots
+MaskShift-*.zip
+MaskShift-*.tar.gz

@@ -1,0 +1,161 @@
+{
+  "version": 1,
+  "home": "~/.maskshift",
+  "host": "127.0.0.1",
+  "port": 4242,
+  "autoOpen": true,
+  "permissionMode": "overdrive",
+  "filesystemScope": "host",
+  "networkAccess": "unrestricted",
+  "maxAgentSteps": 96,
+  "maxSubagentDepth": 3,
+  "maxParallelSubagents": 6,
+  "maxToolOutputChars": 60000,
+  "maxContextChars": 420000,
+  "maxFileReadChars": 240000,
+  "commandTimeoutMs": 300000,
+  "mcpTimeoutMs": 60000,
+  "autoIndex": true,
+  "autoCheckpoint": true,
+  "autoLoadCapabilities": true,
+  "autoConnectMcp": true,
+  "defaultModel": "ollama:auto",
+  "dataFile": "~/.maskshift/maskshift.sqlite",
+  "logFile": "~/.maskshift/logs/maskshift.log",
+  "auditFile": "~/.maskshift/logs/audit.jsonl",
+  "skillsDirs": [
+    "~/.maskshift/skills",
+    "./.maskshift/skills",
+    "./.agents/skills",
+    "./.claude/skills",
+    "~/.codex/skills",
+    "~/.claude/skills",
+    "~/.copilot/skills"
+  ],
+  "pluginDirs": [
+    "~/.maskshift/plugins"
+  ],
+  "contextFiles": [
+    "AGENTS.md",
+    "CLAUDE.md",
+    "MASKSHIFT.md",
+    ".github/copilot-instructions.md",
+    ".cursorrules"
+  ],
+  "providers": [
+    {
+      "id": "ollama",
+      "name": "Ollama",
+      "type": "ollama",
+      "baseUrl": "http://127.0.0.1:11434",
+      "apiKeyEnv": null,
+      "enabled": true,
+      "autoDiscover": true,
+      "models": []
+    },
+    {
+      "id": "openai",
+      "name": "OpenAI",
+      "type": "openai-responses",
+      "baseUrl": "https://api.openai.com/v1",
+      "apiKeyEnv": "OPENAI_API_KEY",
+      "enabled": true,
+      "autoDiscover": true,
+      "models": []
+    },
+    {
+      "id": "anthropic",
+      "name": "Anthropic",
+      "type": "anthropic",
+      "baseUrl": "https://api.anthropic.com/v1",
+      "apiKeyEnv": "ANTHROPIC_API_KEY",
+      "enabled": true,
+      "autoDiscover": false,
+      "models": []
+    },
+    {
+      "id": "openrouter",
+      "name": "OpenRouter",
+      "type": "openai-compatible",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "apiKeyEnv": "OPENROUTER_API_KEY",
+      "enabled": true,
+      "autoDiscover": true,
+      "models": [],
+      "headers": {
+        "HTTP-Referer": "http://127.0.0.1:4242",
+        "X-Title": "MaskShift"
+      }
+    },
+    {
+      "id": "gemini",
+      "name": "Google Gemini",
+      "type": "gemini",
+      "baseUrl": "https://generativelanguage.googleapis.com/v1beta",
+      "apiKeyEnv": "GEMINI_API_KEY",
+      "enabled": true,
+      "autoDiscover": true,
+      "models": []
+    },
+    {
+      "id": "lmstudio",
+      "name": "LM Studio",
+      "type": "openai-compatible",
+      "baseUrl": "http://127.0.0.1:1234/v1",
+      "apiKeyEnv": null,
+      "enabled": true,
+      "autoDiscover": true,
+      "models": []
+    },
+    {
+      "id": "vllm",
+      "name": "vLLM / OpenAI-compatible",
+      "type": "openai-compatible",
+      "baseUrl": "http://127.0.0.1:8000/v1",
+      "apiKeyEnv": "VLLM_API_KEY",
+      "enabled": false,
+      "autoDiscover": true,
+      "models": []
+    }
+  ],
+  "mcpServers": {
+    "example-local": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@example/mcp-server", "${workspace}"],
+      "cwd": "${workspace}",
+      "env": {
+        "EXAMPLE_TOKEN": "${EXAMPLE_TOKEN}"
+      },
+      "enabled": false,
+      "lazy": true
+    },
+    "example-remote": {
+      "transport": "http",
+      "url": "https://example.invalid/mcp",
+      "headers": {
+        "Authorization": "Bearer ${EXAMPLE_REMOTE_TOKEN}"
+      },
+      "enabled": false,
+      "lazy": true
+    }
+  },
+  "agentBridges": {},
+  "automations": {
+    "enabled": true,
+    "pollIntervalMs": 1000,
+    "maxPerTick": 10
+  },
+  "browser": {
+    "executable": null,
+    "profilesDir": "~/.maskshift/browser/profiles",
+    "args": []
+  },
+  "hooks": {},
+  "ui": {
+    "density": "maximal",
+    "motion": true,
+    "telemetry": true,
+    "terminalHeight": 260
+  }
+}

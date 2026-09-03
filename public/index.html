@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#08080b">
+  <meta name="description" content="MaskShift — maximalist autonomous coding harness">
+  <link rel="icon" href="/assets/maskshift-mark.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/styles.css">
+  <title>MaskShift // Overdrive</title>
+</head>
+<body>
+  <div class="speed-field" aria-hidden="true"></div>
+  <div class="scanlines" aria-hidden="true"></div>
+  <div id="app" class="app-shell">
+    <header class="topbar">
+      <button class="brand" id="brandButton" title="MaskShift command center">
+        <img src="/assets/maskshift-mark.svg" alt="">
+        <span class="brand-copy"><b>MASK<span>SHIFT</span></b><small>MAXIMALIST CODING HARNESS</small></span>
+      </button>
+      <div class="topbar-slash"></div>
+      <label class="selector-block workspace-selector">
+        <span>TRACK</span>
+        <select id="workspaceSelect" aria-label="Workspace"></select>
+      </label>
+      <button class="icon-button cut" id="openWorkspaceButton" title="Open workspace">＋</button>
+      <label class="selector-block model-selector">
+        <span>ENGINE</span>
+        <select id="modelSelect" aria-label="Model"></select>
+      </label>
+      <div class="telemetry-strip">
+        <div class="telemetry-cell"><small>MODE</small><strong id="permissionMode">OVERDRIVE</strong></div>
+        <div class="telemetry-cell"><small>TOOLS</small><strong id="toolCount">000</strong></div>
+        <div class="telemetry-cell"><small>MCP</small><strong id="mcpCount">000</strong></div>
+        <div class="telemetry-cell signal"><small>CORE</small><strong id="coreStatus">SYNC</strong></div>
+      </div>
+      <button class="top-action" id="newSessionButton"><span>NEW RUN</span><kbd>⇧N</kbd></button>
+      <button class="icon-button" id="settingsButton" title="Settings">⚙</button>
+    </header>
+
+    <nav class="mobile-view-nav panel-frame" aria-label="MaskShift views">
+      <button class="nav-tab active" data-view="cockpit"><span>01</span>RUN</button>
+      <button class="nav-tab" data-view="files"><span>02</span>FILES</button>
+      <button class="nav-tab" data-view="capabilities"><span>03</span>TOOLS</button>
+      <button class="nav-tab" data-view="mcp"><span>04</span>MCP</button>
+      <button class="nav-tab" data-view="garage"><span>05</span>PIT</button>
+      <button class="mobile-new-run" id="mobileNewSessionButton" title="New run">＋</button>
+    </nav>
+
+    <aside class="left-rail panel-frame">
+      <div class="rail-heading">
+        <div><small>RUN ARCHIVE</small><h2>SESSIONS</h2></div>
+        <button class="mini-button" id="refreshSessionsButton" title="Refresh">↻</button>
+      </div>
+      <div class="search-box"><span>⌕</span><input id="sessionSearch" placeholder="FILTER RUNS" autocomplete="off"></div>
+      <div id="sessionList" class="session-list"></div>
+      <div class="rail-footer">
+        <button class="nav-tab active" data-view="cockpit"><span>01</span>COCKPIT</button>
+        <button class="nav-tab" data-view="files"><span>02</span>FILES</button>
+        <button class="nav-tab" data-view="capabilities"><span>03</span>LOADOUT</button>
+        <button class="nav-tab" data-view="mcp"><span>04</span>MCP GRID</button>
+        <button class="nav-tab" data-view="garage"><span>05</span>PIT GARAGE</button>
+      </div>
+    </aside>
+    <button class="mobile-rail-backdrop" id="mobileRailBackdrop" aria-label="Close session drawer"></button>
+
+    <main class="main-stage">
+      <section class="run-header panel-frame">
+        <div class="run-identity">
+          <span class="status-lamp" id="runLamp"></span>
+          <div><small id="runStatusLabel">READY / IDLE</small><h1 id="sessionTitle">MASKSHIFT READY</h1></div>
+        </div>
+        <div class="run-metrics">
+          <div><small>TURN</small><strong id="stepMetric">00</strong></div>
+          <div><small>ELAPSED</small><strong id="elapsedMetric">00:00</strong></div>
+          <div><small>INDEX</small><strong id="indexMetric">—</strong></div>
+          <div><small>BRANCH</small><strong id="branchMetric">—</strong></div>
+        </div>
+        <button class="emergency-button" id="stopRunButton" disabled><span>■</span> ABORT</button>
+      </section>
+
+      <section id="cockpitView" class="view active">
+        <div id="chatViewport" class="chat-viewport panel-frame">
+          <div id="emptyState" class="empty-state">
+            <div class="tachometer">
+              <div class="tach-ring"></div><div class="tach-needle"></div><span>∞</span>
+            </div>
+            <p class="eyebrow">FULL TOOL AUTHORITY // LAZY CONTEXT INJECTION</p>
+            <h2>EVERY CAPABILITY.<br><em>ONLY WHEN NEEDED.</em></h2>
+            <p>Describe the outcome. MaskShift maps the repository, selects skills and tools, connects MCP, edits, runs, verifies, and recovers without permission theater.</p>
+            <div class="starter-grid">
+              <button data-prompt="Map this repository, identify architectural risks, and propose the highest-impact improvements.">REPO X-RAY</button>
+              <button data-prompt="Find the most important broken or incomplete feature, implement it fully, and verify the result.">HUNT + FIX</button>
+              <button data-prompt="Review the current Git changes, repair defects, add missing tests, and run the relevant verification suite.">CHANGE REVIEW</button>
+            </div>
+          </div>
+          <div id="messageList" class="message-list"></div>
+        </div>
+        <form id="composer" class="composer panel-frame">
+          <div class="composer-gutter"><span>INPUT</span><b id="promptLines">01</b></div>
+          <textarea id="promptInput" rows="3" placeholder="TELL MASKSHIFT WHAT THE FINISH LINE LOOKS LIKE…" spellcheck="true"></textarea>
+          <div class="composer-controls">
+            <button type="button" class="chip-button" id="attachContextButton">＋ CONTEXT</button>
+            <button type="button" class="chip-button active" id="autoLoadButton">AUTO LOAD</button>
+            <button type="submit" class="launch-button" id="launchButton"><span>ENGAGE</span><small>CTRL ↵</small></button>
+          </div>
+          <div class="composer-meter"><i id="composerMeter"></i></div>
+        </form>
+      </section>
+
+      <section id="filesView" class="view split-view">
+        <div class="file-tree-deck panel-frame">
+          <div class="deck-title"><div><small>WORKSPACE MAP</small><h2>FILES</h2></div><button class="mini-button" id="refreshTreeButton">↻</button></div>
+          <div class="search-box"><span>⌕</span><input id="fileSearch" placeholder="FILTER PATHS"></div>
+          <div id="fileTree" class="file-tree"></div>
+        </div>
+        <div class="file-preview panel-frame">
+          <div class="preview-head"><div><small>SOURCE VIEW</small><h2 id="previewPath">SELECT A FILE</h2></div><button class="mini-button" id="copyFileButton">COPY</button></div>
+          <pre id="filePreview"><code>// File contents appear here.</code></pre>
+        </div>
+      </section>
+
+      <section id="capabilitiesView" class="view catalog-view panel-frame">
+        <div class="catalog-head">
+          <div><small>LAZY LOADOUT</small><h2>TOOLS + SKILLS</h2></div>
+          <div class="search-box wide"><span>⌕</span><input id="capabilitySearch" placeholder="SEARCH EVERY CAPABILITY"></div>
+        </div>
+        <div class="catalog-tabs"><button class="active" data-catalog="tools">LOCAL TOOLS</button><button data-catalog="skills">SKILLS</button></div>
+        <div id="capabilityCatalog" class="card-grid"></div>
+      </section>
+
+      <section id="mcpView" class="view catalog-view panel-frame">
+        <div class="catalog-head">
+          <div><small>MODEL CONTEXT PROTOCOL</small><h2>MCP GRID</h2></div>
+          <div class="catalog-actions"><button class="secondary-button" id="addMcpButton">ADD SERVER</button><button class="primary-button" id="registryButton">OFFICIAL REGISTRY</button></div>
+        </div>
+        <div class="search-box wide"><span>⌕</span><input id="mcpSearch" placeholder="FILTER INSTALLED + DISCOVERED SERVERS"></div>
+        <div id="mcpCatalog" class="card-grid mcp-grid"></div>
+      </section>
+
+      <section id="garageView" class="view catalog-view panel-frame">
+        <div class="catalog-head">
+          <div><small>EXTENSION + AUTONOMY BAY</small><h2>PIT GARAGE</h2></div>
+          <div class="catalog-actions">
+            <button class="secondary-button" id="garageRefreshButton">REFRESH</button>
+            <button class="primary-button" id="garagePrimaryButton">NEW AUTOMATION</button>
+          </div>
+        </div>
+        <div class="catalog-tabs garage-tabs">
+          <button class="active" data-garage="automations">AUTOMATIONS <b id="automationCount">0</b></button>
+          <button data-garage="plugins">PLUGINS <b id="pluginCount">0</b></button>
+          <button data-garage="bridges">AGENT BRIDGES <b id="bridgeCount">0</b></button>
+          <button data-garage="browser">BROWSER <b id="browserCount">0</b></button>
+        </div>
+        <div id="garageCatalog" class="card-grid"></div>
+      </section>
+    </main>
+
+    <aside class="right-deck panel-frame">
+      <div class="deck-tabs">
+        <button class="active" data-deck="plan">PLAN</button>
+        <button data-deck="telemetry">TELEMETRY</button>
+        <button data-deck="events">EVENTS</button>
+      </div>
+      <section class="deck-pane active" id="planPane">
+        <div class="deck-title"><div><small>EXECUTION LINE</small><h2>RACE PLAN</h2></div><span id="planProgress">0/0</span></div>
+        <div id="planList" class="plan-list"><div class="quiet-card">No plan yet. Multi-stage runs will publish one here.</div></div>
+      </section>
+      <section class="deck-pane" id="telemetryPane">
+        <div class="deck-title"><div><small>ACTIVE CONTEXT</small><h2>LOADOUT</h2></div></div>
+        <div class="gauge-grid">
+          <div class="gauge"><span>TOOLS</span><strong id="activeToolsMetric">—</strong><i></i></div>
+          <div class="gauge cyan"><span>SKILLS</span><strong id="activeSkillsMetric">—</strong><i></i></div>
+          <div class="gauge amber"><span>MCP</span><strong id="activeMcpMetric">—</strong><i></i></div>
+          <div class="gauge violet"><span>SUBAGENTS</span><strong id="subagentMetric">0</strong><i></i></div>
+        </div>
+        <div class="telemetry-list" id="activeCapabilityList"></div>
+      </section>
+      <section class="deck-pane" id="eventsPane">
+        <div class="deck-title"><div><small>LIVE BUS</small><h2>EVENT FEED</h2></div><button class="mini-button" id="clearEventsButton">CLR</button></div>
+        <div id="eventFeed" class="event-feed"></div>
+      </section>
+      <div class="git-panel">
+        <div class="deck-title"><div><small>REPOSITORY</small><h2>GIT PULSE</h2></div><button class="mini-button" id="refreshGitButton">↻</button></div>
+        <pre id="gitStatus">NO WORKSPACE SIGNAL</pre>
+      </div>
+    </aside>
+
+    <section class="terminal-deck panel-frame" id="terminalDeck">
+      <button class="terminal-handle" id="terminalToggle"><span>TERMINAL // HOST</span><i></i><small id="terminalCwd">~</small><b>⌃</b></button>
+      <div class="terminal-body">
+        <div id="terminalOutput" class="terminal-output"><div class="terminal-line muted">MaskShift host terminal ready. Commands execute with your full Unix account permissions.</div></div>
+        <form id="terminalForm" class="terminal-input"><span>❯</span><input id="terminalCommand" autocomplete="off" spellcheck="false" placeholder="run any command"><button>RUN</button></form>
+      </div>
+    </section>
+  </div>
+
+  <div id="toastStack" class="toast-stack"></div>
+
+  <dialog id="workspaceDialog" class="modal">
+    <form method="dialog" class="modal-shell" id="workspaceForm">
+      <div class="modal-head"><div><small>TRACK SELECT</small><h2>OPEN WORKSPACE</h2></div><button value="cancel" class="close-button">×</button></div>
+      <label>ABSOLUTE OR RELATIVE PATH<input id="workspacePathInput" value="." autocomplete="off"></label>
+      <p>MaskShift will detect Git, import project instructions and MCP configuration, and build a local context index.</p>
+      <div class="modal-actions"><button value="cancel" class="secondary-button">CANCEL</button><button value="default" class="primary-button" id="confirmWorkspaceButton">OPEN + INDEX</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="settingsDialog" class="modal wide-modal">
+    <form method="dialog" class="modal-shell" id="settingsForm">
+      <div class="modal-head"><div><small>CORE TUNING</small><h2>SETTINGS</h2></div><button value="cancel" class="close-button">×</button></div>
+      <div class="settings-grid">
+        <label>DEFAULT MODEL<input id="settingDefaultModel"></label>
+        <label>PERMISSION MODE<select id="settingPermission"><option value="overdrive">OVERDRIVE</option><option value="balanced">BALANCED</option><option value="review">REVIEW</option></select></label>
+        <label>MAX AGENT TURNS<input id="settingMaxSteps" type="number" min="1" max="1000"></label>
+        <label>MAX PARALLEL SUBAGENTS<input id="settingParallel" type="number" min="1" max="32"></label>
+        <label class="toggle-label"><input id="settingAutoIndex" type="checkbox"><span>AUTO INDEX REPOSITORIES</span></label>
+        <label class="toggle-label"><input id="settingAutoCheckpoint" type="checkbox"><span>AUTO CHECKPOINT BEFORE RUN</span></label>
+        <label class="toggle-label"><input id="settingAutoCapabilities" type="checkbox"><span>AUTO PRIME CAPABILITIES</span></label>
+        <label class="toggle-label"><input id="settingMotion" type="checkbox"><span>RACING MOTION EFFECTS</span></label>
+      </div>
+      <div class="modal-actions"><button value="cancel" class="secondary-button">CANCEL</button><button value="default" class="primary-button" id="saveSettingsButton">SAVE CORE</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="registryDialog" class="modal wide-modal">
+    <div class="modal-shell registry-shell">
+      <div class="modal-head"><div><small>LIVE CATALOG</small><h2>OFFICIAL MCP REGISTRY</h2></div><button class="close-button" data-close="registryDialog">×</button></div>
+      <form id="registrySearchForm" class="registry-search"><input id="registrySearchInput" placeholder="SEARCH SERVERS, DATABASES, BROWSERS, CLOUD…"><button class="primary-button">SEARCH</button></form>
+      <div id="registryResults" class="registry-results"><div class="quiet-card">Search the live registry to install remote or package-based MCP servers.</div></div>
+    </div>
+  </dialog>
+
+  <dialog id="mcpDialog" class="modal wide-modal">
+    <form method="dialog" class="modal-shell" id="mcpForm">
+      <div class="modal-head"><div><small>MANUAL LINK</small><h2>ADD MCP SERVER</h2></div><button value="cancel" class="close-button">×</button></div>
+      <div class="settings-grid">
+        <label>NAME<input id="mcpName" required placeholder="my-server"></label>
+        <label>TRANSPORT<select id="mcpTransport"><option value="stdio">STDIO</option><option value="http">STREAMABLE HTTP</option></select></label>
+        <label class="span-2" id="mcpCommandLabel">COMMAND<input id="mcpCommand" placeholder="npx -y @package/server"></label>
+        <label class="span-2 hidden" id="mcpUrlLabel">URL<input id="mcpUrl" placeholder="https://server.example/mcp"></label>
+        <label class="span-2">ENV / HEADERS JSON<textarea id="mcpEnvironment" rows="5" placeholder='{"API_KEY":"${API_KEY}"}'></textarea></label>
+      </div>
+      <div class="modal-actions"><button value="cancel" class="secondary-button">CANCEL</button><button value="default" class="primary-button" id="saveMcpButton">ADD LINK</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="automationDialog" class="modal wide-modal">
+    <form method="dialog" class="modal-shell" id="automationForm">
+      <div class="modal-head"><div><small>AUTONOMY SCHEDULER</small><h2>NEW AUTOMATION</h2></div><button value="cancel" class="close-button">×</button></div>
+      <div class="settings-grid">
+        <label>NAME<input id="automationName" required placeholder="Nightly repository verification"></label>
+        <label>SCHEDULE<input id="automationSchedule" required placeholder="every 6h / 0 2 * * * / ISO time"></label>
+        <label>ACTION TYPE<select id="automationActionType"><option value="agent">AGENT RUN</option><option value="shell">SHELL COMMAND</option><option value="tool">TOOL CALL</option></select></label>
+        <label>MODEL (OPTIONAL)<input id="automationModel" placeholder="ollama:auto"></label>
+        <label class="span-2" id="automationPromptLabel">PROMPT<textarea id="automationPrompt" rows="6" placeholder="Inspect the repository, fix regressions, run tests, and report the result."></textarea></label>
+        <label class="span-2 hidden" id="automationCommandLabel">COMMAND<textarea id="automationCommand" rows="4" placeholder="npm test"></textarea></label>
+        <label class="span-2 hidden" id="automationToolLabel">TOOL + ARGUMENTS JSON<textarea id="automationTool" rows="6" placeholder='{"name":"repo_index","arguments":{"force":true}}'></textarea></label>
+        <label class="toggle-label"><input id="automationEnabled" type="checkbox" checked><span>ENABLED IMMEDIATELY</span></label>
+      </div>
+      <div class="modal-actions"><button value="cancel" class="secondary-button">CANCEL</button><button value="default" class="primary-button">ARM AUTOMATION</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="pluginDialog" class="modal wide-modal">
+    <form method="dialog" class="modal-shell" id="pluginForm">
+      <div class="modal-head"><div><small>CAPABILITY PACK</small><h2>INSTALL PLUGIN</h2></div><button value="cancel" class="close-button">×</button></div>
+      <div class="settings-grid">
+        <label class="span-2">SOURCE<input id="pluginSource" required placeholder="/path/to/plugin, git URL, or npm package"></label>
+        <label>INSTALL TYPE<select id="pluginKind"><option value="auto">AUTO DETECT</option><option value="local">LOCAL DIRECTORY</option><option value="git">GIT REPOSITORY</option><option value="npm">NPM PACKAGE</option></select></label>
+        <label>LOCAL NAME (OPTIONAL)<input id="pluginName" placeholder="my-capability-pack"></label>
+      </div>
+      <p>Plugins execute inside the MaskShift daemon and can register tools, skill directories, MCP servers, and event listeners with full host authority.</p>
+      <div class="modal-actions"><button value="cancel" class="secondary-button">CANCEL</button><button value="default" class="primary-button">INSTALL + ACTIVATE</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="browserDialog" class="modal wide-modal">
+    <form method="dialog" class="modal-shell" id="browserForm">
+      <div class="modal-head"><div><small>CHROME DEVTOOLS PIPELINE</small><h2>LAUNCH BROWSER</h2></div><button value="cancel" class="close-button">×</button></div>
+      <div class="settings-grid">
+        <label>PROFILE<input id="browserProfile" value="default" placeholder="default"></label>
+        <label>START URL<input id="browserUrl" value="about:blank" placeholder="https://example.com"></label>
+        <label class="toggle-label"><input id="browserHeadless" type="checkbox" checked><span>HEADLESS MODE</span></label>
+        <label class="toggle-label"><input id="browserReuse" type="checkbox" checked><span>REUSE MATCHING PROFILE</span></label>
+      </div>
+      <p>Visible mode is useful for one-time login. Profiles persist under the MaskShift home directory and can then be reused by autonomous browser tools.</p>
+      <div class="modal-actions"><button value="cancel" class="secondary-button">CANCEL</button><button value="default" class="primary-button">IGNITE BROWSER</button></div>
+    </form>
+  </dialog>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

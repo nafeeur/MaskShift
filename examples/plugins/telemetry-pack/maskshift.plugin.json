@@ -1,0 +1,7 @@
+{
+  "name": "telemetry-pack",
+  "version": "1.0.0",
+  "description": "Example trusted plugin that adds runtime telemetry tools.",
+  "entry": "index.mjs",
+  "enabled": true
+}

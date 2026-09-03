@@ -2,8 +2,7 @@
 
 **A maximalist, model-agnostic coding harness with lazy capability loading and an unrestricted local execution model.**
 
-![MaskShift cockpit](<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/bc2e59db-024d-4392-abed-5f111497d0af" />
-)
+![MaskShift cockpit](docs/screenshots/cockpit-1920x1080.png)
 
 MaskShift gives a coding model one integrated control plane for repository understanding, file edits, host shell commands, Git recovery, language servers, browser automation, containers, databases, remote machines, persistent memory, scheduled work, plugins, external coding agents, skills, and MCP servers. The full catalog is always available to the harness, while only the capabilities relevant to the current step are inserted into model context.
 
@@ -248,4 +247,4 @@ A container limits MaskShift to the files, sockets, devices, and credentials mou
 
 Version `1.0.0` is a complete local product baseline rather than a UI mockup. The included automated suite covers configuration isolation, SQLite/FTS memory, nullable automation updates, modern and legacy MCP negotiation, lazy MCP dispatch, native host tools, repository indexing, plugin hot loading, one-shot scheduling, clean-state Git checkpoint restoration, HTTP APIs, and a two-turn tool-calling agent run.
 
-MaskShift is released under the GPL3 License.
+MaskShift is released under the MIT License.
