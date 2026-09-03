@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="public/assets/maskshift-mark.svg" alt="MaskShift" width="96">
+</p>
+
 # MaskShift
 
 **A maximalist, model-agnostic coding harness with lazy capability loading and an unrestricted local execution model.**
@@ -36,7 +40,7 @@ The daemon and web cockpit run on Node.js 22 using only built-in Node modules. T
 - **Autonomous repository context** from project instructions, manifests, repository tree, indexed code chunks (lexical + optional embedding-based semantic retrieval), stored memory, recent history, and Git state.
 - **Parallel and isolated agents** with independent sessions and optional Git worktrees.
 - **Permissive by default**: `permissionMode: "overdrive"`, host filesystem scope, unrestricted network setting, and no per-command approval dialogs.
-- **Redline racing cockpit** with live run telemetry, plans, tool traces, source browser, MCP grid, capability loadout, persistent terminal, plugin/automation garage, and responsive mobile navigation.
+- **Redline racing cockpit** with live run telemetry, plans, tool traces, source browser, MCP grid, capability loadout, persistent terminal, plugin/automation garage, and responsive mobile navigation, in a disciplined black/orange/white pit-lane design language with hazard-stripe and checkered-flag motion cues in place of arbitrary status colors.
 
 See [the complete native tool inventory](docs/TOOLS.md), [bundled skills](docs/SKILLS.md), [architecture](docs/ARCHITECTURE.md), and [local HTTP API](docs/API.md).
 

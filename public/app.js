@@ -116,7 +116,8 @@ function toast(message, type = '') {
 function setCoreStatus(text, mode = 'ok') {
   const node = $('#coreStatus');
   node.textContent = text;
-  node.style.color = mode === 'error' ? 'var(--amber)' : mode === 'busy' ? 'var(--red)' : 'var(--green)';
+  if (mode === 'ok') delete node.dataset.mode;
+  else node.dataset.mode = mode;
 }
 
 function populateWorkspaces() {
