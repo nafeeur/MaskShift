@@ -124,7 +124,7 @@ function populateWorkspaces() {
   const select = $('#workspaceSelect');
   select.innerHTML = '';
   const workspaces = app.state?.workspaces || [];
-  if (!workspaces.length) select.add(new Option('NO TRACK OPEN', ''));
+  if (!workspaces.length) select.add(new Option('NO TARGET OPEN', ''));
   for (const workspace of workspaces) select.add(new Option(`${workspace.name} — ${workspace.path}`, workspace.id));
   if (app.workspaceId && workspaces.some((item) => item.id === app.workspaceId)) select.value = app.workspaceId;
   $('#terminalCwd').textContent = currentWorkspace()?.path || '~';
@@ -178,7 +178,7 @@ function renderSessions() {
     <button class="session-card ${session.id === app.sessionId ? 'active' : ''}" data-session="${escapeHtml(session.id)}">
       <strong>${escapeHtml(session.title || 'Untitled run')}</strong>
       <span><i>${escapeHtml((session.model_id || 'AUTO').split(':').at(-1))}</i><i>${session.status === 'running' ? '● LIVE' : formatDate(session.updated_at)}</i></span>
-    </button>`).join('') : '<div class="quiet-card">No runs on this track yet.</div>';
+    </button>`).join('') : '<div class="quiet-card">No heists on this target yet.</div>';
   $$('[data-session]', list).forEach((button) => button.addEventListener('click', () => selectSession(button.dataset.session)));
 }
 
@@ -196,7 +196,7 @@ function clearSession() {
   app.messages = [];
   app.runId = null;
   app.runStatus = 'idle';
-  $('#sessionTitle').textContent = 'MASKSHIFT READY';
+  $('#sessionTitle').textContent = 'STANDBY FOR ORDERS';
   $('#messageList').innerHTML = '';
   $('#emptyState').classList.remove('hidden');
   updateRunUI();
@@ -215,7 +215,7 @@ async function selectSession(sessionId) {
   app.sessionId = sessionId;
   renderSessions();
   const session = app.sessions.find((item) => item.id === sessionId);
-  $('#sessionTitle').textContent = session?.title || 'MASKSHIFT RUN';
+  $('#sessionTitle').textContent = session?.title || 'MASKSHIFT HEIST';
   await loadMessages();
   const runs = await api(`/api/sessions/${encodeURIComponent(sessionId)}/runs?limit=1`);
   if (runs[0]) {
@@ -241,7 +241,7 @@ function renderMessages() {
     const calls = message.meta?.toolCalls || [];
     const body = message.content ? `<div class="message-body">${renderMarkdown(message.content)}</div>` : '';
     return `<article class="message ${message.role}">
-      <div class="message-head"><strong>${message.role === 'user' ? 'DRIVER' : 'MASKSHIFT'}</strong><span>${time}${message.meta?.modelRef ? ` / ${escapeHtml(message.meta.modelRef)}` : ''}</span></div>
+      <div class="message-head"><strong>${message.role === 'user' ? 'PHANTOM' : 'MASKSHIFT'}</strong><span>${time}${message.meta?.modelRef ? ` / ${escapeHtml(message.meta.modelRef)}` : ''}</span></div>
       ${body}
       ${calls.length ? `<div class="message-body tool-call-badges">${calls.map((call) => `<span>↯ ${escapeHtml(call.name)}</span>`).join('')}</div>` : ''}
     </article>`;
@@ -253,7 +253,7 @@ async function loadMessages() {
   if (!app.sessionId) return;
   app.messages = await api(`/api/sessions/${encodeURIComponent(app.sessionId)}/messages?limit=2000`);
   const session = app.sessions.find((item) => item.id === app.sessionId);
-  $('#sessionTitle').textContent = session?.title || 'MASKSHIFT RUN';
+  $('#sessionTitle').textContent = session?.title || 'MASKSHIFT HEIST';
   renderMessages();
 }
 
@@ -262,11 +262,11 @@ function updateRunUI(run = null) {
   app.runStatus = status;
   const live = ['queued', 'running'].includes(status);
   $('#runLamp').className = `status-lamp ${status}`;
-  $('#runStatusLabel').textContent = live ? `OVERDRIVE / ${status.toUpperCase()}` : status === 'completed' ? 'FINISH / VERIFIED' : status.toUpperCase();
+  $('#runStatusLabel').textContent = live ? `INFILTRATING / ${status.toUpperCase()}` : status === 'completed' ? 'HEIST COMPLETE / VERIFIED' : status.toUpperCase();
   $('#stepMetric').textContent = String(run?.step_count || 0).padStart(2, '0');
   $('#stopRunButton').disabled = !live;
   $('#launchButton').disabled = live;
-  $('#launchButton span').textContent = live ? 'RUNNING' : 'ENGAGE';
+  $('#launchButton span').textContent = live ? 'WORKING' : 'EXECUTE';
   if (live && !app.runStartedAt) app.runStartedAt = new Date(run?.started_at || Date.now()).getTime();
   if (!live && run) app.runStartedAt = null;
 }
@@ -323,7 +323,7 @@ async function launchRun(prompt) {
   $('#promptInput').value = '';
   resizePrompt();
   try {
-    setCoreStatus('IGNITION', 'busy');
+    setCoreStatus('LINKING', 'busy');
     const run = await api('/api/runs', {
       method: 'POST', body: {
         sessionId: app.sessionId, workspaceId: app.workspaceId,
@@ -343,7 +343,7 @@ async function launchRun(prompt) {
 
 async function stopRun() {
   if (!app.runId) return;
-  try { await api(`/api/runs/${encodeURIComponent(app.runId)}/cancel`, { method: 'POST', body: {} }); toast('Abort signal sent to run.', 'error'); }
+  try { await api(`/api/runs/${encodeURIComponent(app.runId)}/cancel`, { method: 'POST', body: {} }); toast('Retreat signal sent.', 'error'); }
   catch (error) { toast(error.message, 'error'); }
 }
 
@@ -356,7 +356,17 @@ function resizePrompt() {
   $('#composerMeter').style.width = `${Math.min(100, 3 + length / 35)}%`;
 }
 
+function playTransitionWipe() {
+  const wipe = $('#transitionWipe');
+  if (!wipe || document.body.classList.contains('no-motion')) return;
+  wipe.classList.remove('play');
+  void wipe.offsetWidth;
+  wipe.classList.add('play');
+  setTimeout(() => wipe.classList.remove('play'), 600);
+}
+
 function switchView(name) {
+  if (name !== app.currentView) playTransitionWipe();
   app.currentView = name;
   $$('.view').forEach((view) => view.classList.toggle('active', view.id === `${name}View`));
   $$('.nav-tab').forEach((button) => button.classList.toggle('active', button.dataset.view === name));
@@ -364,6 +374,23 @@ function switchView(name) {
   if (name === 'capabilities') void refreshCapabilities();
   if (name === 'mcp') void refreshMcp();
   if (name === 'garage') void refreshGarage();
+}
+
+let unmountHeroScene = null;
+async function syncHeroScene() {
+  const canvas = $('#heroCanvas');
+  if (!canvas) return;
+  const motionOn = document.body.classList.contains('no-motion') === false
+    && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (motionOn && !unmountHeroScene) {
+    try {
+      const { mountHeroScene } = await import('/hero-scene.mjs');
+      if ($('#heroCanvas') === canvas) unmountHeroScene = mountHeroScene(canvas);
+    } catch { /* WebGL unavailable — the CSS halftone backdrop still carries the hero. */ }
+  } else if (!motionOn && unmountHeroScene) {
+    unmountHeroScene();
+    unmountHeroScene = null;
+  }
 }
 
 async function refreshWorkspaceInspection() {
@@ -431,7 +458,7 @@ async function showCapabilityDetail(kind, name) {
 function showDetail(title, content) {
   const dialog = document.createElement('dialog');
   dialog.className = 'modal wide-modal';
-  dialog.innerHTML = `<div class="modal-shell"><div class="modal-head"><div><small>CAPABILITY DETAIL</small><h2>${escapeHtml(title)}</h2></div><button class="close-button">×</button></div><pre style="max-height:65vh;overflow:auto;padding:14px;background:#141414;color:#b7b7b7;font:10px/1.55 var(--mono);white-space:pre-wrap">${escapeHtml(content || '')}</pre></div>`;
+  dialog.innerHTML = `<div class="modal-shell"><div class="modal-head"><div><small>CAPABILITY DETAIL</small><h2>${escapeHtml(title)}</h2></div><button class="close-button">×</button></div><pre class="detail-pre">${escapeHtml(content || '')}</pre></div>`;
   document.body.append(dialog);
   dialog.querySelector('button').addEventListener('click', () => dialog.close());
   dialog.addEventListener('close', () => dialog.remove());
@@ -742,7 +769,7 @@ async function openWorkspace(path, { index = true, announce = true } = {}) {
   app.state = state; app.workspaceId = workspace.id; app.sessionId = null; app.runId = null;
   populateWorkspaces(); populateModels();
   await Promise.all([refreshSessions(), refreshWorkspaceInspection(), refreshMcp(), refreshCapabilities(), refreshGarage()]);
-  if (announce) toast(`Track loaded: ${workspace.path}`, 'success');
+  if (announce) toast(`Target loaded: ${workspace.path}`, 'success');
   return workspace;
 }
 
@@ -770,6 +797,7 @@ async function saveSettings() {
   app.state.config = await api('/api/config', { method: 'PATCH', body: patch });
   document.body.classList.toggle('no-motion', app.state.config.ui?.motion === false);
   $('#permissionMode').textContent = app.state.config.permissionMode.toUpperCase();
+  void syncHeroScene();
   toast('Core settings saved.', 'success');
 }
 
@@ -908,6 +936,7 @@ async function init() {
     $('#toolCount').textContent = String(app.state.toolCount || 0).padStart(3, '0');
     $('#mcpCount').textContent = String(app.state.mcpServers?.length || 0).padStart(3, '0');
     document.body.classList.toggle('no-motion', app.state.config.ui?.motion === false);
+    void syncHeroScene();
     populateWorkspaces(); populateModels(); connectEvents();
     await Promise.all([refreshSessions(true), refreshWorkspaceInspection(), refreshMcp(), refreshCapabilities(), refreshGarage()]);
     void refreshProviders();

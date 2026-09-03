@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-03T03:43:53.084Z",
+  "generatedAt": "2026-09-03T05:48:08.940Z",
   "version": "1.0.0",
   "nativeToolCount": 148,
   "bundledSkillCount": 36,
@@ -1535,17 +1535,17 @@
       "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
-      "name": "frontend-redline-ui",
-      "description": "Build MaskShift interfaces in the high-velocity black/red racing design language with sharp geometry, dense information, and clear hierarchy.",
-      "path": "skills/frontend-redline-ui",
-      "file": "skills/frontend-redline-ui/SKILL.md",
+      "name": "frontend-phantom-ui",
+      "description": "Build MaskShift interfaces in the maximalist black/red/white Phantom design language — angular panels, poster typography, and comic-panel motion inspired by stylized JRPG menu UI.",
+      "path": "skills/frontend-phantom-ui",
+      "file": "skills/frontend-phantom-ui/SKILL.md",
       "source": "bundled",
       "meta": {
-        "name": "frontend-redline-ui",
-        "description": "Build MaskShift interfaces in the high-velocity black/red racing design language with sharp geometry, dense information, and clear hierarchy."
+        "name": "frontend-phantom-ui",
+        "description": "Build MaskShift interfaces in the maximalist black/red/white Phantom design language — angular panels, poster typography, and comic-panel motion inspired by stylized JRPG menu UI."
       },
-      "bodyChars": 742,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "bodyChars": 1190,
+      "updatedAt": "2026-09-03T05:48:05.054Z"
     },
     {
       "name": "git-worktrees",

@@ -6,3 +6,4 @@ node_modules/
 .env
 coverage/
 dist/
+example_persona_5_reference/

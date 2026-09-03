@@ -1,6 +1,26 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="MaskShift">
-  <path fill="#100d09" stroke="#ff5e28" stroke-width="6" d="M12 18h67l29 27-10 57H27L8 75z"/>
-  <path fill="#ff5e28" d="M22 35h19l17 22 19-22h20L83 87H68l8-30-18 22-18-22 7 30H31z"/>
-  <path fill="#f5f0e6" d="M84 25h13l11 11-3 17z"/>
-  <path fill="#f5f0e6" d="M17 87h34l-4 9H21z"/>
+  <defs>
+    <clipPath id="ms-diamond">
+      <polygon points="60,3 117,60 60,117 3,60"/>
+    </clipPath>
+  </defs>
+
+  <polygon points="60,3 117,60 60,117 3,60" fill="#0a0a0c"/>
+
+  <g clip-path="url(#ms-diamond)">
+    <polygon points="-10,44 18,16 134,92 106,120" fill="#e2001b"/>
+    <polygon points="-10,86 46,10 60,20 6,120" fill="#f2eee6" opacity=".08"/>
+  </g>
+
+  <polygon points="60,3 117,60 60,117 3,60" fill="none" stroke="#f2eee6" stroke-width="3.5"/>
+
+  <g fill="#f2eee6">
+    <polygon points="15,57 40,39 57,48 50,66 27,72 17,64"/>
+    <polygon points="105,57 80,39 63,48 70,66 93,72 103,64"/>
+  </g>
+  <g fill="#0a0a0c">
+    <polygon points="57,48 63,48 66,57 60,61 54,57"/>
+  </g>
+
+  <path d="M96 20l3 7 7 3-7 3-3 7-3-7-7-3 7-3z" fill="#e2001b"/>
 </svg>

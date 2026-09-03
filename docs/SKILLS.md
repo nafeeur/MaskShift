@@ -19,7 +19,7 @@ MaskShift ships with **36 skills**. Descriptions are indexed at startup; full sk
 | `docker-kubernetes` | Containerize and operate development services with reproducible images, health checks, persistent state, and clear networking. | `skills/docker-kubernetes` |
 | `documentation` | Write accurate user, operator, API, and architecture documentation grounded in the implemented product. | `skills/documentation` |
 | `feature-implementation` | Implement production features end to end, including integration, error states, tests, documentation, and verification. | `skills/feature-implementation` |
-| `frontend-redline-ui` | Build MaskShift interfaces in the high-velocity black/red racing design language with sharp geometry, dense information, and clear hierarchy. | `skills/frontend-redline-ui` |
+| `frontend-phantom-ui` | Build MaskShift interfaces in the maximalist black/red/white Phantom design language — angular panels, poster typography, and comic-panel motion inspired by stylized JRPG menu UI. | `skills/frontend-phantom-ui` |
 | `git-worktrees` | Use Git worktrees and checkpoints for parallel agents, isolated changes, review, integration, and recovery. | `skills/git-worktrees` |
 | `go-engineering` | Implement idiomatic Go services and tools with context propagation, interfaces, concurrency discipline, and tests. | `skills/go-engineering` |
 | `incident-response` | Diagnose and stabilize production incidents, preserve evidence, restore service, and produce actionable follow-up work. | `skills/incident-response` |

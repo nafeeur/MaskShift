@@ -116,25 +116,25 @@ Exact model availability depends on the configured endpoint. Custom providers ca
 
 ## The cockpit
 
-The cockpit is a single-page racing-instrumentation UI for the daemon: track/model pickers, live run telemetry, a plan pane, tool traces, a source browser, and a persistent host terminal, all in one view.
+The cockpit is a single-page, maximalist black/red/white UI for the daemon — angular panels, poster type, and comic-panel motion over target/model pickers, live run telemetry, a plan pane, tool traces, a source browser, and a persistent host terminal, all in one view (pictured at the top of this document).
 
-**Loadout** searches every native tool and skill in the catalog, so you can see exactly what a run has access to before it uses it:
+**Arsenal** searches every native tool and skill in the catalog, so you can see exactly what a run has access to before it uses it:
 
 ![Tools and skills catalog](docs/screenshots/capabilities-1920x1080.png)
 
-**MCP Grid** lists every discovered Model Context Protocol server — bundled, workspace-configured, or pulled from the live MCP Registry — and connects one on demand:
+**Network** lists every discovered Model Context Protocol server — bundled, workspace-configured, or pulled from the live MCP Registry — and connects one on demand:
 
 ![MCP server grid](docs/screenshots/mcp-1920x1080.png)
 
-**Pit Garage** manages scheduled automations, installed plugins, external agent bridges, and browser profiles from one tab:
+**Mod Shop** manages scheduled automations, installed plugins, external agent bridges, and browser profiles from one tab:
 
-![Pit Garage automation view](docs/screenshots/garage-1920x1080.png)
+![Mod Shop automation view](docs/screenshots/garage-1920x1080.png)
 
-**Settings** tune the core engine — default model, permission mode, agent turn/subagent limits, indexing, and checkpoint behavior — without touching `config.json` by hand:
+**Settings** (the Velvet Room) tune the core engine — default model, permission mode, agent turn/subagent limits, indexing, and checkpoint behavior — without touching `config.json` by hand:
 
 ![Core settings dialog](docs/screenshots/settings-1920x1080.png)
 
-The layout collapses into a tabbed mobile navigation at narrow widths, so the same run, files, tools, MCP, and garage views work from a phone:
+The layout collapses into a tabbed mobile navigation at narrow widths, so the same run, files, tools, MCP, and mod-shop views work from a phone:
 
 <img src="docs/screenshots/cockpit-412x915.png" alt="MaskShift cockpit on a mobile viewport" width="360">
 
@@ -200,7 +200,7 @@ The agent can create and improve skills through native tools. A skill is a direc
 
 Plugins are trusted code loaded into the MaskShift daemon. A plugin can register native tools, skill directories, MCP servers, event listeners, and cleanup hooks.
 
-Install through the Pit Garage or use the tool/API:
+Install through the Mod Shop or use the tool/API:
 
 ```text
 plugin_install source=/absolute/path/to/plugin kind=local
@@ -218,7 +218,7 @@ These CLIs are not vendored into MaskShift. The bridge activates when the execut
 
 ## Automation
 
-The Pit Garage schedules three kinds of work:
+The Mod Shop schedules three kinds of work:
 
 - autonomous MaskShift agent runs;
 - direct native-tool calls;
@@ -241,7 +241,7 @@ Overdrive mode does not ask permission before executing. It still keeps recovery
 - isolated worktrees for parallel delegates;
 - append-only JSONL audit records;
 - persistent event and run history;
-- explicit Abort control in the cockpit.
+- explicit Retreat control in the cockpit.
 
 These are recovery features, not a sandbox. Read [the permissive execution model](docs/PERMISSIVE_MODE.md) before binding MaskShift beyond loopback.
 

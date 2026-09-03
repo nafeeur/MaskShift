@@ -3,12 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#ff6a00">
+  <meta name="theme-color" content="#e2001b">
   <meta name="description" content="MaskShift — maximalist autonomous coding harness">
   <link rel="icon" href="/assets/maskshift-mark.svg" type="image/svg+xml">
   <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="/styles.css">
-  <title>MaskShift // Overdrive</title>
+  <title>MaskShift // Phantom Protocol</title>
 </head>
 <body>
   <div id="app" class="app-shell">
@@ -18,46 +20,46 @@
         <span class="brand-copy"><b>MASK<span>SHIFT</span></b><small>MAXIMALIST CODING HARNESS</small></span>
       </button>
       <label class="selector-block workspace-selector">
-        <span>TRACK</span>
+        <span>TARGET</span>
         <select id="workspaceSelect" aria-label="Workspace"></select>
       </label>
       <button class="icon-button cut" id="openWorkspaceButton" title="Open workspace">＋</button>
       <label class="selector-block model-selector">
-        <span>ENGINE</span>
+        <span>PERSONA</span>
         <select id="modelSelect" aria-label="Model"></select>
       </label>
       <div class="telemetry-strip">
         <div class="telemetry-cell"><small>MODE</small><strong id="permissionMode">OVERDRIVE</strong></div>
         <div class="telemetry-cell"><small>TOOLS</small><strong id="toolCount">000</strong></div>
         <div class="telemetry-cell"><small>MCP</small><strong id="mcpCount">000</strong></div>
-        <div class="telemetry-cell signal"><small>CORE</small><strong id="coreStatus">SYNC</strong></div>
+        <div class="telemetry-cell signal"><small>LINK</small><strong id="coreStatus">SYNC</strong></div>
       </div>
-      <button class="top-action" id="newSessionButton"><span>NEW RUN</span><kbd>⇧N</kbd></button>
+      <button class="top-action" id="newSessionButton"><span>NEW HEIST</span><kbd>⇧N</kbd></button>
       <button class="icon-button" id="settingsButton" title="Settings">⚙</button>
     </header>
 
     <nav class="mobile-view-nav panel-frame" aria-label="MaskShift views">
-      <button class="nav-tab active" data-view="cockpit"><span>01</span>RUN</button>
+      <button class="nav-tab active" data-view="cockpit"><span>01</span>HEIST</button>
       <button class="nav-tab" data-view="files"><span>02</span>FILES</button>
-      <button class="nav-tab" data-view="capabilities"><span>03</span>TOOLS</button>
-      <button class="nav-tab" data-view="mcp"><span>04</span>MCP</button>
-      <button class="nav-tab" data-view="garage"><span>05</span>PIT</button>
-      <button class="mobile-new-run" id="mobileNewSessionButton" title="New run">＋</button>
+      <button class="nav-tab" data-view="capabilities"><span>03</span>ARSENAL</button>
+      <button class="nav-tab" data-view="mcp"><span>04</span>NET</button>
+      <button class="nav-tab" data-view="garage"><span>05</span>MODS</button>
+      <button class="mobile-new-run" id="mobileNewSessionButton" title="New heist">＋</button>
     </nav>
 
     <aside class="left-rail panel-frame">
       <div class="rail-heading">
-        <div><small>RUN ARCHIVE</small><h2>SESSIONS</h2></div>
+        <div><small>CASE ARCHIVE</small><h2>HEISTS</h2></div>
         <button class="mini-button" id="refreshSessionsButton" title="Refresh">↻</button>
       </div>
-      <div class="search-box"><span>⌕</span><input id="sessionSearch" placeholder="FILTER RUNS" autocomplete="off"></div>
+      <div class="search-box"><span>⌕</span><input id="sessionSearch" placeholder="FILTER HEISTS" autocomplete="off"></div>
       <div id="sessionList" class="session-list"></div>
       <div class="rail-footer">
-        <button class="nav-tab active" data-view="cockpit"><span>01</span>COCKPIT</button>
+        <button class="nav-tab active" data-view="cockpit"><span>01</span>HEIST</button>
         <button class="nav-tab" data-view="files"><span>02</span>FILES</button>
-        <button class="nav-tab" data-view="capabilities"><span>03</span>LOADOUT</button>
-        <button class="nav-tab" data-view="mcp"><span>04</span>MCP GRID</button>
-        <button class="nav-tab" data-view="garage"><span>05</span>PIT GARAGE</button>
+        <button class="nav-tab" data-view="capabilities"><span>03</span>ARSENAL</button>
+        <button class="nav-tab" data-view="mcp"><span>04</span>NETWORK</button>
+        <button class="nav-tab" data-view="garage"><span>05</span>MOD SHOP</button>
       </div>
     </aside>
     <button class="mobile-rail-backdrop" id="mobileRailBackdrop" aria-label="Close session drawer"></button>
@@ -66,7 +68,7 @@
       <section class="run-header panel-frame">
         <div class="run-identity">
           <span class="status-lamp" id="runLamp"></span>
-          <div><small id="runStatusLabel">READY / IDLE</small><h1 id="sessionTitle">MASKSHIFT READY</h1></div>
+          <div><small id="runStatusLabel">STANDBY / IDLE</small><h1 id="sessionTitle">STANDBY FOR ORDERS</h1></div>
         </div>
         <div class="run-metrics">
           <div><small>TURN</small><strong id="stepMetric">00</strong></div>
@@ -74,35 +76,36 @@
           <div><small>INDEX</small><strong id="indexMetric">—</strong></div>
           <div><small>BRANCH</small><strong id="branchMetric">—</strong></div>
         </div>
-        <button class="emergency-button" id="stopRunButton" disabled><span>■</span> ABORT</button>
+        <button class="emergency-button" id="stopRunButton" disabled><span>■</span> RETREAT</button>
       </section>
 
       <section id="cockpitView" class="view active">
         <div id="chatViewport" class="chat-viewport panel-frame">
           <div id="emptyState" class="empty-state">
+            <canvas id="heroCanvas" class="hero-canvas" aria-hidden="true"></canvas>
             <div class="rally-badge">
               <div class="badge-ring"></div>
               <span class="badge-number">00</span>
-              <small class="badge-caption">STANDBY</small>
+              <small class="badge-caption">AWAITING ORDERS</small>
             </div>
-            <p class="eyebrow">FULL TOOL AUTHORITY // LAZY CONTEXT INJECTION</p>
-            <h2>EVERY CAPABILITY.<br><em>ONLY WHEN NEEDED.</em></h2>
-            <p>Describe the outcome. MaskShift maps the repository, selects skills and tools, connects MCP, edits, runs, verifies, and recovers without permission theater.</p>
+            <p class="eyebrow">TOTAL ARSENAL ACCESS // SUMMONED ONLY WHEN NEEDED</p>
+            <h2>EVERY MASK.<br><em>ONLY WHEN NEEDED.</em></h2>
+            <p>Name the target. MaskShift studies the repository, summons the right skills and tools, links MCP, edits, runs, verifies, and recovers &mdash; no permission theater, no wasted moves.</p>
             <div class="starter-grid">
-              <button data-prompt="Map this repository, identify architectural risks, and propose the highest-impact improvements.">REPO X-RAY</button>
-              <button data-prompt="Find the most important broken or incomplete feature, implement it fully, and verify the result.">HUNT + FIX</button>
-              <button data-prompt="Review the current Git changes, repair defects, add missing tests, and run the relevant verification suite.">CHANGE REVIEW</button>
+              <button data-prompt="Map this repository, identify architectural risks, and propose the highest-impact improvements.">CASE THE REPO</button>
+              <button data-prompt="Find the most important broken or incomplete feature, implement it fully, and verify the result.">HUNT &amp; ELIMINATE</button>
+              <button data-prompt="Review the current Git changes, repair defects, add missing tests, and run the relevant verification suite.">REVIEW THE TAKE</button>
             </div>
           </div>
           <div id="messageList" class="message-list"></div>
         </div>
         <form id="composer" class="composer panel-frame">
           <div class="composer-gutter"><span>INPUT</span><b id="promptLines">01</b></div>
-          <textarea id="promptInput" rows="3" placeholder="TELL MASKSHIFT WHAT THE FINISH LINE LOOKS LIKE…" spellcheck="true"></textarea>
+          <textarea id="promptInput" rows="3" placeholder="TELL MASKSHIFT WHAT SUCCESS LOOKS LIKE…" spellcheck="true"></textarea>
           <div class="composer-controls">
             <button type="button" class="chip-button" id="attachContextButton">＋ CONTEXT</button>
             <button type="button" class="chip-button active" id="autoLoadButton">AUTO LOAD</button>
-            <button type="submit" class="launch-button" id="launchButton"><span>ENGAGE</span><small>CTRL ↵</small></button>
+            <button type="submit" class="launch-button" id="launchButton"><span>EXECUTE</span><small>CTRL ↵</small></button>
           </div>
           <div class="composer-meter"><i id="composerMeter"></i></div>
         </form>
@@ -122,16 +125,16 @@
 
       <section id="capabilitiesView" class="view catalog-view panel-frame">
         <div class="catalog-head">
-          <div><small>LAZY LOADOUT</small><h2>TOOLS + SKILLS</h2></div>
+          <div><small>SUMMONED ON DEMAND</small><h2>ARSENAL</h2></div>
           <div class="search-box wide"><span>⌕</span><input id="capabilitySearch" placeholder="SEARCH EVERY CAPABILITY"></div>
         </div>
-        <div class="catalog-tabs"><button class="active" data-catalog="tools">LOCAL TOOLS</button><button data-catalog="skills">SKILLS</button></div>
+        <div class="catalog-tabs"><button class="active" data-catalog="tools">TOOLS</button><button data-catalog="skills">SKILLS</button></div>
         <div id="capabilityCatalog" class="card-grid"></div>
       </section>
 
       <section id="mcpView" class="view catalog-view panel-frame">
         <div class="catalog-head">
-          <div><small>MODEL CONTEXT PROTOCOL</small><h2>MCP GRID</h2></div>
+          <div><small>MODEL CONTEXT PROTOCOL</small><h2>NETWORK</h2></div>
           <div class="catalog-actions"><button class="secondary-button" id="addMcpButton">ADD SERVER</button><button class="primary-button" id="registryButton">OFFICIAL REGISTRY</button></div>
         </div>
         <div class="search-box wide"><span>⌕</span><input id="mcpSearch" placeholder="FILTER INSTALLED + DISCOVERED SERVERS"></div>
@@ -140,7 +143,7 @@
 
       <section id="garageView" class="view catalog-view panel-frame">
         <div class="catalog-head">
-          <div><small>EXTENSION + AUTONOMY BAY</small><h2>PIT GARAGE</h2></div>
+          <div><small>EXTENSION + AUTONOMY BAY</small><h2>MOD SHOP</h2></div>
           <div class="catalog-actions">
             <button class="secondary-button" id="garageRefreshButton">REFRESH</button>
             <button class="primary-button" id="garagePrimaryButton">NEW AUTOMATION</button>
@@ -163,7 +166,7 @@
         <button data-deck="events">EVENTS</button>
       </div>
       <section class="deck-pane active" id="planPane">
-        <div class="deck-title"><div><small>EXECUTION LINE</small><h2>RACE PLAN</h2></div><span id="planProgress">0/0</span></div>
+        <div class="deck-title"><div><small>EXECUTION LINE</small><h2>PLAN OF ATTACK</h2></div><span id="planProgress">0/0</span></div>
         <div id="planList" class="plan-list"><div class="quiet-card">No plan yet. Multi-stage runs will publish one here.</div></div>
       </section>
       <section class="deck-pane" id="telemetryPane">
@@ -181,7 +184,7 @@
         <div id="eventFeed" class="event-feed"></div>
       </section>
       <div class="git-panel">
-        <div class="deck-title"><div><small>REPOSITORY</small><h2>GIT PULSE</h2></div><button class="mini-button" id="refreshGitButton">↻</button></div>
+        <div class="deck-title"><div><small>TARGET INTEL</small><h2>GIT PULSE</h2></div><button class="mini-button" id="refreshGitButton">↻</button></div>
         <pre id="gitStatus">NO WORKSPACE SIGNAL</pre>
       </div>
     </aside>
@@ -196,10 +199,11 @@
   </div>
 
   <div id="toastStack" class="toast-stack"></div>
+  <div id="transitionWipe" class="transition-wipe" aria-hidden="true"><span></span></div>
 
   <dialog id="workspaceDialog" class="modal">
     <form method="dialog" class="modal-shell" id="workspaceForm">
-      <div class="modal-head"><div><small>TRACK SELECT</small><h2>OPEN WORKSPACE</h2></div><button value="cancel" class="close-button">×</button></div>
+      <div class="modal-head"><div><small>TARGET SELECT</small><h2>OPEN WORKSPACE</h2></div><button value="cancel" class="close-button">×</button></div>
       <label>ABSOLUTE OR RELATIVE PATH<input id="workspacePathInput" value="." autocomplete="off"></label>
       <p>MaskShift will detect Git, import project instructions and MCP configuration, and build a local context index.</p>
       <div class="modal-actions"><button value="cancel" class="secondary-button">CANCEL</button><button value="default" class="primary-button" id="confirmWorkspaceButton">OPEN + INDEX</button></div>
@@ -208,7 +212,7 @@
 
   <dialog id="settingsDialog" class="modal wide-modal">
     <form method="dialog" class="modal-shell" id="settingsForm">
-      <div class="modal-head"><div><small>CORE TUNING</small><h2>SETTINGS</h2></div><button value="cancel" class="close-button">×</button></div>
+      <div class="modal-head"><div><small>VELVET ROOM</small><h2>SETTINGS</h2></div><button value="cancel" class="close-button">×</button></div>
       <div class="settings-grid">
         <label>DEFAULT MODEL<input id="settingDefaultModel"></label>
         <label>PERMISSION MODE<select id="settingPermission"><option value="overdrive">OVERDRIVE</option><option value="balanced">BALANCED</option><option value="review">REVIEW</option></select></label>
@@ -217,9 +221,9 @@
         <label class="toggle-label"><input id="settingAutoIndex" type="checkbox"><span>AUTO INDEX REPOSITORIES</span></label>
         <label class="toggle-label"><input id="settingAutoCheckpoint" type="checkbox"><span>AUTO CHECKPOINT BEFORE RUN</span></label>
         <label class="toggle-label"><input id="settingAutoCapabilities" type="checkbox"><span>AUTO PRIME CAPABILITIES</span></label>
-        <label class="toggle-label"><input id="settingMotion" type="checkbox"><span>RACING MOTION EFFECTS</span></label>
+        <label class="toggle-label"><input id="settingMotion" type="checkbox"><span>MOTION &amp; VFX</span></label>
       </div>
-      <div class="modal-actions"><button value="cancel" class="secondary-button">CANCEL</button><button value="default" class="primary-button" id="saveSettingsButton">SAVE CORE</button></div>
+      <div class="modal-actions"><button value="cancel" class="secondary-button">CANCEL</button><button value="default" class="primary-button" id="saveSettingsButton">CONFIRM</button></div>
     </form>
   </dialog>
 
@@ -285,7 +289,7 @@
         <label class="toggle-label"><input id="browserReuse" type="checkbox" checked><span>REUSE MATCHING PROFILE</span></label>
       </div>
       <p>Visible mode is useful for one-time login. Profiles persist under the MaskShift home directory and can then be reused by autonomous browser tools.</p>
-      <div class="modal-actions"><button value="cancel" class="secondary-button">CANCEL</button><button value="default" class="primary-button">IGNITE BROWSER</button></div>
+      <div class="modal-actions"><button value="cancel" class="secondary-button">CANCEL</button><button value="default" class="primary-button">LAUNCH BROWSER</button></div>
     </form>
   </dialog>
 
