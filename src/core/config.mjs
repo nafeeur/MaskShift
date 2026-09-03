@@ -35,6 +35,7 @@ function envProviderDefaults() {
       apiKeyEnv: 'ANTHROPIC_API_KEY',
       enabled: true,
       autoDiscover: false,
+      promptCaching: true,
       models: [],
     },
     {
@@ -125,6 +126,13 @@ export function defaultConfig() {
       embedBatchSize: 32,
       embedMaxChunks: 4000,
     },
+    memory: {
+      decayHalfLifeDays: 30,
+    },
+    pricing: {
+      currency: 'USD',
+      models: {},
+    },
     defaultModel: process.env.MASKSHIFT_MODEL || 'ollama:auto',
     dataFile: path.join(home, 'maskshift.sqlite'),
     logFile: path.join(home, 'logs', 'maskshift.log'),
@@ -174,6 +182,11 @@ function mergeConfig(base, override) {
   merged.automations = { ...base.automations, ...(override?.automations || {}) };
   merged.browser = { ...base.browser, ...(override?.browser || {}) };
   merged.indexing = { ...base.indexing, ...(override?.indexing || {}) };
+  merged.memory = { ...base.memory, ...(override?.memory || {}) };
+  merged.pricing = {
+    ...base.pricing, ...(override?.pricing || {}),
+    models: { ...(base.pricing?.models || {}), ...(override?.pricing?.models || {}) },
+  };
   merged.providers = mergeById(base.providers, override?.providers);
 
   const baseHome = absolutePath(base.home);

@@ -28,7 +28,8 @@ The daemon and web cockpit run on Node.js 22 using only built-in Node modules. T
 
 ## What is included
 
-- **146 native tools** across host filesystem, shell/process control, search/indexing, Git/worktrees/checkpoints, LSP, browsers/CDP, containers/Kubernetes, SSH/rsync, databases, runtimes, documents (PDF/Jupyter), artifacts, web retrieval, plugins, automations, memory, MCP, orchestration, and external-agent bridges.
+- **148 native tools** across host filesystem, shell/process control, search/indexing, Git/worktrees/checkpoints, LSP, browsers/CDP, containers/Kubernetes, SSH/rsync, databases, runtimes, documents (PDF/Jupyter), artifacts, web retrieval, plugins, automations, memory, MCP, orchestration, and external-agent bridges.
+- **Cost-aware execution**: Anthropic prompt-cache breakpoints on the stable system/tool/history prefix, decay- and access-aware memory ranking with automatic dedup and an optimize/prune tool, and a `usage_report` tool that aggregates token spend per model from a user-editable pricing table (never a guessed price).
 - **36 bundled skills**, with additional skills imported from MaskShift, Claude, Codex, Copilot, and workspace skill directories.
 - **Lazy MCP fabric** supporting stdio and Streamable HTTP, modern stateless MCP and legacy initialization-based MCP, resources, prompts, qualified tools, imported configs, and the live official MCP Registry.
 - **Multi-provider tool calling** for Ollama, OpenAI Responses, OpenAI-compatible servers, Anthropic, Gemini, OpenRouter, LM Studio, and vLLM.

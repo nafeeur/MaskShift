@@ -46,7 +46,7 @@ async function fetchJson(url, options, { signal, timeoutMs = 180_000 } = {}) {
 
 function normalizeToolCall(call, index = 0) {
   const name = call?.function?.name || call?.name || call?.functionCall?.name;
-  const rawArgs = call?.function?.arguments ?? call?.arguments ?? call?.functionCall?.args ?? {};
+  const rawArgs = call?.function?.arguments ?? call?.arguments ?? call?.functionCall?.args ?? call?.input ?? {};
   return {
     id: call.id || call.tool_call_id || `call_${Date.now()}_${index}`,
     name,
@@ -112,6 +112,17 @@ function toResponsesTools(tools) {
     parameters: tool.inputSchema || { type: 'object', properties: {} },
     strict: false,
   }));
+}
+
+function anthropicSystemBlocks(messages) {
+  const systemMessages = messages.filter((message) => message.role === 'system');
+  if (systemMessages.length === 1 && Array.isArray(systemMessages[0].blocks) && systemMessages[0].blocks.length) {
+    return systemMessages[0].blocks
+      .filter((block) => block.text)
+      .map((block) => (block.cacheable ? { type: 'text', text: block.text, cache_control: { type: 'ephemeral' } } : { type: 'text', text: block.text }));
+  }
+  const joined = systemMessages.map((message) => message.content).join('\n\n');
+  return joined ? [{ type: 'text', text: joined }] : [];
 }
 
 function mergeAnthropicMessages(messages) {
@@ -297,6 +308,9 @@ export class ProviderManager {
       else if (resolved.provider.type === 'gemini') result = await this.#gemini(resolved, messages, tools, { signal, temperature, maxTokens });
       else result = await this.#openAiCompatible(resolved, messages, tools, { signal, temperature, maxTokens });
       result.modelRef = resolved.ref;
+      result.providerId = resolved.provider.id;
+      result.providerType = resolved.provider.type;
+      result.model = resolved.model;
       result.durationMs = Date.now() - started;
       this.eventBus.emit('model.request.completed', {
         provider: resolved.provider.id, model: resolved.model, durationMs: result.durationMs,
@@ -402,14 +416,30 @@ export class ProviderManager {
 
   async #anthropic(resolved, messages, tools, { signal, temperature, maxTokens }) {
     const provider = resolved.provider;
+    const cachingEnabled = provider.promptCaching !== false;
     const converted = mergeAnthropicMessages(messages);
+
+    // Mark the conversation-so-far boundary as cacheable: everything before the newest turn is
+    // byte-identical to the previous request in this run, so Anthropic can reuse it from cache.
+    if (cachingEnabled && converted.messages.length > 1) {
+      const priorTurn = converted.messages[converted.messages.length - 2];
+      const lastBlock = priorTurn?.content?.at?.(-1);
+      if (lastBlock && typeof lastBlock === 'object') lastBlock.cache_control = { type: 'ephemeral' };
+    }
+
+    const toolDefs = tools.map((tool) => ({
+      name: tool.name, description: truncate(tool.description || '', 1024), input_schema: tool.inputSchema || { type: 'object', properties: {} },
+    }));
+    if (cachingEnabled && toolDefs.length) toolDefs[toolDefs.length - 1].cache_control = { type: 'ephemeral' };
+
+    const systemBlocks = cachingEnabled ? anthropicSystemBlocks(messages) : [];
     const body = {
       model: resolved.model,
       max_tokens: maxTokens,
       temperature,
-      system: converted.system,
+      system: systemBlocks.length ? systemBlocks : converted.system,
       messages: converted.messages,
-      ...(tools.length ? { tools: tools.map((tool) => ({ name: tool.name, description: truncate(tool.description || '', 1024), input_schema: tool.inputSchema || { type: 'object', properties: {} } })) } : {}),
+      ...(toolDefs.length ? { tools: toolDefs } : {}),
       ...provider.requestDefaults,
     };
     const data = await fetchJson(`${provider.baseUrl.replace(/\/$/, '')}/messages`, {

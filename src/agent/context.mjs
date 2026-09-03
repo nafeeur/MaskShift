@@ -38,7 +38,7 @@ export class ContextBuilder {
       this.workspaceManager.listFiles(workspaceId, { depth: 3, maxEntries: 1600, includeHidden: false }).catch(() => ({ entries: [], truncated: false })),
       this.workspaceManager.loadContextFiles(workspace.path).catch(() => []),
       indexStats?.chunks ? this.indexer.contextFor(workspaceId, prompt, { limit: 14, maxChars: 100_000 }).catch(() => []) : [],
-      this.store.searchMemories(prompt, { workspaceId, limit: 10 }),
+      this.store.searchMemories(prompt, { workspaceId, limit: 10, decayHalfLifeDays: this.config.get().memory?.decayHalfLifeDays || 30 }),
     ]);
 
     const sections = [

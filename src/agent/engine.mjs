@@ -1,4 +1,5 @@
 import { nowIso, runCommand, truncate } from '../core/utils.mjs';
+import { estimateUsageCost, summarizeCosts } from '../core/pricing.mjs';
 
 function titleFromPrompt(prompt) {
   return String(prompt || '').replace(/\s+/g, ' ').trim().slice(0, 78) || 'MaskShift run';
@@ -198,6 +199,7 @@ export class AgentEngine {
       let finalContent = '';
       let step = 0;
       let usage = [];
+      let costs = [];
 
       while (step < maxSteps) {
         if (signal.aborted) throw signal.reason || new Error('Run cancelled');
@@ -210,13 +212,14 @@ export class AgentEngine {
         this.#event(run.id, 'model-turn', { step, tools: tools.map((tool) => tool.name), skillCount: capabilityState.skills.size }, scope);
         const response = await this.providerManager.complete({
           modelRef: currentRun.model_id,
-          messages: [{ role: 'system', content: system }, ...history],
+          messages: [{ role: 'system', content: system.text, blocks: system.blocks }, ...history],
           tools,
           signal,
           temperature: entry.options.temperature ?? 0.1,
           maxTokens: entry.options.maxTokens || 16_384,
         });
         usage.push(response.usage);
+        costs.push(estimateUsageCost(this.config.get(), response.providerId, response.providerType, response.model, response.usage));
         const assistantMessage = {
           role: 'assistant', content: response.content || '', toolCalls: response.toolCalls || [],
         };
@@ -232,7 +235,7 @@ export class AgentEngine {
           const meta = {
             ...currentRun.meta, checkpointId: checkpoint?.id || null,
             capabilities: this.capabilityController.snapshot(capabilityState), plan: entry.planState,
-            usage,
+            usage, costEstimate: summarizeCosts(costs),
           };
           const completed = this.store.updateRun(run.id, { status: 'completed', ended_at: nowIso(), meta });
           this.store.updateSession(session.id, { status: 'idle', model_id: response.modelRef || currentRun.model_id });
@@ -270,7 +273,7 @@ export class AgentEngine {
       const current = this.store.getRun(run.id);
       const completed = this.store.updateRun(run.id, {
         status: 'max_steps', ended_at: nowIso(), error: message,
-        meta: { ...current.meta, capabilities: this.capabilityController.snapshot(capabilityState), plan: entry.planState, usage },
+        meta: { ...current.meta, capabilities: this.capabilityController.snapshot(capabilityState), plan: entry.planState, usage, costEstimate: summarizeCosts(costs) },
       });
       this.store.updateSession(session.id, { status: 'idle' });
       this.#event(run.id, 'max-steps', { message, final: finalContent }, scope);

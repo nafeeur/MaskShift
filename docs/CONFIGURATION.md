@@ -103,6 +103,35 @@ Provider entries are merged by `id` with built-in defaults.
 
 Supported `type` values are `ollama`, `openai-responses`, `openai-compatible`, `anthropic`, and `gemini`.
 
+An `anthropic` provider entry also accepts `promptCaching` (default `true`). When enabled, MaskShift marks the stable system-prompt block, the active tool schema list, and the conversation-so-far boundary with `cache_control: {"type": "ephemeral"}` breakpoints so a run's repeated turns reuse cached input tokens instead of rebilling them in full. Set `"promptCaching": false` on the provider entry if a proxy in front of the Anthropic-compatible endpoint rejects the `cache_control` field.
+
+## Memory ranking
+
+`memory` controls how `memory_search`/`memory_list` rank and age persistent memories.
+
+| Field | Default | Meaning |
+|---|---:|---|
+| `memory.decayHalfLifeDays` | `30` | A memory's recency contribution to ranking halves roughly every this many days since it was last saved or updated. Memories are never auto-deleted by decay alone — use `memory_optimize` to actually prune. |
+
+Ranking blends normalized text relevance, raw `importance`, and this recency decay; `memory_save` also deduplicates by same-scope/same-title (merging tags, keeping the higher importance) unless called with `dedupe: false`.
+
+## Cost estimation
+
+`pricing` is a user-editable table the `usage_report` tool and per-run `costEstimate` use to turn token counts into an estimated spend. MaskShift ships this **empty by default** — it never guesses a price. Local providers (Ollama) are always priced at `0` since there is no per-token provider charge.
+
+```json
+{
+  "pricing": {
+    "currency": "USD",
+    "models": {
+      "anthropic:claude-sonnet-5": { "inputPerMTok": 3, "outputPerMTok": 15, "cacheWritePerMTok": 3.75, "cacheReadPerMTok": 0.3 }
+    }
+  }
+}
+```
+
+Keys may be `"<providerId>:<model>"` or a bare model id. Verify current rates against your provider's own pricing page before relying on this for a real budget decision — prices change and this file will not update itself.
+
 ## MCP definitions
 
 ```json

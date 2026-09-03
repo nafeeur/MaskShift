@@ -6,6 +6,10 @@
 - Added `pdf_read` for text extraction from PDFs via `pdftotext` (poppler-utils), with page-range and layout controls.
 - Added `notebook_read` and `notebook_edit` for inspecting and editing Jupyter (`.ipynb`) notebook cells, clearing stale outputs on edit.
 - Repository indexing now computes optional embedding vectors (via a local Ollama embedding model) alongside the existing SQLite FTS index, and `repo_search` blends both with reciprocal rank fusion. Embeddings are reused by content hash across reindexes, and the feature degrades silently to lexical-only search when no embedding model is reachable.
+- Added Anthropic prompt caching: the stable system-prompt block (operating contract, repository context, capability catalog), the active tool schema list, and the conversation-so-far boundary are marked with `cache_control` breakpoints so a run's repeated turns reuse cached tokens instead of rebilling them. Disable per-provider with `promptCaching: false`.
+- Fixed a bug where the Anthropic provider never read a tool call's `input` field, so tool-call arguments were silently dropped for every Anthropic-backed run.
+- Added cost-estimation tooling: a new `usage_report` tool aggregates token usage and estimated spend per model across recent runs, and every completed run now carries a `costEstimate` in its metadata. Pricing comes only from the user-editable `pricing.models` config table (see `maskshift.config.example.json`); a model without a configured price is reported as token counts only, never a guessed cost. Local providers (Ollama) are always priced at zero.
+- Made persistent memory ranking decay- and access-aware: `memory_search`/`memory_list` blend text relevance, importance, and an exponential recency decay (`memory.decayHalfLifeDays`, default 30) instead of ranking on raw importance or bm25 alone. `memory_save` now deduplicates by same-scope/same-title, merging tags and taking the max importance instead of accumulating duplicates. Added `memory_optimize` to find and (with `dryRun: false`) merge duplicate-title memories and prune stale, low-importance, never-accessed ones.
 
 ## 1.0.0 — 2026-09-02
 

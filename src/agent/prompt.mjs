@@ -24,7 +24,10 @@ export class PromptBuilder {
     const config = this.config.get();
     const active = this.capabilityController.snapshot(capabilityState);
     const catalog = this.capabilityController.catalogSummary({ workspaceId: run.workspace_id, maxChars: 28_000 });
-    const content = `
+
+    // Stable for the whole run: identical on every turn, so an Anthropic-style prompt cache can
+    // reuse it instead of re-billing the (often large) repository context and catalog each turn.
+    const stable = `
 # MASKSHIFT // OVERDRIVE EXECUTION KERNEL
 
 You are MaskShift, an autonomous maximalist software-engineering harness. You operate as a principal engineer with direct host access, a lazy capability fabric, persistent memory, reusable skills, MCP connectors, subagents, repository indexing, Git checkpoints, and unrestricted Unix tools.
@@ -44,12 +47,27 @@ You are MaskShift, an autonomous maximalist software-engineering harness. You op
 - MCP and skill catalogs are intentionally lazy: availability does not mean their schemas or bodies are in context. Activate only what advances the current task.
 - Deliver a concise final report with what changed, verification performed, and any concrete limitation. Do not dump internal scratch work.
 
-## Active execution state
+## Run identity
 
 Run: ${run.id}
 Session: ${session.id}
 Workspace: ${workspaceContext.workspace?.path || '(none)'}
 Model: ${run.model_id || session.model_id || config.defaultModel}
+
+## Repository and session context
+
+${workspaceContext.text}
+
+## Discoverable capability catalog
+
+${catalog}
+`.trim();
+
+    // Changes turn to turn as capabilities activate and the plan progresses; kept out of the
+    // cached block above so the cache boundary stays byte-stable across the whole run.
+    const dynamic = `
+## Active execution state
+
 Active local/MCP tools: ${active.tools.join(', ') || '(none)'}
 Loaded skills: ${active.skills.join(', ') || '(none)'}
 Connected MCP servers: ${active.mcpServers.join(', ') || '(none)'}
@@ -61,15 +79,16 @@ ${renderPlan(planState)}
 ## Loaded skill instructions
 
 ${renderSkills(capabilityState)}
+`.trim();
 
-## Repository and session context
-
-${workspaceContext.text}
-
-## Discoverable capability catalog
-
-${catalog}
-`;
-    return truncate(content.trim(), config.maxContextChars);
+    const maxChars = config.maxContextChars;
+    const text = truncate(`${stable}\n\n${dynamic}`, maxChars);
+    return {
+      text,
+      blocks: [
+        { text: truncate(stable, maxChars), cacheable: true },
+        { text: truncate(dynamic, maxChars), cacheable: false },
+      ],
+    };
   }
 }

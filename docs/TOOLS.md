@@ -1,6 +1,6 @@
 # Native Tool Inventory
 
-Generated from the MaskShift 1.0.0 runtime. **146 native tools** are available before plugins or MCP servers add more capabilities.
+Generated from the MaskShift 1.0.0 runtime. **148 native tools** are available before plugins or MCP servers add more capabilities.
 
 Only activated descriptors enter a model request; this document is the complete local catalog.
 
@@ -147,14 +147,15 @@ Only activated descriptors enter a model request; this document is the complete 
 | `mcp_resources` | read | normal | Connect to a server and list its MCP resources. |
 | `mcp_search` | read | normal | Search discovered MCP servers and tools already known to MaskShift. Servers remain lazy until connected. |
 
-## memory (4)
+## memory (5)
 
 | Tool | Access | Risk | Description |
 |---|---|---|---|
 | `memory_delete` | write | write | Delete a memory by ID. |
-| `memory_list` | read | normal | List the highest-priority project and global memories. |
-| `memory_save` | write | write | Save a durable project or global fact, architectural decision, convention, result, or reusable lesson. |
-| `memory_search` | read | normal | Search project and global long-term memory using SQLite full-text ranking. |
+| `memory_list` | read | normal | List memories ordered by effective importance: raw importance blended with a recency decay so stale, untouched memories sink without being deleted. |
+| `memory_optimize` | write | write | Find duplicate-title memories to merge and stale, low-importance, never-accessed memories to prune. Defaults to a dry run that only reports candidates; set dryRun to false to apply the merge and prune. |
+| `memory_save` | write | write | Save a durable project or global fact, architectural decision, convention, result, or reusable lesson. Automatically merges into an existing memory with the same title in the same scope instead of creating a duplicate, unless dedupe is set to false. |
+| `memory_search` | read | normal | Search project and global long-term memory, ranked by a blend of text relevance, importance, and recency (older, untouched memories decay in rank without being deleted). |
 
 ## orchestration (9)
 
@@ -182,7 +183,7 @@ Only activated descriptors enter a model request; this document is the complete 
 | `plugin_scaffold` | write | write | Generate and activate a complete single-tool MaskShift plugin scaffold. |
 | `plugin_scan` | write | host-exec | Rescan user and workspace plugin directories and activate newly discovered plugins. |
 
-## project (7)
+## project (8)
 
 | Tool | Access | Risk | Description |
 |---|---|---|---|
@@ -193,6 +194,7 @@ Only activated descriptors enter a model request; this document is the complete 
 | `project_tree` | read | normal | Render a bounded source tree for any workspace subdirectory. |
 | `provider_list` | read | normal | Inspect configured model providers, connectivity status, and discovered models. |
 | `session_history` | read | normal | Read messages and recent runs from the current MaskShift session. |
+| `usage_report` | read | normal | Aggregate model token usage and estimated spend across recent runs, grouped by model, using the pricing table in config. Models without a configured price are reported as token counts only (priced:false), never guessed. |
 
 ## remote (2)
 

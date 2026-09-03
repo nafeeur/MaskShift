@@ -17,7 +17,7 @@ Local HTTP daemon ───── SSE event stream ───── audit + telem
         │     ├── capability controller
         │     └── plan / tool / subagent loop
         │
-        ├── Native tool registry (146 tools)
+        ├── Native tool registry (148 tools)
         ├── Skill manager (metadata eager, body lazy)
         ├── MCP manager (definition eager, connection/schema lazy)
         ├── Workspace + index + checkpoint managers

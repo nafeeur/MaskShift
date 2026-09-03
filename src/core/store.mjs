@@ -105,7 +105,9 @@ export class Store {
         importance REAL NOT NULL DEFAULT 0.5,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
-        meta TEXT NOT NULL DEFAULT '{}'
+        meta TEXT NOT NULL DEFAULT '{}',
+        access_count INTEGER NOT NULL DEFAULT 0,
+        last_accessed_at TEXT
       );
 
       CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(
@@ -177,6 +179,8 @@ export class Store {
     for (const statement of [
       'ALTER TABLE repo_chunks ADD COLUMN embedding TEXT',
       'ALTER TABLE repo_chunks ADD COLUMN embedding_model TEXT',
+      'ALTER TABLE memories ADD COLUMN access_count INTEGER NOT NULL DEFAULT 0',
+      'ALTER TABLE memories ADD COLUMN last_accessed_at TEXT',
     ]) {
       try { this.db.exec(statement); } catch { /* column already present on an existing database */ }
     }
@@ -305,10 +309,14 @@ export class Store {
     return parseFields(this.db.prepare('SELECT * FROM runs WHERE id = ?').get(runId), ['meta']);
   }
 
-  listRuns({ sessionId, limit = 100 } = {}) {
-    const rows = sessionId
-      ? this.db.prepare('SELECT * FROM runs WHERE session_id = ? ORDER BY started_at DESC LIMIT ?').all(sessionId, limit)
-      : this.db.prepare('SELECT * FROM runs ORDER BY started_at DESC LIMIT ?').all(limit);
+  listRuns({ sessionId, workspaceId, since, limit = 100 } = {}) {
+    const clauses = [];
+    const args = [];
+    if (sessionId) { clauses.push('session_id = ?'); args.push(sessionId); }
+    if (workspaceId) { clauses.push('workspace_id = ?'); args.push(workspaceId); }
+    if (since) { clauses.push('started_at >= ?'); args.push(since); }
+    const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+    const rows = this.db.prepare(`SELECT * FROM runs ${where} ORDER BY started_at DESC LIMIT ?`).all(...args, limit);
     return rows.map((row) => parseFields(row, ['meta']));
   }
 
@@ -324,55 +332,100 @@ export class Store {
       .all(runId, limit).map((row) => parseFields(row, ['payload']));
   }
 
-  saveMemory({ id: memoryId, workspaceId = null, scope = 'workspace', title, content, tags = [], importance = 0.5, meta = {} }) {
-    const existing = memoryId ? this.db.prepare('SELECT id, created_at FROM memories WHERE id = ?').get(memoryId) : null;
+  saveMemory({ id: memoryId, workspaceId = null, scope = 'workspace', title, content, tags = [], importance = 0.5, meta = {}, dedupe = true }) {
+    let existing = memoryId ? this.db.prepare('SELECT id, created_at, tags, importance FROM memories WHERE id = ?').get(memoryId) : null;
+    if (!existing && dedupe && title) {
+      const normalizedTitle = String(title).trim().toLowerCase();
+      existing = workspaceId
+        ? this.db.prepare(`SELECT id, created_at, tags, importance FROM memories
+            WHERE scope = ? AND workspace_id = ? AND lower(trim(title)) = ?`).get(scope, workspaceId, normalizedTitle)
+        : this.db.prepare(`SELECT id, created_at, tags, importance FROM memories
+            WHERE scope = ? AND workspace_id IS NULL AND lower(trim(title)) = ?`).get(scope, normalizedTitle);
+    }
+    const mergedTags = existing ? [...new Set([...safeJsonParse(existing.tags, []), ...tags])] : tags;
+    const mergedImportance = existing ? Math.max(Number(existing.importance) || 0, importance) : importance;
     const memory = {
-      id: existing?.id || id('mem'), workspace_id: workspaceId, scope, title, content, tags,
-      importance, created_at: existing?.created_at || nowIso(), updated_at: nowIso(), meta,
+      id: existing?.id || id('mem'), workspace_id: workspaceId, scope, title, content, tags: mergedTags,
+      importance: mergedImportance, created_at: existing?.created_at || nowIso(), updated_at: nowIso(), meta,
     };
     this.transaction(() => {
-      this.db.prepare(`INSERT INTO memories(id, workspace_id, scope, title, content, tags, importance, created_at, updated_at, meta)
-        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      this.db.prepare(`INSERT INTO memories(id, workspace_id, scope, title, content, tags, importance, created_at, updated_at, meta, access_count, last_accessed_at)
+        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL)
         ON CONFLICT(id) DO UPDATE SET workspace_id=excluded.workspace_id, scope=excluded.scope, title=excluded.title,
           content=excluded.content, tags=excluded.tags, importance=excluded.importance, updated_at=excluded.updated_at, meta=excluded.meta`)
-        .run(memory.id, memory.workspace_id, memory.scope, memory.title, memory.content, JSON.stringify(tags), importance,
+        .run(memory.id, memory.workspace_id, memory.scope, memory.title, memory.content, JSON.stringify(mergedTags), mergedImportance,
           memory.created_at, memory.updated_at, JSON.stringify(meta));
       this.db.prepare('DELETE FROM memory_fts WHERE memory_id = ?').run(memory.id);
       this.db.prepare('INSERT INTO memory_fts(memory_id, workspace_id, title, content, tags) VALUES(?, ?, ?, ?, ?)')
-        .run(memory.id, workspaceId || '', title, content, tags.join(' '));
+        .run(memory.id, workspaceId || '', title, content, mergedTags.join(' '));
     });
-    return memory;
+    return { ...memory, merged: Boolean(existing) };
   }
 
   getMemory(memoryId) {
     return parseFields(this.db.prepare('SELECT * FROM memories WHERE id = ?').get(memoryId), ['tags', 'meta']);
   }
 
-  listMemories({ workspaceId, scope, limit = 200 } = {}) {
+  #touchMemories(memoryIds) {
+    const ids = [...new Set(memoryIds)];
+    if (!ids.length) return;
+    const statement = this.db.prepare('UPDATE memories SET access_count = access_count + 1, last_accessed_at = ? WHERE id = ?');
+    const now = nowIso();
+    this.transaction(() => { for (const memoryId of ids) statement.run(now, memoryId); });
+  }
+
+  listMemories({ workspaceId, scope, limit = 200, decayHalfLifeDays = 30 } = {}) {
     const clauses = [];
     const args = [];
     if (workspaceId) { clauses.push('(workspace_id = ? OR scope = \'global\')'); args.push(workspaceId); }
     if (scope) { clauses.push('scope = ?'); args.push(scope); }
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
-    return this.db.prepare(`SELECT * FROM memories ${where} ORDER BY importance DESC, updated_at DESC LIMIT ?`)
-      .all(...args, limit).map((row) => parseFields(row, ['tags', 'meta']));
+    const rows = this.db.prepare(`SELECT * FROM memories ${where} ORDER BY updated_at DESC LIMIT 5000`)
+      .all(...args).map((row) => parseFields(row, ['tags', 'meta']));
+    const now = Date.now();
+    const scored = rows.map((memory) => {
+      const ageDays = Math.max(0, (now - Date.parse(memory.updated_at)) / 86_400_000);
+      const recencyScore = Math.exp(-ageDays / Math.max(1, decayHalfLifeDays));
+      const effectiveImportance = (Number(memory.importance) || 0) * 0.7 + recencyScore * 0.3;
+      return { ...memory, recencyScore, effectiveImportance };
+    });
+    scored.sort((a, b) => b.effectiveImportance - a.effectiveImportance);
+    return scored.slice(0, limit);
   }
 
-  searchMemories(query, { workspaceId, limit = 12 } = {}) {
-    if (!String(query || '').trim()) return this.listMemories({ workspaceId, limit });
+  searchMemories(query, { workspaceId, limit = 12, decayHalfLifeDays = 30 } = {}) {
+    if (!String(query || '').trim()) return this.listMemories({ workspaceId, limit, decayHalfLifeDays });
     const match = ftsQuery(query);
+    const candidateLimit = Math.min(Math.max(limit * 3, 30), 100);
+    let rows;
     try {
-      const rows = workspaceId
-        ? this.db.prepare(`SELECT memory_id, bm25(memory_fts) AS rank, snippet(memory_fts, 3, '<b>', '</b>', ' … ', 24) AS snippet
-            FROM memory_fts WHERE memory_fts MATCH ? AND (workspace_id = ? OR workspace_id = '') ORDER BY rank LIMIT ?`)
-          .all(match, workspaceId, limit)
-        : this.db.prepare(`SELECT memory_id, bm25(memory_fts) AS rank, snippet(memory_fts, 3, '<b>', '</b>', ' … ', 24) AS snippet
-            FROM memory_fts WHERE memory_fts MATCH ? ORDER BY rank LIMIT ?`).all(match, limit);
-      return rows.map((row) => ({ ...this.getMemory(row.memory_id), rank: row.rank, snippet: row.snippet }));
+      rows = workspaceId
+        ? this.db.prepare(`SELECT memory_id, snippet(memory_fts, 3, '<b>', '</b>', ' … ', 24) AS snippet
+            FROM memory_fts WHERE memory_fts MATCH ? AND (workspace_id = ? OR workspace_id = '') ORDER BY bm25(memory_fts) LIMIT ?`)
+          .all(match, workspaceId, candidateLimit)
+        : this.db.prepare(`SELECT memory_id, snippet(memory_fts, 3, '<b>', '</b>', ' … ', 24) AS snippet
+            FROM memory_fts WHERE memory_fts MATCH ? ORDER BY bm25(memory_fts) LIMIT ?`).all(match, candidateLimit);
     } catch {
-      return this.listMemories({ workspaceId, limit }).filter((item) =>
+      const fallback = this.listMemories({ workspaceId, limit, decayHalfLifeDays }).filter((item) =>
         `${item.title} ${item.content} ${(item.tags || []).join(' ')}`.toLowerCase().includes(String(query).toLowerCase()));
+      this.#touchMemories(fallback.map((item) => item.id));
+      return fallback;
     }
+    const now = Date.now();
+    const scored = rows.map((row, index) => {
+      const memory = this.getMemory(row.memory_id);
+      if (!memory) return null;
+      const relevanceScore = rows.length > 1 ? 1 - index / (rows.length - 1) : 1;
+      const ageDays = Math.max(0, (now - Date.parse(memory.updated_at)) / 86_400_000);
+      const recencyScore = Math.exp(-ageDays / Math.max(1, decayHalfLifeDays));
+      const importanceScore = Number(memory.importance) || 0;
+      const blendedScore = relevanceScore * 0.55 + importanceScore * 0.30 + recencyScore * 0.15;
+      return { ...memory, snippet: row.snippet, relevanceScore, importanceScore, recencyScore, blendedScore };
+    }).filter(Boolean);
+    scored.sort((a, b) => b.blendedScore - a.blendedScore);
+    const top = scored.slice(0, limit);
+    this.#touchMemories(top.map((item) => item.id));
+    return top;
   }
 
   deleteMemory(memoryId) {

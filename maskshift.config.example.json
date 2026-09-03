@@ -71,6 +71,7 @@
       "apiKeyEnv": "ANTHROPIC_API_KEY",
       "enabled": true,
       "autoDiscover": false,
+      "promptCaching": true,
       "models": []
     },
     {
@@ -156,6 +157,13 @@
     "embedModel": "nomic-embed-text",
     "embedBatchSize": 32,
     "embedMaxChunks": 4000
+  },
+  "memory": {
+    "decayHalfLifeDays": 30
+  },
+  "pricing": {
+    "currency": "USD",
+    "models": {}
   },
   "hooks": {},
   "ui": {

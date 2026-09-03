@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-09-03T03:23:45.248Z",
+  "generatedAt": "2026-09-03T03:43:53.084Z",
   "version": "1.0.0",
-  "nativeToolCount": 146,
+  "nativeToolCount": 148,
   "bundledSkillCount": 36,
   "curatedMcpCount": 8,
   "tools": [
@@ -809,16 +809,25 @@
     {
       "name": "memory_list",
       "title": "List persistent memories",
-      "description": "List the highest-priority project and global memories.",
+      "description": "List memories ordered by effective importance: raw importance blended with a recency decay so stale, untouched memories sink without being deleted.",
       "category": "memory",
       "readOnly": true,
       "risk": "normal",
       "alwaysAvailable": false
     },
     {
+      "name": "memory_optimize",
+      "title": "Optimize persistent memory",
+      "description": "Find duplicate-title memories to merge and stale, low-importance, never-accessed memories to prune. Defaults to a dry run that only reports candidates; set dryRun to false to apply the merge and prune.",
+      "category": "memory",
+      "readOnly": false,
+      "risk": "write",
+      "alwaysAvailable": false
+    },
+    {
       "name": "memory_save",
       "title": "Save persistent memory",
-      "description": "Save a durable project or global fact, architectural decision, convention, result, or reusable lesson.",
+      "description": "Save a durable project or global fact, architectural decision, convention, result, or reusable lesson. Automatically merges into an existing memory with the same title in the same scope instead of creating a duplicate, unless dedupe is set to false.",
       "category": "memory",
       "readOnly": false,
       "risk": "write",
@@ -827,7 +836,7 @@
     {
       "name": "memory_search",
       "title": "Search persistent memory",
-      "description": "Search project and global long-term memory using SQLite full-text ranking.",
+      "description": "Search project and global long-term memory, ranked by a blend of text relevance, importance, and recency (older, untouched memories decay in rank without being deleted).",
       "category": "memory",
       "readOnly": true,
       "risk": "normal",
@@ -1035,6 +1044,15 @@
       "name": "session_history",
       "title": "Read session history",
       "description": "Read messages and recent runs from the current MaskShift session.",
+      "category": "project",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "usage_report",
+      "title": "Report token usage and estimated cost",
+      "description": "Aggregate model token usage and estimated spend across recent runs, grouped by model, using the pricing table in config. Models without a configured price are reported as token counts only (priced:false), never guessed.",
       "category": "project",
       "readOnly": true,
       "risk": "normal",
