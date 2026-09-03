@@ -4,7 +4,7 @@
   "description": "Maximalist autonomous coding harness",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#050507",
-  "theme_color": "#ff243d",
+  "background_color": "#0b0a08",
+  "theme_color": "#ff5e28",
   "icons": [{"src":"/assets/maskshift-mark.svg","sizes":"any","type":"image/svg+xml"}]
 }
