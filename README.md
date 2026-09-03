@@ -247,4 +247,4 @@ A container limits MaskShift to the files, sockets, devices, and credentials mou
 
 Version `1.0.0` is a complete local product baseline rather than a UI mockup. The included automated suite covers configuration isolation, SQLite/FTS memory, nullable automation updates, modern and legacy MCP negotiation, lazy MCP dispatch, native host tools, repository indexing, plugin hot loading, one-shot scheduling, clean-state Git checkpoint restoration, HTTP APIs, and a two-turn tool-calling agent run.
 
-MaskShift is released under the MIT License.
+MaskShift is released under the GNU General Public License v3.0.

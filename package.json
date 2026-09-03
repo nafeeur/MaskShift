@@ -30,5 +30,5 @@
     "openai",
     "anthropic"
   ],
-  "license": "MIT"
+  "license": "GPL-3.0-only"
 }
