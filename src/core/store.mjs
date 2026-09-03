@@ -126,7 +126,9 @@ export class Store {
         end_line INTEGER NOT NULL,
         content TEXT NOT NULL,
         content_hash TEXT NOT NULL,
-        indexed_at TEXT NOT NULL
+        indexed_at TEXT NOT NULL,
+        embedding TEXT,
+        embedding_model TEXT
       );
       CREATE INDEX IF NOT EXISTS idx_repo_chunks_workspace_path ON repo_chunks(workspace_id, path);
 
@@ -172,6 +174,12 @@ export class Store {
       );
       CREATE INDEX IF NOT EXISTS idx_automations_due ON automations(enabled, next_run_at);
     `);
+    for (const statement of [
+      'ALTER TABLE repo_chunks ADD COLUMN embedding TEXT',
+      'ALTER TABLE repo_chunks ADD COLUMN embedding_model TEXT',
+    ]) {
+      try { this.db.exec(statement); } catch { /* column already present on an existing database */ }
+    }
     return this;
   }
 
@@ -375,17 +383,25 @@ export class Store {
   }
 
   replaceRepoChunks(workspaceId, chunks) {
-    this.transaction(() => {
+    return this.transaction(() => {
+      const reusable = new Map(
+        this.db.prepare('SELECT content_hash, embedding, embedding_model FROM repo_chunks WHERE workspace_id = ? AND embedding IS NOT NULL')
+          .all(workspaceId).map((row) => [row.content_hash, { embedding: row.embedding, model: row.embedding_model }]),
+      );
       this.db.prepare('DELETE FROM repo_chunks WHERE workspace_id = ?').run(workspaceId);
       this.db.prepare('DELETE FROM repo_fts WHERE workspace_id = ?').run(workspaceId);
-      const insertChunk = this.db.prepare(`INSERT INTO repo_chunks(id, workspace_id, path, language, start_line, end_line, content, content_hash, indexed_at)
-        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      const insertChunk = this.db.prepare(`INSERT INTO repo_chunks(id, workspace_id, path, language, start_line, end_line, content, content_hash, indexed_at, embedding, embedding_model)
+        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
       const insertFts = this.db.prepare('INSERT INTO repo_fts(chunk_id, workspace_id, path, language, content) VALUES(?, ?, ?, ?, ?)');
+      const pending = [];
       for (const chunk of chunks) {
+        const reused = reusable.get(chunk.contentHash);
         insertChunk.run(chunk.id, workspaceId, chunk.path, chunk.language || '', chunk.startLine, chunk.endLine,
-          chunk.content, chunk.contentHash, chunk.indexedAt);
+          chunk.content, chunk.contentHash, chunk.indexedAt, reused?.embedding ?? null, reused?.model ?? null);
         insertFts.run(chunk.id, workspaceId, chunk.path, chunk.language || '', chunk.content);
+        if (!reused) pending.push({ id: chunk.id, content: chunk.content });
       }
+      return { pending };
     });
   }
 
@@ -401,6 +417,22 @@ export class Store {
     } catch {
       return [];
     }
+  }
+
+  setChunkEmbedding(chunkId, model, embeddingText) {
+    this.db.prepare('UPDATE repo_chunks SET embedding = ?, embedding_model = ? WHERE id = ?').run(embeddingText, model, chunkId);
+  }
+
+  chunksWithEmbeddings(workspaceId, model) {
+    return this.db.prepare(`SELECT id, path, language, start_line, end_line, content, embedding
+      FROM repo_chunks WHERE workspace_id = ? AND embedding IS NOT NULL AND embedding_model = ?`)
+      .all(workspaceId, model).map(plain);
+  }
+
+  embeddingStats(workspaceId, model) {
+    return plain(this.db.prepare(`SELECT COUNT(*) AS total,
+      SUM(CASE WHEN embedding IS NOT NULL AND embedding_model = ? THEN 1 ELSE 0 END) AS embedded
+      FROM repo_chunks WHERE workspace_id = ?`).get(model, workspaceId));
   }
 
   repoIndexStats(workspaceId) {

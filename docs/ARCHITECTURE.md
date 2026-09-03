@@ -17,7 +17,7 @@ Local HTTP daemon ───── SSE event stream ───── audit + telem
         │     ├── capability controller
         │     └── plan / tool / subagent loop
         │
-        ├── Native tool registry (143 tools)
+        ├── Native tool registry (146 tools)
         ├── Skill manager (metadata eager, body lazy)
         ├── MCP manager (definition eager, connection/schema lazy)
         ├── Workspace + index + checkpoint managers
@@ -88,7 +88,7 @@ The internal shape contains text, normalized tool calls, finish reason, usage, m
 
 The built-in `node:sqlite` driver stores:
 
-- workspaces and repository chunks;
+- workspaces and repository chunks, each optionally carrying an embedding vector for hybrid lexical/semantic retrieval;
 - sessions, messages, runs, plans, and events;
 - durable memories with FTS5 search;
 - checkpoints;

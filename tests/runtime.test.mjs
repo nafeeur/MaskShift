@@ -29,7 +29,7 @@ test('runtime exposes maximal lazy capabilities and executes host tools', async 
 
   const index = await runtime.indexer.index(workspace.id, { force: true });
   assert.ok(index.indexedFiles >= 3);
-  assert.ok(runtime.indexer.search(workspace.id, 'velocity distance time').some((hit) => hit.path === 'index.js'));
+  assert.ok((await runtime.indexer.search(workspace.id, 'velocity distance time')).some((hit) => hit.path === 'index.js'));
 });
 
 test('plugins hot-load tools and one-shot automations clear their schedule after execution', async (t) => {

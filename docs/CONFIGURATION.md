@@ -27,6 +27,19 @@ The full example is [`maskshift.config.example.json`](../maskshift.config.exampl
 | `autoLoadCapabilities` | `true` | Prime tools and skills from prompt relevance. |
 | `autoConnectMcp` | `true` | Permit relevance-driven MCP connection. |
 
+## Repository indexing
+
+`indexing` controls the local SQLite FTS code index and its optional embedding layer.
+
+| Field | Default | Meaning |
+|---|---:|---|
+| `indexing.embeddings` | `true` | Attempt embedding-based semantic search in addition to lexical FTS. |
+| `indexing.embedModel` | `nomic-embed-text` | Ollama model requested for embeddings; override with `MASKSHIFT_EMBED_MODEL`. |
+| `indexing.embedBatchSize` | `32` | Chunks embedded per request to the Ollama `/api/embed` endpoint. |
+| `indexing.embedMaxChunks` | `4000` | Upper bound on chunks embedded per index run. |
+
+Embeddings are best-effort: if the configured Ollama endpoint or model is unreachable, `repo_search` and repository context construction silently fall back to lexical FTS only. Embeddings are keyed by content hash and carried over across reindexes, so unchanged files are never re-embedded.
+
 ## Environment variables
 
 ```text
@@ -36,6 +49,7 @@ MASKSHIFT_HOST
 MASKSHIFT_PORT
 MASKSHIFT_MODEL
 MASKSHIFT_DEBUG
+MASKSHIFT_EMBED_MODEL
 OLLAMA_BASE_URL
 OPENAI_API_KEY
 OPENAI_BASE_URL

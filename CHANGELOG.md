@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- `web_search` now calls Brave, Tavily, or Exa when their API key is configured, falling back to the DuckDuckGo HTML scrape, with an explicit `provider` override.
+- Added `pdf_read` for text extraction from PDFs via `pdftotext` (poppler-utils), with page-range and layout controls.
+- Added `notebook_read` and `notebook_edit` for inspecting and editing Jupyter (`.ipynb`) notebook cells, clearing stale outputs on edit.
+- Repository indexing now computes optional embedding vectors (via a local Ollama embedding model) alongside the existing SQLite FTS index, and `repo_search` blends both with reciprocal rank fusion. Embeddings are reused by content hash across reindexes, and the feature degrades silently to lexical-only search when no embedding model is reachable.
+
 ## 1.0.0 — 2026-09-02
 
 - Initial production baseline of the MaskShift maximalist coding harness.

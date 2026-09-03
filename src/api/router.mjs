@@ -144,7 +144,7 @@ export function createApiRouter(runtime) {
       params = match(pathname, '/api/workspaces/:workspaceId/search');
       if (params && method === 'GET') {
         const query = url.searchParams.get('q') || '';
-        sendJson(response, 200, runtime.indexer.search(params.workspaceId, query, number(url.searchParams.get('limit'), 20, 1, 100)));
+        sendJson(response, 200, await runtime.indexer.search(params.workspaceId, query, number(url.searchParams.get('limit'), 20, 1, 100)));
         return true;
       }
 

@@ -113,9 +113,9 @@ export function registerSearchTools(registry, { indexer, workspaceManager, confi
   registry.register({
     name: 'repo_search',
     title: 'Search indexed code context',
-    description: 'Search the local repository index for semantically adjacent code using full-text ranking and return bounded source chunks.',
+    description: 'Search the local repository index using full-text ranking, blended with embedding-based semantic similarity when a local Ollama embedding model is available, and return bounded source chunks.',
     category: 'search', readOnly: true, alwaysAvailable: true,
-    keywords: ['rag', 'context', 'indexed search', 'architecture', 'similar code'],
+    keywords: ['rag', 'context', 'indexed search', 'architecture', 'similar code', 'semantic', 'embeddings'],
     inputSchema: { type: 'object', required: ['query'], properties: { query: { type: 'string' }, limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 } } },
     execute: async (args, context) => {
       if (!context.workspaceId) throw new Error('Repository search requires a workspace');
@@ -124,7 +124,7 @@ export function registerSearchTools(registry, { indexer, workspaceManager, confi
         await indexer.index(context.workspaceId);
         stats = indexer.stats(context.workspaceId);
       }
-      return { stats, hits: indexer.search(context.workspaceId, args.query, args.limit || 20) };
+      return { stats, hits: await indexer.search(context.workspaceId, args.query, args.limit || 20) };
     },
   });
 

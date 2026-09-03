@@ -28,11 +28,11 @@ The daemon and web cockpit run on Node.js 22 using only built-in Node modules. T
 
 ## What is included
 
-- **143 native tools** across host filesystem, shell/process control, search/indexing, Git/worktrees/checkpoints, LSP, browsers/CDP, containers/Kubernetes, SSH/rsync, databases, runtimes, artifacts, web retrieval, plugins, automations, memory, MCP, orchestration, and external-agent bridges.
+- **146 native tools** across host filesystem, shell/process control, search/indexing, Git/worktrees/checkpoints, LSP, browsers/CDP, containers/Kubernetes, SSH/rsync, databases, runtimes, documents (PDF/Jupyter), artifacts, web retrieval, plugins, automations, memory, MCP, orchestration, and external-agent bridges.
 - **36 bundled skills**, with additional skills imported from MaskShift, Claude, Codex, Copilot, and workspace skill directories.
 - **Lazy MCP fabric** supporting stdio and Streamable HTTP, modern stateless MCP and legacy initialization-based MCP, resources, prompts, qualified tools, imported configs, and the live official MCP Registry.
 - **Multi-provider tool calling** for Ollama, OpenAI Responses, OpenAI-compatible servers, Anthropic, Gemini, OpenRouter, LM Studio, and vLLM.
-- **Autonomous repository context** from project instructions, manifests, repository tree, indexed code chunks, stored memory, recent history, and Git state.
+- **Autonomous repository context** from project instructions, manifests, repository tree, indexed code chunks (lexical + optional embedding-based semantic retrieval), stored memory, recent history, and Git state.
 - **Parallel and isolated agents** with independent sessions and optional Git worktrees.
 - **Permissive by default**: `permissionMode: "overdrive"`, host filesystem scope, unrestricted network setting, and no per-command approval dialogs.
 - **Redline racing cockpit** with live run telemetry, plans, tool traces, source browser, MCP grid, capability loadout, persistent terminal, plugin/automation garage, and responsive mobile navigation.

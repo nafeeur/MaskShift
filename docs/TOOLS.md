@@ -1,6 +1,6 @@
 # Native Tool Inventory
 
-Generated from the MaskShift 1.0.0 runtime. **143 native tools** are available before plugins or MCP servers add more capabilities.
+Generated from the MaskShift 1.0.0 runtime. **146 native tools** are available before plugins or MCP servers add more capabilities.
 
 Only activated descriptors enter a model request; this document is the complete local catalog.
 
@@ -92,6 +92,14 @@ Only activated descriptors enter a model request; this document is the complete 
 | `database_cli` | write | database-write | Execute a command through psql, mysql, redis-cli, mongosh, duckdb, or another installed database client. |
 | `sqlite_query` | write | database-write | Open any SQLite database directly through Node native SQLite, execute parameterized SQL, and return structured rows. Write statements are allowed. |
 | `sqlite_schema` | read | normal | Return tables, views, indexes, triggers, and CREATE statements from a SQLite database. |
+
+## documents (3)
+
+| Tool | Access | Risk | Description |
+|---|---|---|---|
+| `notebook_edit` | write | write | Replace, insert, or delete one cell in a Jupyter (.ipynb) notebook by index. Replacing or inserting a code cell clears its stale outputs and execution count. |
+| `notebook_read` | read | normal | Read a Jupyter (.ipynb) notebook and return each cell's index, type, source, and a bounded summary of its outputs. |
+| `pdf_read` | read | normal | Extract text from a PDF using pdftotext (poppler-utils), with optional page range and layout preservation. |
 
 ## filesystem (10)
 
@@ -206,7 +214,7 @@ Only activated descriptors enter a model request; this document is the complete 
 |---|---|---|---|
 | `dependency_scan` | read | normal | Inspect imports across selected source files and return a compact file-to-dependency graph without installing parsers. |
 | `repo_index` | write | local-index | Build or refresh MaskShift’s local SQLite FTS code index for structure-aware context retrieval. |
-| `repo_search` | read | normal | Search the local repository index for semantically adjacent code using full-text ranking and return bounded source chunks. |
+| `repo_search` | read | normal | Search the local repository index using full-text ranking, blended with embedding-based semantic similarity when a local Ollama embedding model is available, and return bounded source chunks. |
 | `search_files` | read | normal | Find files by fuzzy substring or glob across a workspace while respecting common repository ignores. |
 | `search_text` | read | normal | Fast recursive source search using ripgrep when available, with regex, glob, case, hidden-file, and context controls. |
 | `symbol_outline` | read | normal | Extract a lightweight outline of classes, functions, interfaces, structs, methods, and test blocks from source files. |
@@ -250,5 +258,5 @@ Only activated descriptors enter a model request; this document is the complete 
 |---|---|---|---|
 | `web_download` | write | write | Download an HTTP(S) response directly to a host or workspace file, creating parent directories. |
 | `web_fetch` | read | normal | Fetch any HTTP(S) URL with custom method, headers, and body. Returns bounded text, JSON, or readable text extracted from HTML. |
-| `web_search` | read | normal | Search the public web through DuckDuckGo HTML and return result titles, URLs, and snippets. For specialized search, activate an MCP search provider. |
+| `web_search` | read | normal | Search the public web through Brave, Tavily, or Exa when an API key is configured, falling back to DuckDuckGo HTML otherwise. For specialized search, activate an MCP search provider. |
 

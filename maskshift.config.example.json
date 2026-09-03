@@ -151,6 +151,12 @@
     "profilesDir": "~/.maskshift/browser/profiles",
     "args": []
   },
+  "indexing": {
+    "embeddings": true,
+    "embedModel": "nomic-embed-text",
+    "embedBatchSize": 32,
+    "embedMaxChunks": 4000
+  },
   "hooks": {},
   "ui": {
     "density": "maximal",

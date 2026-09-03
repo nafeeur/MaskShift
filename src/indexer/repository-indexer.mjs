@@ -24,6 +24,46 @@ const SKIP_EXTENSIONS = new Set([
 
 const BOUNDARY = /^\s*(?:export\s+)?(?:async\s+)?(?:function|class|interface|type|enum|struct|trait|impl|def|async\s+def|fn|pub\s+fn|func|package|namespace|module)\b|^\s*(?:describe|it|test)\s*\(/;
 
+async function ollamaEmbed(baseUrl, model, inputs, { timeoutMs = 30_000 } = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new Error('Embedding request timed out')), timeoutMs);
+  timer.unref?.();
+  try {
+    const response = await fetch(`${baseUrl.replace(/\/$/, '')}/api/embed`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model, input: inputs }), signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`Ollama embeddings HTTP ${response.status}`);
+    const data = await response.json();
+    if (!Array.isArray(data.embeddings)) throw new Error('Ollama embeddings response is missing an embeddings array');
+    return data.embeddings;
+  } finally { clearTimeout(timer); }
+}
+
+function cosineSimilarity(a, b) {
+  let dot = 0, normA = 0, normB = 0;
+  const len = Math.min(a.length, b.length);
+  for (let i = 0; i < len; i += 1) { dot += a[i] * b[i]; normA += a[i] * a[i]; normB += b[i] * b[i]; }
+  if (!normA || !normB) return 0;
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+function fuseResults(ftsHits, semanticHits, limit) {
+  const RRF_K = 60;
+  const scores = new Map();
+  const byId = new Map();
+  const accumulate = (hits) => hits.forEach((hit, index) => {
+    if (!byId.has(hit.id)) byId.set(hit.id, hit);
+    scores.set(hit.id, (scores.get(hit.id) || 0) + 1 / (RRF_K + index + 1));
+  });
+  accumulate(ftsHits);
+  accumulate(semanticHits);
+  return [...scores.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([chunkId, score]) => ({ ...byId.get(chunkId), fusedScore: score }));
+}
+
 export class RepositoryIndexer {
   constructor({ store, workspaceManager, config, logger, eventBus }) {
     this.store = store;
@@ -141,23 +181,82 @@ export class RepositoryIndexer {
       }
     }
 
-    this.store.replaceRepoChunks(workspaceId, chunks);
-    const stats = { scanned, indexedFiles, chunks: chunks.length, durationMs: Date.now() - started };
+    const { pending } = this.store.replaceRepoChunks(workspaceId, chunks);
+    const embedding = await this.embedPending(workspaceId, pending);
+    const stats = { scanned, indexedFiles, chunks: chunks.length, durationMs: Date.now() - started, ...embedding };
     this.logger.info('Repository index completed', { workspaceId, ...stats });
     this.eventBus.emit('index.completed', stats, { workspaceId });
     return stats;
   }
 
-  search(workspaceId, query, limit = 20) {
-    return this.store.searchRepo(workspaceId, query, limit);
+  embedModel() {
+    return this.config.get().indexing?.embedModel || 'nomic-embed-text';
+  }
+
+  ollamaBaseUrl() {
+    return this.config.get().providers.find((provider) => provider.id === 'ollama')?.baseUrl || null;
+  }
+
+  async embedPending(workspaceId, pending) {
+    const settings = this.config.get().indexing || {};
+    if (settings.embeddings === false || !pending?.length) return { embeddedChunks: 0, embedAttempted: 0 };
+    const baseUrl = this.ollamaBaseUrl();
+    if (!baseUrl) return { embeddedChunks: 0, embedAttempted: 0 };
+    const model = this.embedModel();
+    const batchSize = settings.embedBatchSize || 32;
+    const items = pending.slice(0, settings.embedMaxChunks || 4000);
+    let embeddedChunks = 0;
+    for (let i = 0; i < items.length; i += batchSize) {
+      const batch = items.slice(i, i + batchSize);
+      try {
+        const vectors = await ollamaEmbed(baseUrl, model, batch.map((item) => truncate(item.content, 8000)));
+        vectors.forEach((vector, index) => {
+          this.store.setChunkEmbedding(batch[index].id, model, JSON.stringify(vector.map((value) => Math.round(value * 1e6) / 1e6)));
+          embeddedChunks += 1;
+        });
+      } catch (error) {
+        this.logger.warn('Repository embedding batch failed; leaving remaining chunks on lexical search only', { workspaceId, error: error.message });
+        break;
+      }
+    }
+    return { embeddedChunks, embedAttempted: items.length };
+  }
+
+  async search(workspaceId, query, limit = 20) {
+    const ftsHits = this.store.searchRepo(workspaceId, query, Math.max(limit, 40));
+    const model = this.embedModel();
+    const embeddingStats = this.store.embeddingStats(workspaceId, model);
+    const baseUrl = this.ollamaBaseUrl();
+    if (this.config.get().indexing?.embeddings === false || !embeddingStats?.embedded || !baseUrl) {
+      return ftsHits.slice(0, limit);
+    }
+    let queryVector;
+    try {
+      [queryVector] = await ollamaEmbed(baseUrl, model, [query], { timeoutMs: 10_000 });
+    } catch {
+      return ftsHits.slice(0, limit);
+    }
+    const semanticHits = this.store.chunksWithEmbeddings(workspaceId, model)
+      .map((row) => ({ ...row, score: cosineSimilarity(queryVector, JSON.parse(row.embedding)) }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, Math.max(limit, 40));
+    return fuseResults(ftsHits, semanticHits, limit);
   }
 
   stats(workspaceId) {
-    return this.store.repoIndexStats(workspaceId);
+    const base = this.store.repoIndexStats(workspaceId);
+    const model = this.embedModel();
+    const embeddingStats = this.store.embeddingStats(workspaceId, model);
+    return {
+      ...base,
+      embeddingModel: model,
+      embeddedChunks: embeddingStats?.embedded || 0,
+      semanticSearchAvailable: Boolean(embeddingStats?.embedded),
+    };
   }
 
   async contextFor(workspaceId, prompt, { limit = 12, maxChars = 90_000 } = {}) {
-    const hits = this.search(workspaceId, prompt, limit);
+    const hits = await this.search(workspaceId, prompt, limit);
     let used = 0;
     const selected = [];
     for (const hit of hits) {

@@ -119,6 +119,12 @@ export function defaultConfig() {
       profilesDir: path.join(home, 'browser', 'profiles'),
       args: [],
     },
+    indexing: {
+      embeddings: true,
+      embedModel: process.env.MASKSHIFT_EMBED_MODEL || 'nomic-embed-text',
+      embedBatchSize: 32,
+      embedMaxChunks: 4000,
+    },
     defaultModel: process.env.MASKSHIFT_MODEL || 'ollama:auto',
     dataFile: path.join(home, 'maskshift.sqlite'),
     logFile: path.join(home, 'logs', 'maskshift.log'),
@@ -167,6 +173,7 @@ function mergeConfig(base, override) {
   merged.agentBridges = { ...base.agentBridges, ...(override?.agentBridges || {}) };
   merged.automations = { ...base.automations, ...(override?.automations || {}) };
   merged.browser = { ...base.browser, ...(override?.browser || {}) };
+  merged.indexing = { ...base.indexing, ...(override?.indexing || {}) };
   merged.providers = mergeById(base.providers, override?.providers);
 
   const baseHome = absolutePath(base.home);

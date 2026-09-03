@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-09-02T20:26:27.416Z",
+  "generatedAt": "2026-09-03T03:23:45.248Z",
   "version": "1.0.0",
-  "nativeToolCount": 143,
+  "nativeToolCount": 146,
   "bundledSkillCount": 36,
   "curatedMcpCount": 8,
   "tools": [
@@ -487,6 +487,33 @@
       "title": "Inspect SQLite schema",
       "description": "Return tables, views, indexes, triggers, and CREATE statements from a SQLite database.",
       "category": "database",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "notebook_edit",
+      "title": "Edit Jupyter notebook cell",
+      "description": "Replace, insert, or delete one cell in a Jupyter (.ipynb) notebook by index. Replacing or inserting a code cell clears its stale outputs and execution count.",
+      "category": "documents",
+      "readOnly": false,
+      "risk": "write",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "notebook_read",
+      "title": "Read Jupyter notebook",
+      "description": "Read a Jupyter (.ipynb) notebook and return each cell's index, type, source, and a bounded summary of its outputs.",
+      "category": "documents",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "pdf_read",
+      "title": "Extract PDF text",
+      "description": "Extract text from a PDF using pdftotext (poppler-utils), with optional page range and layout preservation.",
+      "category": "documents",
       "readOnly": true,
       "risk": "normal",
       "alwaysAvailable": false
@@ -1070,7 +1097,7 @@
     {
       "name": "repo_search",
       "title": "Search indexed code context",
-      "description": "Search the local repository index for semantically adjacent code using full-text ranking and return bounded source chunks.",
+      "description": "Search the local repository index using full-text ranking, blended with embedding-based semantic similarity when a local Ollama embedding model is available, and return bounded source chunks.",
       "category": "search",
       "readOnly": true,
       "risk": "normal",
@@ -1286,7 +1313,7 @@
     {
       "name": "web_search",
       "title": "Search the web",
-      "description": "Search the public web through DuckDuckGo HTML and return result titles, URLs, and snippets. For specialized search, activate an MCP search provider.",
+      "description": "Search the public web through Brave, Tavily, or Exa when an API key is configured, falling back to DuckDuckGo HTML otherwise. For specialized search, activate an MCP search provider.",
       "category": "web",
       "readOnly": true,
       "risk": "normal",
@@ -1305,7 +1332,7 @@
         "description": "Design system architecture with explicit requirements, boundaries, data flows, tradeoffs, failure modes, and evolution paths."
       },
       "bodyChars": 615,
-      "updatedAt": "2026-09-02T19:41:25.675Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "backend-api",
@@ -1318,7 +1345,7 @@
         "description": "Design and implement reliable local or network APIs with validation, streaming, cancellation, observability, and stable contracts."
       },
       "bodyChars": 535,
-      "updatedAt": "2026-09-02T19:41:25.674Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "browser-automation",
@@ -1331,7 +1358,7 @@
         "description": "Automate and verify browser workflows using accessibility-first locators, deterministic waits, screenshots, and failure artifacts."
       },
       "bodyChars": 450,
-      "updatedAt": "2026-09-02T19:41:25.675Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "build-repair",
@@ -1344,7 +1371,7 @@
         "description": "Repair broken builds, type checks, packaging, and startup paths across environments with minimal, verifiable changes."
       },
       "bodyChars": 496,
-      "updatedAt": "2026-09-02T19:41:25.674Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "ci-cd",
@@ -1357,7 +1384,7 @@
         "description": "Create and repair CI/CD pipelines with caching, parallelism, reproducibility, artifacts, and actionable failures."
       },
       "bodyChars": 509,
-      "updatedAt": "2026-09-02T19:41:25.674Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "code-review",
@@ -1370,7 +1397,7 @@
         "description": "Review changes for real correctness, maintainability, regressions, missing tests, and integration defects with low-noise findings."
       },
       "bodyChars": 586,
-      "updatedAt": "2026-09-02T19:41:25.673Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "codebase-indexing",
@@ -1383,7 +1410,7 @@
         "description": "Build and maintain scalable repository indexes for lexical, structural, symbol, and semantic retrieval with bounded context."
       },
       "bodyChars": 611,
-      "updatedAt": "2026-09-02T19:41:25.675Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "cpp-qt",
@@ -1396,7 +1423,7 @@
         "description": "Implement and debug modern C++ and Qt applications, including signals/slots, models, threading, CMake, rendering, and ownership."
       },
       "bodyChars": 588,
-      "updatedAt": "2026-09-02T19:41:25.674Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "data-analysis",
@@ -1409,7 +1436,7 @@
         "description": "Analyze datasets reproducibly, validate quality, calculate defensible metrics, and produce clear artifacts."
       },
       "bodyChars": 490,
-      "updatedAt": "2026-09-02T19:41:25.675Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "database-migrations",
@@ -1422,7 +1449,7 @@
         "description": "Evolve persistent schemas safely with compatible migrations, backfills, rollback strategy, and integrity checks."
       },
       "bodyChars": 527,
-      "updatedAt": "2026-09-02T19:41:25.674Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "debugging",
@@ -1435,7 +1462,7 @@
         "description": "Diagnose and repair software failures using evidence, reproduction, instrumentation, and regression tests rather than speculative edits."
       },
       "bodyChars": 549,
-      "updatedAt": "2026-09-02T19:41:25.673Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "dependency-upgrade",
@@ -1448,7 +1475,7 @@
         "description": "Upgrade libraries and runtimes with compatibility research, focused changes, lockfile integrity, and regression verification."
       },
       "bodyChars": 520,
-      "updatedAt": "2026-09-02T19:41:25.674Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "docker-kubernetes",
@@ -1461,7 +1488,7 @@
         "description": "Containerize and operate development services with reproducible images, health checks, persistent state, and clear networking."
       },
       "bodyChars": 520,
-      "updatedAt": "2026-09-02T19:41:25.674Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "documentation",
@@ -1474,7 +1501,7 @@
         "description": "Write accurate user, operator, API, and architecture documentation grounded in the implemented product."
       },
       "bodyChars": 530,
-      "updatedAt": "2026-09-02T19:41:25.674Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "feature-implementation",
@@ -1487,7 +1514,7 @@
         "description": "Implement production features end to end, including integration, error states, tests, documentation, and verification."
       },
       "bodyChars": 602,
-      "updatedAt": "2026-09-02T19:41:25.673Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "frontend-redline-ui",
@@ -1500,7 +1527,7 @@
         "description": "Build MaskShift interfaces in the high-velocity black/red racing design language with sharp geometry, dense information, and clear hierarchy."
       },
       "bodyChars": 742,
-      "updatedAt": "2026-09-02T19:41:25.673Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "git-worktrees",
@@ -1513,7 +1540,7 @@
         "description": "Use Git worktrees and checkpoints for parallel agents, isolated changes, review, integration, and recovery."
       },
       "bodyChars": 506,
-      "updatedAt": "2026-09-02T19:41:25.674Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "go-engineering",
@@ -1526,7 +1553,7 @@
         "description": "Implement idiomatic Go services and tools with context propagation, interfaces, concurrency discipline, and tests."
       },
       "bodyChars": 487,
-      "updatedAt": "2026-09-02T19:41:25.674Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "incident-response",
@@ -1539,7 +1566,7 @@
         "description": "Diagnose and stabilize production incidents, preserve evidence, restore service, and produce actionable follow-up work."
       },
       "bodyChars": 490,
-      "updatedAt": "2026-09-02T19:41:25.675Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "mcp-authoring",
@@ -1552,7 +1579,7 @@
         "description": "Build and integrate MCP servers and clients across modern 2026 stateless and legacy initialization-based protocol revisions."
       },
       "bodyChars": 635,
-      "updatedAt": "2026-09-02T19:41:25.675Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "migration-modernization",
@@ -1565,7 +1592,7 @@
         "description": "Modernize legacy code or frameworks incrementally while preserving behavior, interoperability, and delivery velocity."
       },
       "bodyChars": 509,
-      "updatedAt": "2026-09-02T19:41:25.675Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "performance",
@@ -1578,7 +1605,7 @@
         "description": "Profile and optimize latency, throughput, memory, context usage, and startup costs using measured bottlenecks."
       },
       "bodyChars": 579,
-      "updatedAt": "2026-09-02T19:41:25.673Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "plugin-authoring",
@@ -1591,7 +1618,7 @@
         "description": "Create modular MaskShift plugins that add tools, skills, providers, hooks, UI panels, or MCP catalog sources without coupling core policy."
       },
       "bodyChars": 513,
-      "updatedAt": "2026-09-02T19:41:25.675Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "prompt-evals",
@@ -1604,7 +1631,7 @@
         "description": "Create evaluations for agent prompts, tool routing, context retrieval, and coding outcomes using reproducible tasks and scoring."
       },
       "bodyChars": 634,
-      "updatedAt": "2026-09-02T19:41:25.675Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "python-engineering",
@@ -1617,7 +1644,7 @@
         "description": "Build maintainable Python applications and automation with typed boundaries, packaging, environments, tests, and robust subprocess handling."
       },
       "bodyChars": 512,
-      "updatedAt": "2026-09-02T19:41:25.674Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "refactoring",
@@ -1630,7 +1657,7 @@
         "description": "Restructure code safely while preserving behavior, reducing duplication, clarifying ownership, and maintaining compatibility."
       },
       "bodyChars": 471,
-      "updatedAt": "2026-09-02T19:41:25.673Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "release",
@@ -1643,7 +1670,7 @@
         "description": "Prepare reproducible production releases with versioning, changelogs, packaging, smoke tests, and rollback notes."
       },
       "bodyChars": 543,
-      "updatedAt": "2026-09-02T19:41:25.674Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "repo-cartography",
@@ -1656,7 +1683,7 @@
         "description": "Map unfamiliar repositories and identify the correct files, dependency paths, conventions, and verification commands before implementation."
       },
       "bodyChars": 610,
-      "updatedAt": "2026-09-02T19:41:25.673Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "rust-engineering",
@@ -1669,7 +1696,7 @@
         "description": "Implement reliable Rust systems with ownership-aware design, errors, async cancellation, tests, and workspace conventions."
       },
       "bodyChars": 404,
-      "updatedAt": "2026-09-02T19:41:25.674Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "scientific-computing",
@@ -1682,7 +1709,7 @@
         "description": "Implement numerically sound scientific and engineering software with units, validation, reproducibility, and performance awareness."
       },
       "bodyChars": 540,
-      "updatedAt": "2026-09-02T19:41:25.675Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "security-audit",
@@ -1695,7 +1722,7 @@
         "description": "Audit code and dependencies for concrete exploitable weaknesses while preserving MaskShift’s intentionally permissive local execution philosophy."
       },
       "bodyChars": 683,
-      "updatedAt": "2026-09-02T19:41:25.674Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "self-improving-skills",
@@ -1708,7 +1735,7 @@
         "description": "Capture durable, non-obvious workflow knowledge as reusable skills and improve it from verified outcomes."
       },
       "bodyChars": 592,
-      "updatedAt": "2026-09-02T19:41:25.675Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "test-engineering",
@@ -1721,7 +1748,7 @@
         "description": "Design and implement high-signal unit, integration, end-to-end, property, and regression tests for changed behavior."
       },
       "bodyChars": 625,
-      "updatedAt": "2026-09-02T19:41:25.673Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "typescript-engineering",
@@ -1734,7 +1761,7 @@
         "description": "Build strict TypeScript applications with stable runtime validation, modular architecture, and browser/server correctness."
       },
       "bodyChars": 484,
-      "updatedAt": "2026-09-02T19:41:25.674Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "ui-visual-qa",
@@ -1747,7 +1774,7 @@
         "description": "Inspect web user interfaces for clipping, overlap, responsiveness, focus, loading, empty, error, and interaction-state defects."
       },
       "bodyChars": 500,
-      "updatedAt": "2026-09-02T19:41:25.673Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     },
     {
       "name": "web-research",
@@ -1760,7 +1787,7 @@
         "description": "Research changing technical facts from primary sources and convert findings into implementation decisions with traceability."
       },
       "bodyChars": 567,
-      "updatedAt": "2026-09-02T19:41:25.675Z"
+      "updatedAt": "2026-09-02T19:41:25.000Z"
     }
   ],
   "mcpServers": [

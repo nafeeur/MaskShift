@@ -15,6 +15,7 @@ import { registerPluginTools } from './plugin-tools.mjs';
 import { registerAutomationTools } from './automation-tools.mjs';
 import { registerBrowserTools } from './browser-tools.mjs';
 import { registerPlatformTools } from './platform-tools.mjs';
+import { registerDocumentTools } from './document-tools.mjs';
 
 export function registerAllTools(registry, dependencies) {
   registerFilesystemTools(registry, dependencies);
@@ -34,5 +35,6 @@ export function registerAllTools(registry, dependencies) {
   registerAutomationTools(registry, dependencies);
   registerBrowserTools(registry, dependencies);
   registerPlatformTools(registry, dependencies);
+  registerDocumentTools(registry, dependencies);
   return registry;
 }
