@@ -2,11 +2,29 @@
 
 **A maximalist, model-agnostic coding harness with lazy capability loading and an unrestricted local execution model.**
 
-![MaskShift cockpit](docs/screenshots/cockpit-1920x1080.png)
-
 MaskShift gives a coding model one integrated control plane for repository understanding, file edits, host shell commands, Git recovery, language servers, browser automation, containers, databases, remote machines, persistent memory, scheduled work, plugins, external coding agents, skills, and MCP servers. The full catalog is always available to the harness, while only the capabilities relevant to the current step are inserted into model context.
 
 The daemon and web cockpit run on Node.js 22 using only built-in Node modules. There is no npm runtime dependency tree to install.
+
+![MaskShift cockpit](docs/screenshots/cockpit-1920x1080.png)
+
+## Contents
+
+- [What is included](#what-is-included)
+- [Quick start](#quick-start)
+- [Model configuration](#model-configuration)
+- [The cockpit](#the-cockpit)
+- [MCP: everything available, nothing dumped into context](#mcp-everything-available-nothing-dumped-into-context)
+- [Skills](#skills)
+- [Plugins](#plugins)
+- [External coding-agent bridges](#external-coding-agent-bridges)
+- [Automation](#automation)
+- [Browser automation](#browser-automation)
+- [Repository safety and recovery](#repository-safety-and-recovery)
+- [Data locations](#data-locations)
+- [Commands](#commands)
+- [Deployment](#deployment)
+- [Status](#status)
 
 ## What is included
 
@@ -92,6 +110,30 @@ vllm:auto
 
 Exact model availability depends on the configured endpoint. Custom providers can be added in `~/.maskshift/config.json`; see [configuration](docs/CONFIGURATION.md).
 
+## The cockpit
+
+The cockpit is a single-page racing-instrumentation UI for the daemon: track/model pickers, live run telemetry, a plan pane, tool traces, a source browser, and a persistent host terminal, all in one view.
+
+**Loadout** searches every native tool and skill in the catalog, so you can see exactly what a run has access to before it uses it:
+
+![Tools and skills catalog](docs/screenshots/capabilities-1920x1080.png)
+
+**MCP Grid** lists every discovered Model Context Protocol server — bundled, workspace-configured, or pulled from the live MCP Registry — and connects one on demand:
+
+![MCP server grid](docs/screenshots/mcp-1920x1080.png)
+
+**Pit Garage** manages scheduled automations, installed plugins, external agent bridges, and browser profiles from one tab:
+
+![Pit Garage automation view](docs/screenshots/garage-1920x1080.png)
+
+**Settings** tune the core engine — default model, permission mode, agent turn/subagent limits, indexing, and checkpoint behavior — without touching `config.json` by hand:
+
+![Core settings dialog](docs/screenshots/settings-1920x1080.png)
+
+The layout collapses into a tabbed mobile navigation at narrow widths, so the same run, files, tools, MCP, and garage views work from a phone:
+
+<img src="docs/screenshots/cockpit-412x915.png" alt="MaskShift cockpit on a mobile viewport" width="360">
+
 ## MCP: everything available, nothing dumped into context
 
 MaskShift maintains one combined catalog from:
@@ -103,7 +145,7 @@ MaskShift maintains one combined catalog from:
 - the live official MCP Registry;
 - plugins that register additional servers.
 
-Servers are intentionally **lazy**. MaskShift searches the catalog, connects the relevant server when a task requires it, reads its tool schema, qualifies every tool as `mcp__server__tool`, and injects only those activated tools into the current run. This preserves the “every tool at your disposal” philosophy without consuming the entire context window before work begins.
+Servers are intentionally **lazy**. MaskShift searches the catalog, connects the relevant server when a task requires it, reads its tool schema, qualifies every tool as `mcp__server__tool`, and injects only those activated tools into the current run. This preserves the "every tool at your disposal" philosophy without consuming the entire context window before work begins.
 
 Credential-gated servers still require their real API key or OAuth setup. MaskShift can discover, install, import, and connect them, but it cannot fabricate credentials.
 
