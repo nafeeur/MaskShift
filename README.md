@@ -116,7 +116,7 @@ Exact model availability depends on the configured endpoint. Custom providers ca
 
 ## The cockpit
 
-The cockpit is a single-page, maximalist black/red/white UI for the daemon — angular panels, poster type, and comic-panel motion over target/model pickers, live run telemetry, a plan pane, tool traces, a source browser, and a persistent host terminal, all in one view (pictured at the top of this document).
+The cockpit is a single-page, maximalist black/red/white Phantom UI for the daemon — angular clip-path panels, poster type, and comic-panel motion over target/model pickers, live run telemetry, a plan pane, tool traces, a source browser, and a persistent host terminal, all in one view (pictured at the top of this document). A target-lock reticle marks the idle state, diagonal wipes carry every view switch, and cyan/magenta/gold are reserved, consistent accents for MCP, skills, and scheduled automations rather than decoration — so the same color always means the same category, everywhere in the UI.
 
 **Arsenal** searches every native tool and skill in the catalog, so you can see exactly what a run has access to before it uses it:
 
