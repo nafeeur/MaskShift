@@ -12,7 +12,7 @@ async function walk(directory) {
     if (excluded.has(entry.name)) continue;
     const file = path.join(directory, entry.name);
     if (entry.isDirectory()) await walk(file);
-    else if (file.endsWith('.mjs') || file === path.join(root, 'public', 'app.js')) files.push(file);
+    else if (file.endsWith('.mjs')) files.push(file);
   }
 }
 
