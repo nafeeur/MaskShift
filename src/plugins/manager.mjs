@@ -249,11 +249,21 @@ export class PluginManager {
 
   async scaffold({ name, directory = null, description = '' }) {
     const pluginName = safeName(name);
-    const root = directory ? absolutePath(directory) : path.join(this.roots()[0], pluginName);
+    // `directory` names the parent to create the plugin in, so it never collides with a
+    // sibling plugin and never scatters manifest files loose across a plugin root.
+    const parent = directory ? absolutePath(directory, this.workspacePath) : this.roots()[0];
+    const root = path.join(parent, pluginName);
     await ensureDir(root);
     await writeJsonAtomic(path.join(root, 'maskshift.plugin.json'), { name: pluginName, version: '0.1.0', description, entry: 'index.mjs' });
     await fsp.writeFile(path.join(root, 'index.mjs'), `export async function activate(api) {\n  api.registerTool({\n    name: '${pluginName.replaceAll('-', '_')}_hello',\n    title: '${pluginName} hello',\n    description: 'Example tool from ${pluginName}.',\n    category: 'plugin',\n    readOnly: true,\n    inputSchema: { type: 'object', properties: { name: { type: 'string', default: 'MaskShift' } } },\n    execute: async ({ name = 'MaskShift' }) => ({ message: \`Hello, \${name}\` }),\n  });\n}\n`, 'utf8');
     await this.scan({ activate: false });
+    // A scaffold written outside a configured plugin root is invisible to scan(), so
+    // register it directly rather than failing activation with "Unknown plugin".
+    if (!this.plugins.has(pluginName)) {
+      const manifest = await this.manifestFor(root);
+      if (!manifest) throw new Error(`Scaffolded plugin is not loadable: ${root}`);
+      this.plugins.set(manifest.name, { ...manifest, status: 'discovered', error: null, registrations: [], cleanup: [] });
+    }
     return { root, plugin: await this.activate(pluginName) };
   }
 
