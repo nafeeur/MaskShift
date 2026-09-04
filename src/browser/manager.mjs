@@ -281,6 +281,13 @@ export class BrowserManager {
     throw new Error(`Timed out waiting for ${selector} to be ${state}`);
   }
 
+  // A relative artifact path belongs to the workspace, not to whatever directory the
+  // MaskShift process happens to run from.
+  artifactBase(workspaceId) {
+    const workspace = workspaceId ? this.workspaceManager.get(workspaceId) : null;
+    return workspace?.path || path.join(this.config.get().home, 'artifacts');
+  }
+
   async screenshot({ instanceId = null, tabId = null, file = null, fullPage = true, format = 'png', quality = 90, workspaceId = null } = {}) {
     const { instance, tab, connection } = await this.target(instanceId, tabId);
     let clip;
@@ -290,13 +297,8 @@ export class BrowserManager {
       clip = { x: 0, y: 0, width: Math.max(1, size.width), height: Math.max(1, size.height), scale: 1 };
     }
     const result = await connection.send('Page.captureScreenshot', { format, quality: format === 'jpeg' ? quality : undefined, captureBeyondViewport: fullPage, fromSurface: true, ...(clip ? { clip } : {}) }, 60_000);
-    let output = file;
-    if (!output) {
-      const workspace = workspaceId ? this.workspaceManager.get(workspaceId) : null;
-      const base = workspace?.path || path.join(this.config.get().home, 'artifacts');
-      output = path.join(base, `maskshift-browser-${Date.now()}.${format === 'jpeg' ? 'jpg' : format}`);
-    }
-    output = absolutePath(output);
+    const base = this.artifactBase(workspaceId);
+    const output = absolutePath(file || `maskshift-browser-${Date.now()}.${format === 'jpeg' ? 'jpg' : format}`, base);
     await ensureDir(path.dirname(output));
     await fsp.writeFile(output, Buffer.from(result.data, 'base64'));
     return { instanceId: instance.id, tabId: tab.id, file: output, bytes: Buffer.byteLength(result.data, 'base64'), format, fullPage };
@@ -305,12 +307,8 @@ export class BrowserManager {
   async printPdf({ instanceId = null, tabId = null, file = null, landscape = false, printBackground = true, workspaceId = null } = {}) {
     const { instance, tab, connection } = await this.target(instanceId, tabId);
     const result = await connection.send('Page.printToPDF', { landscape, printBackground, preferCSSPageSize: true }, 60_000);
-    let output = file;
-    if (!output) {
-      const workspace = workspaceId ? this.workspaceManager.get(workspaceId) : null;
-      output = path.join(workspace?.path || path.join(this.config.get().home, 'artifacts'), `maskshift-page-${Date.now()}.pdf`);
-    }
-    output = absolutePath(output);
+    const base = this.artifactBase(workspaceId);
+    const output = absolutePath(file || `maskshift-page-${Date.now()}.pdf`, base);
     await ensureDir(path.dirname(output));
     await fsp.writeFile(output, Buffer.from(result.data, 'base64'));
     return { instanceId: instance.id, tabId: tab.id, file: output, bytes: Buffer.byteLength(result.data, 'base64') };

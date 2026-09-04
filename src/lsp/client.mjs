@@ -81,6 +81,9 @@ export class LanguageServerClient {
     this.serverInfo = initialized?.serverInfo || null;
     this.started = true;
     this.notify('initialized', {});
+    // Servers that gate analysis on initial configuration (pyright among them) stay idle
+    // until this arrives, so every later request would time out. Editors always send it.
+    this.notify('workspace/didChangeConfiguration', { settings: {} });
     this.eventBus?.emit('lsp.started', { server: this.serverId, serverInfo: this.serverInfo, capabilities: Object.keys(this.capabilities) }, { workspaceId: this.workspaceId });
     return this.status();
   }

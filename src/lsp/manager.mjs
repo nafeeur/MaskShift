@@ -115,6 +115,9 @@ export class LspManager {
 
   async format(workspaceId, file, apply = true, options = {}, serverId) {
     const { client, file: full } = await this.ensure(workspaceId, file, serverId);
+    if (!client.capabilities?.documentFormattingProvider) {
+      throw new Error(`Language server ${client.serverId} does not provide document formatting; format ${path.basename(full)} with a dedicated formatter instead`);
+    }
     const edits = await client.documentRequest('textDocument/formatting', full, { options: { tabSize: options.tabSize || 2, insertSpaces: options.insertSpaces !== false, trimTrailingWhitespace: true, insertFinalNewline: true } });
     return { edits, applied: apply ? await client.applyTextEdits(full, edits || []) : null };
   }

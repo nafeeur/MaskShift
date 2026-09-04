@@ -47,10 +47,18 @@ export function registerShellTools(registry, { processManager, config }) {
     inputSchema: {
       type: 'object', required: ['commands'],
       properties: {
-        commands: { type: 'array', minItems: 1, maxItems: 16, items: { type: 'object', required: ['command'], properties: { command: { type: 'string' }, cwd: { type: 'string' }, env: { type: 'object' }, timeoutMs: { type: 'integer' } } } },
+        commands: {
+          type: 'array', minItems: 1, maxItems: 16,
+          description: 'Each entry is either a plain command string or an object with per-command cwd, env, and timeoutMs.',
+          items: { oneOf: [{ type: 'string' }, { type: 'object', required: ['command'], properties: { command: { type: 'string' }, cwd: { type: 'string' }, env: { type: 'object' }, timeoutMs: { type: 'integer' } } }] },
+        },
       },
     },
-    execute: async (args, context) => Promise.all(args.commands.map(async (item) => {
+    execute: async (args, context) => Promise.all(args.commands.map(async (entry) => {
+      const item = typeof entry === 'string' ? { command: entry } : entry || {};
+      if (typeof item.command !== 'string' || !item.command.trim()) {
+        throw new Error('Each shell_exec_parallel entry must be a command string or an object with a "command" string');
+      }
       const cwd = cwdFor(item, context);
       return runCommand(item.command, {
         cwd, env: item.env || {}, timeoutMs: item.timeoutMs ?? config.get().commandTimeoutMs,
