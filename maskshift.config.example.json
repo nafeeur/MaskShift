@@ -51,6 +51,7 @@
       "apiKeyEnv": null,
       "enabled": true,
       "autoDiscover": true,
+      "toolProtocol": "auto",
       "models": []
     },
     {

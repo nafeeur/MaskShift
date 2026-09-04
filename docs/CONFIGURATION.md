@@ -70,6 +70,13 @@ GITHUB_TOKEN
 
 Provider entries are merged by `id` with built-in defaults.
 
+`toolProtocol` selects how tools reach the model: `auto` (default) prefers the provider's
+native tool API and falls back to the in-prompt text protocol the first time an endpoint
+rejects a tool schema or a model replies with a text call; `native` always uses the tool API;
+`text` always uses the text protocol and never sends a `tools` field. Set `text` for a local
+model known to lack tool support, to skip the one probing request `auto` spends discovering
+that. See [Models without native tool calling](../README.md#models-without-native-tool-calling).
+
 ```json
 {
   "providers": [
@@ -80,6 +87,7 @@ Provider entries are merged by `id` with built-in defaults.
       "baseUrl": "http://model-host:11434",
       "enabled": true,
       "autoDiscover": true,
+      "toolProtocol": "auto",
       "models": [],
       "timeoutMs": 600000,
       "options": {

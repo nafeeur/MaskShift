@@ -36,7 +36,7 @@ The daemon and web cockpit run on Node.js 22 using only built-in Node modules. T
 - **Cost-aware execution**: Anthropic prompt-cache breakpoints on the stable system/tool/history prefix, decay- and access-aware memory ranking with automatic dedup and an optimize/prune tool, and a `usage_report` tool that aggregates token spend per model from a user-editable pricing table (never a guessed price).
 - **36 bundled skills**, with additional skills imported from MaskShift, Claude, Codex, Copilot, and workspace skill directories.
 - **Lazy MCP fabric** supporting stdio and Streamable HTTP, modern stateless MCP and legacy initialization-based MCP, resources, prompts, qualified tools, imported configs, and the live official MCP Registry.
-- **Multi-provider tool calling** for Ollama, OpenAI Responses, OpenAI-compatible servers, Anthropic, Gemini, OpenRouter, LM Studio, and vLLM.
+- **Multi-provider tool calling** for Ollama, OpenAI Responses, OpenAI-compatible servers, Anthropic, Gemini, OpenRouter, LM Studio, and vLLM, with a text-protocol fallback that gives models without a native tool API the full tool surface.
 - **Autonomous repository context** from project instructions, manifests, repository tree, indexed code chunks (lexical + optional embedding-based semantic retrieval), stored memory, recent history, and Git state.
 - **Parallel and isolated agents** with independent sessions and optional Git worktrees.
 - **Permissive by default**: `permissionMode: "overdrive"`, host filesystem scope, unrestricted network setting, and no per-command approval dialogs.
@@ -50,7 +50,7 @@ Requirements:
 - Node.js 22 or newer
 - Git recommended
 - Ripgrep recommended
-- A tool-capable model through Ollama or another configured provider
+- Any instruction-following model through Ollama or another configured provider (native tool calling is used when available, and emulated when it is not)
 
 Run directly from the source directory:
 
@@ -113,6 +113,48 @@ vllm:auto
 ```
 
 Exact model availability depends on the configured endpoint. Custom providers can be added in `~/.maskshift/config.json`; see [configuration](docs/CONFIGURATION.md).
+
+### Models without native tool calling
+
+Every MaskShift capability is reached through a tool call, so a model that cannot emit one
+would otherwise be limited to conversation. Models that lack a native tool API are therefore
+driven with a text protocol instead: the active tools and their schemas are rendered into the
+system prompt, and the model calls them by writing a block in its reply.
+
+```text
+<tool_call>
+{"name": "fs_read", "arguments": {"path": "src/index.js"}}
+</tool_call>
+```
+
+Replies are parsed back into ordinary tool calls, so the whole harness — lazy capability
+activation, skills, MCP servers, subagents, plan tracking, checkpoints — behaves identically
+either way. The reader accepts the variants small models tend to emit (single quotes, unquoted
+keys, trailing commas, Python literals, fenced blocks, arguments as a JSON string), and a call
+it cannot parse is sent back for correction rather than ending the run.
+
+Each provider takes an optional `toolProtocol`:
+
+| Value | Behaviour |
+| --- | --- |
+| `auto` (default) | Use the native tool API, and fall back to the text protocol the first time the endpoint rejects a tool schema or the model answers with a text call instead. |
+| `native` | Always use the provider's tool API. |
+| `text` | Always use the text protocol, and never send a `tools` field. |
+
+`auto` needs no configuration: the downgrade is remembered per model, so it costs at most one
+request. Set `text` explicitly to skip even that probe.
+
+```json
+{
+  "providers": [
+    { "id": "ollama", "type": "ollama", "toolProtocol": "text" }
+  ]
+}
+```
+
+Native tool calling remains preferable where a model supports it properly — it is more
+token-efficient and less error-prone — so leave `auto` alone unless a model is known to need
+otherwise.
 
 ## The cockpit
 

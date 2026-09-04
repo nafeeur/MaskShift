@@ -1,4 +1,14 @@
 import { safeJsonParse, truncate } from '../core/utils.mjs';
+import { parseToolCalls, toTextProtocolMessages } from './tool-protocol.mjs';
+
+// Errors a provider returns when the model or endpoint has no function-calling support.
+// Matching these is what lets `toolProtocol: 'auto'` recover without the user configuring it.
+const NO_TOOL_SUPPORT = /(does not support tools|tools are not supported|tool use is not supported|unsupported.{0,20}tool|no endpoints found that support tool use|function calling is not|tool_choice.{0,30}not supported|does not support function)/i;
+
+function looksLikeMissingToolSupport(error) {
+  const text = `${error?.message || ''} ${JSON.stringify(error?.data || {})}`;
+  return NO_TOOL_SUPPORT.test(text);
+}
 
 function splitModelRef(ref) {
   const value = String(ref || '');
@@ -296,17 +306,82 @@ export class ProviderManager {
     return { provider, model, ref: `${provider.id}:${model}` };
   }
 
+  /** Cache of models proven to lack native tool calling, so the fallback costs one request once. */
+  #textProtocolModels = new Set();
+
+  toolProtocolFor(resolved) {
+    const configured = resolved.provider.toolProtocol || 'auto';
+    if (configured !== 'auto') return configured;
+    return this.#textProtocolModels.has(resolved.ref) ? 'text' : 'native';
+  }
+
+  async #dispatch(resolved, messages, tools, options, protocol) {
+    // In text mode the tools live in the prompt, so the wire request carries none. Providers
+    // that reject a `tools` field, or silently drop it, both behave correctly this way.
+    const useText = protocol === 'text' && tools.length > 0;
+    const outbound = useText ? toTextProtocolMessages(messages, tools) : messages;
+    const wireTools = useText ? [] : tools;
+    const { signal, temperature, maxTokens } = options;
+
+    let result;
+    if (resolved.provider.type === 'anthropic') result = await this.#anthropic(resolved, outbound, wireTools, { signal, temperature, maxTokens });
+    else if (resolved.provider.type === 'openai-responses') result = await this.#openAiResponses(resolved, outbound, wireTools, { signal, temperature, maxTokens });
+    else if (resolved.provider.type === 'ollama') result = await this.#ollama(resolved, outbound, wireTools, { signal, temperature });
+    else if (resolved.provider.type === 'gemini') result = await this.#gemini(resolved, outbound, wireTools, { signal, temperature, maxTokens });
+    else result = await this.#openAiCompatible(resolved, outbound, wireTools, { signal, temperature, maxTokens });
+
+    result.toolProtocol = useText ? 'text' : 'native';
+    result.parseErrors = [];
+    if (useText) {
+      const parsed = parseToolCalls(result.content);
+      result.content = parsed.content;
+      result.toolCalls = parsed.toolCalls;
+      result.parseErrors = parsed.parseErrors;
+    } else if (!result.toolCalls?.length && result.content && tools.length) {
+      // Native mode salvage: a model that ignored the tool API but wrote the call as text
+      // still gets its work done. Guarded on a real tool name so prose is never mistaken
+      // for a call.
+      const offered = new Set(tools.map((tool) => tool.name));
+      const parsed = parseToolCalls(result.content);
+      const recognised = parsed.toolCalls.filter((call) => offered.has(call.name));
+      if (recognised.length) {
+        result.content = parsed.content;
+        result.toolCalls = recognised;
+        result.toolProtocol = 'text-salvage';
+        if (resolved.provider.toolProtocol !== 'native') this.#textProtocolModels.add(resolved.ref);
+      } else if (parsed.parseErrors.length) {
+        // The model tried to call a tool as text and mangled it. That is proof enough that its
+        // native tool calling is not working, so switch protocols and let the engine ask for a
+        // correction — the next turn then arrives with the format actually taught.
+        result.parseErrors = parsed.parseErrors;
+        if (resolved.provider.toolProtocol !== 'native') this.#textProtocolModels.add(resolved.ref);
+      }
+    }
+    return result;
+  }
+
   async complete({ modelRef, messages, tools = [], signal, temperature = 0.1, maxTokens = 16_384 }) {
     const resolved = await this.resolveModel(modelRef);
     const started = Date.now();
-    this.eventBus.emit('model.request.started', { provider: resolved.provider.id, model: resolved.model, messages: messages.length, tools: tools.length });
+    const protocol = this.toolProtocolFor(resolved);
+    this.eventBus.emit('model.request.started', { provider: resolved.provider.id, model: resolved.model, messages: messages.length, tools: tools.length, toolProtocol: protocol });
     try {
       let result;
-      if (resolved.provider.type === 'anthropic') result = await this.#anthropic(resolved, messages, tools, { signal, temperature, maxTokens });
-      else if (resolved.provider.type === 'openai-responses') result = await this.#openAiResponses(resolved, messages, tools, { signal, temperature, maxTokens });
-      else if (resolved.provider.type === 'ollama') result = await this.#ollama(resolved, messages, tools, { signal, temperature });
-      else if (resolved.provider.type === 'gemini') result = await this.#gemini(resolved, messages, tools, { signal, temperature, maxTokens });
-      else result = await this.#openAiCompatible(resolved, messages, tools, { signal, temperature, maxTokens });
+      try {
+        result = await this.#dispatch(resolved, messages, tools, { signal, temperature, maxTokens }, protocol);
+      } catch (error) {
+        // The endpoint rejected the tool schema outright: remember it and re-run in text mode
+        // rather than surfacing a dead end to the user.
+        const recoverable = protocol === 'native' && tools.length > 0
+          && (resolved.provider.toolProtocol || 'auto') === 'auto'
+          && looksLikeMissingToolSupport(error);
+        if (!recoverable) throw error;
+        this.#textProtocolModels.add(resolved.ref);
+        this.eventBus.emit('model.tool-protocol.downgraded', {
+          provider: resolved.provider.id, model: resolved.model, reason: truncate(error.message, 300),
+        });
+        result = await this.#dispatch(resolved, messages, tools, { signal, temperature, maxTokens }, 'text');
+      }
       result.modelRef = resolved.ref;
       result.providerId = resolved.provider.id;
       result.providerType = resolved.provider.type;
@@ -314,7 +389,7 @@ export class ProviderManager {
       result.durationMs = Date.now() - started;
       this.eventBus.emit('model.request.completed', {
         provider: resolved.provider.id, model: resolved.model, durationMs: result.durationMs,
-        toolCalls: result.toolCalls.length, usage: result.usage,
+        toolCalls: result.toolCalls.length, usage: result.usage, toolProtocol: result.toolProtocol,
       });
       return result;
     } catch (error) {
