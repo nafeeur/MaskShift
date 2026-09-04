@@ -1,5 +1,9 @@
 import { nowIso, runCommand, truncate } from '../core/utils.mjs';
 import { estimateUsageCost, summarizeCosts } from '../core/pricing.mjs';
+import { repairPrompt } from './tool-protocol.mjs';
+
+// Bounded so a model that cannot produce valid syntax ends the run instead of looping on it.
+const MAX_TOOL_CALL_REPAIRS = 2;
 
 function titleFromPrompt(prompt) {
   return String(prompt || '').replace(/\s+/g, ' ').trim().slice(0, 78) || 'MaskShift run';
@@ -200,6 +204,7 @@ export class AgentEngine {
       let step = 0;
       let usage = [];
       let costs = [];
+      let repairAttempts = 0;
 
       while (step < maxSteps) {
         if (signal.aborted) throw signal.reason || new Error('Run cancelled');
@@ -230,6 +235,20 @@ export class AgentEngine {
         });
         this.#event(run.id, 'assistant', { content: response.content || '', toolCalls: response.toolCalls || [], modelRef: response.modelRef, usage: response.usage }, scope);
         if (response.content) finalContent = response.content;
+
+        // A text-protocol model wrote something call-shaped that would not parse. Correct it
+        // rather than reading the malformed turn as "finished and no tools needed".
+        if (!response.toolCalls?.length && response.parseErrors?.length && repairAttempts < MAX_TOOL_CALL_REPAIRS) {
+          repairAttempts += 1;
+          const correction = repairPrompt(response.parseErrors, tools);
+          history.push({ role: 'user', content: correction });
+          this.store.addMessage({
+            sessionId: session.id, role: 'user', content: correction,
+            meta: { runId: run.id, synthetic: true, toolCallRepair: repairAttempts },
+          });
+          this.#event(run.id, 'tool-call-repair', { attempt: repairAttempts, errors: response.parseErrors }, scope);
+          continue;
+        }
 
         if (!response.toolCalls?.length) {
           const meta = {
