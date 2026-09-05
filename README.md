@@ -1,3 +1,28 @@
+<p align="center">
+<img width="150" height="150" alt="maskshift-mark" src="https://github.com/user-attachments/assets/137393bb-7576-4edd-ac4d-78e19a0215a2" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="MaskShift">
+  <defs>
+    <clipPath id="ms-diamond">
+      <polygon points="60,2 118,60 60,118 2,60"/>
+    </clipPath>
+  </defs>
+
+  <polygon points="60,2 118,60 60,118 2,60" fill="#0a0a0c"/>
+
+  <g clip-path="url(#ms-diamond)">
+    <polygon points="-14,124 44,30 152,66 116,134" fill="#e2001b"/>
+  </g>
+
+  <polygon points="60,2 118,60 60,118 2,60" fill="none" stroke="#f2eee6" stroke-width="4"/>
+
+  <path d="M14,58 35,33 53,46 60,39 67,46 85,33 106,58 89,73 69,55 60,63 51,55 31,73 Z" fill="#f2eee6"/>
+  <path d="M32,52 47,46 52,56 38,63 Z" fill="#e2001b"/>
+  <path d="M88,52 73,46 68,56 82,63 Z" fill="#e2001b"/>
+
+  <path d="M104,8 106.4,14 112.8,16.4 106.4,18.8 104,25.2 101.6,18.8 95.2,16.4 101.6,14 Z" fill="#e2001b"/>
+</svg>
+</p>
+
 # MaskShift
 
 **A maximalist, model-agnostic coding harness with lazy capability loading and an unrestricted local execution model.**
