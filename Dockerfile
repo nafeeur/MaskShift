@@ -9,17 +9,21 @@ RUN apt-get update \
 WORKDIR /opt/maskshift
 COPY . .
 RUN chmod +x /opt/maskshift/bin/maskshift.mjs /opt/maskshift/start.sh /opt/maskshift/install.sh \
+    && ln -sf /opt/maskshift/bin/maskshift.mjs /usr/local/bin/maskshift \
     && mkdir -p /data /workspace
 
 ENV MASKSHIFT_HOME=/data \
-    MASKSHIFT_HOST=0.0.0.0 \
-    MASKSHIFT_PORT=4242 \
-    MASKSHIFT_MODEL=ollama:auto
+    MASKSHIFT_MODEL=ollama:auto \
+    TERM=xterm-256color \
+    COLORTERM=truecolor
 
 VOLUME ["/data", "/workspace"]
-EXPOSE 4242
+WORKDIR /workspace
 
-HEALTHCHECK --interval=20s --timeout=5s --start-period=15s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:4242/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+# MaskShift is a terminal application: run it with `docker run -it` so the TUI
+# gets a real TTY, or pass a subcommand such as `run "…"` for headless work.
+HEALTHCHECK --interval=60s --timeout=20s --start-period=15s --retries=3 \
+  CMD node --no-warnings /opt/maskshift/bin/maskshift.mjs doctor --json > /dev/null || exit 1
 
-CMD ["node", "--no-warnings", "./bin/maskshift.mjs", "serve", "--workspace", "/workspace", "--host", "0.0.0.0", "--port", "4242", "--no-open"]
+ENTRYPOINT ["node", "--no-warnings", "/opt/maskshift/bin/maskshift.mjs"]
+CMD ["tui", "--workspace", "/workspace"]

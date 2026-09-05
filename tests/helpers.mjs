@@ -32,7 +32,6 @@ export async function runtimeForTest(t, workspacePath, overrides = {}) {
     workspacePath,
     configOverrides: {
       home,
-      autoOpen: false,
       autoIndex: false,
       autoCheckpoint: false,
       commandTimeoutMs: 20_000,

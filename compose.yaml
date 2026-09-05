@@ -2,8 +2,10 @@ services:
   maskshift:
     build: .
     container_name: maskshift
-    ports:
-      - "127.0.0.1:4242:4242"
+    # MaskShift is a TUI: keep a TTY attached and reach it with
+    # `docker compose run --rm maskshift` or `docker attach maskshift`.
+    stdin_open: true
+    tty: true
     environment:
       MASKSHIFT_HOME: /data
       MASKSHIFT_MODEL: ${MASKSHIFT_MODEL:-ollama:auto}
@@ -26,7 +28,6 @@ services:
     volumes:
       - maskshift-data:/data
       - ./:/workspace
-    restart: unless-stopped
 
 volumes:
   maskshift-data:

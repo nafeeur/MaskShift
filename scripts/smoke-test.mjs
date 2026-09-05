@@ -1,10 +1,17 @@
+// End-to-end smoke test: boot the runtime against a fixture model, drive one
+// agent run through the CLI path, paint the TUI, and verify the artifact with
+// the host terminal — no browser and no HTTP server anywhere.
+
 import assert from 'node:assert/strict';
 import fsp from 'node:fs/promises';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
+import { Writable } from 'node:stream';
 import { createRuntime } from '../src/runtime.mjs';
-import { startServer } from '../src/server.mjs';
+import { MaskShiftTui } from '../src/tui/app.mjs';
+import { Theme } from '../src/tui/theme.mjs';
+import { stripAnsi, visibleWidth } from '../src/tui/text.mjs';
 
 const temp = await fsp.mkdtemp(path.join(os.tmpdir(), 'maskshift-smoke-'));
 const home = path.join(temp, 'home');
@@ -12,6 +19,11 @@ const workspace = path.join(temp, 'workspace');
 await fsp.mkdir(workspace, { recursive: true });
 await fsp.writeFile(path.join(workspace, 'package.json'), '{"name":"maskshift-smoke","scripts":{"test":"node test.mjs"}}\n');
 await fsp.writeFile(path.join(workspace, 'test.mjs'), "import assert from 'node:assert/strict'; import fsp from 'node:fs/promises'; assert.equal(await fsp.readFile('smoke-agent.txt','utf8'),'MASKSHIFT_SMOKE_OK\\n');\n");
+
+class FakeTerminal extends Writable {
+  constructor(columns, rows) { super(); this.columns = columns; this.rows = rows; this.isTTY = false; }
+  _write(chunk, encoding, callback) { callback(); }
+}
 
 function listen(server) {
   return new Promise((resolve, reject) => {
@@ -31,17 +43,6 @@ async function body(request) {
   const chunks = [];
   for await (const chunk of request) chunks.push(chunk);
   return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
-}
-async function request(url, route, options = {}) {
-  const response = await fetch(`${url}${route}`, {
-    ...options,
-    headers: { ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...(options.headers || {}) },
-    body: options.body && typeof options.body !== 'string' ? JSON.stringify(options.body) : options.body,
-  });
-  const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
-  if (!response.ok) throw new Error(`${route} -> HTTP ${response.status}: ${text}`);
-  return data;
 }
 
 let turns = 0;
@@ -68,12 +69,11 @@ const modelServer = http.createServer(async (req, res) => {
 
 const modelPort = await listen(modelServer);
 let runtime;
-let daemon;
 try {
   runtime = await createRuntime({
     workspacePath: workspace,
     configOverrides: {
-      home, autoIndex: false, autoOpen: false, autoCheckpoint: false,
+      home, autoIndex: false, autoCheckpoint: false,
       defaultModel: 'smoke:smoke-coder',
       providers: [{
         id: 'smoke', name: 'Smoke model', type: 'openai-responses',
@@ -82,45 +82,68 @@ try {
       }],
     },
   });
-  daemon = await startServer(runtime, { host: '127.0.0.1', port: 0, autoOpen: false });
-  const health = await request(daemon.url, '/api/health');
-  assert.equal(health.ok, true);
-  const state = await request(daemon.url, '/api/state');
-  assert.ok(state.toolCount >= 143);
-  assert.ok(state.skills.length >= 36);
 
-  const opened = await request(daemon.url, '/api/workspaces', { method: 'POST', body: { path: workspace, index: false } });
-  const run = await request(daemon.url, '/api/runs', {
-    method: 'POST',
-    body: { workspaceId: opened.id, prompt: 'Create smoke-agent.txt with the exact requested marker.', modelRef: 'smoke:smoke-coder' },
+  const toolCount = runtime.toolRegistry.list({ includeSchema: false }).length;
+  const skillCount = runtime.skillManager.list().length;
+  assert.ok(toolCount >= 143, `expected the full tool catalogue, saw ${toolCount}`);
+  assert.ok(skillCount >= 36, `expected the bundled skills, saw ${skillCount}`);
+
+  const opened = await runtime.workspaceManager.open(workspace);
+  const run = await runtime.engine.startRun({
+    workspaceId: opened.id,
+    prompt: 'Create smoke-agent.txt with the exact requested marker.',
+    modelRef: 'smoke:smoke-coder',
+    options: { source: 'smoke' },
   });
-
-  let complete;
-  const deadline = Date.now() + 15_000;
-  while (Date.now() < deadline) {
-    complete = await request(daemon.url, `/api/runs/${run.id}`);
-    if (['completed', 'failed', 'cancelled', 'max_steps'].includes(complete.status)) break;
-    await new Promise((resolve) => setTimeout(resolve, 50));
-  }
-  assert.equal(complete?.status, 'completed', complete?.error || 'run did not complete');
+  const complete = await runtime.engine.waitForRun(run.id);
+  assert.equal(complete.status, 'completed', complete.error || 'run did not complete');
   assert.equal(turns, 2);
   assert.equal(await fsp.readFile(path.join(workspace, 'smoke-agent.txt'), 'utf8'), 'MASKSHIFT_SMOKE_OK\n');
 
-  const shell = await request(daemon.url, '/api/terminal/exec', { method: 'POST', body: { workspaceId: opened.id, command: 'node test.mjs' } });
+  // The interface must paint the finished transcript at an exact size.
+  const columns = 120;
+  const rows = 32;
+  const app = new MaskShiftTui(runtime, {
+    workspacePath: workspace, headless: true,
+    theme: new Theme({ depth: 24, unicode: true }),
+    output: new FakeTerminal(columns, rows),
+  });
+  await app.bootstrap();
+  const frames = {};
+  for (const view of ['chat', 'files', 'arsenal', 'network', 'modshop', 'terminal']) {
+    app.view = view;
+    app.focus = app.defaultFocus();
+    app.screen.invalidate();
+    const frame = app.snapshot();
+    assert.equal(frame.length, rows, `${view} painted ${frame.length} rows`);
+    for (const line of frame) assert.equal(visibleWidth(line), columns, `${view}: "${stripAnsi(line)}"`);
+    frames[view] = frame.length;
+  }
+  app.view = 'chat';
+  app.screen.invalidate();
+  const transcript = app.snapshot().map(stripAnsi).join('\n');
+  assert.match(transcript, /Smoke artifact created and verified/);
+
+  const shell = await runtime.toolRegistry.execute('shell_exec', { command: 'node test.mjs', cwd: '.' }, {
+    workspaceId: opened.id, workspacePath: workspace, scope: { workspaceId: opened.id },
+    eventBus: runtime.eventBus, store: runtime.store,
+    capabilityState: runtime.capabilityController.createState({ workspaceId: opened.id }),
+    planState: { summary: '', steps: [] },
+  });
   assert.equal(shell.code, 0, shell.stderr);
 
   console.log(JSON.stringify({
     result: 'PASS',
-    version: health.version,
-    tools: state.toolCount,
-    skills: state.skills.length,
-    mcp: state.mcpServers.length,
+    version: '1.0.0',
+    tools: toolCount,
+    skills: skillCount,
+    mcp: runtime.mcpManager.listServers().length,
     modelTurns: turns,
     agentRun: complete.status,
+    interfaceViews: Object.keys(frames).length,
     terminalVerification: 'PASS',
   }, null, 2));
 } finally {
-  if (daemon?.server) await close(daemon.server).catch(() => {});
   if (runtime) await runtime.close().catch(() => {});
   await close(modelServer).catch(() => {});
   await fsp.rm(temp, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }).catch(() => {});

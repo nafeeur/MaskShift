@@ -1,23 +1,20 @@
-<p align="center">
-  <img src="public/assets/maskshift-mark.svg" alt="MaskShift" width="96">
-</p>
-
 # MaskShift
 
 **A maximalist, model-agnostic coding harness with lazy capability loading and an unrestricted local execution model.**
 
 MaskShift gives a coding model one integrated control plane for repository understanding, file edits, host shell commands, Git recovery, language servers, browser automation, containers, databases, remote machines, persistent memory, scheduled work, plugins, external coding agents, skills, and MCP servers. The full catalog is always available to the harness, while only the capabilities relevant to the current step are inserted into model context.
 
-The daemon and web cockpit run on Node.js 22 using only built-in Node modules. There is no npm runtime dependency tree to install.
+MaskShift is a **terminal application**. It runs on Node.js 22 using only built-in Node modules — the interface renderer included. There is no npm runtime dependency tree, no HTTP server, no browser, and no listening socket.
 
-![MaskShift cockpit](docs/screenshots/cockpit-1920x1080.png)
+![MaskShift interface](docs/screenshots/heist.svg)
 
 ## Contents
 
 - [What is included](#what-is-included)
 - [Quick start](#quick-start)
 - [Model configuration](#model-configuration)
-- [The cockpit](#the-cockpit)
+- [The interface](#the-interface)
+- [The command line](#the-command-line)
 - [MCP: everything available, nothing dumped into context](#mcp-everything-available-nothing-dumped-into-context)
 - [Skills](#skills)
 - [Plugins](#plugins)
@@ -41,7 +38,7 @@ The daemon and web cockpit run on Node.js 22 using only built-in Node modules. T
 - **Parallel and isolated agents** with independent sessions and optional Git worktrees.
 - **Permissive by default**: `permissionMode: "overdrive"`, host filesystem scope, unrestricted network setting, and no per-command approval dialogs.
 
-See [the complete native tool inventory](docs/TOOLS.md), [bundled skills](docs/SKILLS.md), [architecture](docs/ARCHITECTURE.md), and [local HTTP API](docs/API.md).
+See [the complete native tool inventory](docs/TOOLS.md), [bundled skills](docs/SKILLS.md), [architecture](docs/ARCHITECTURE.md), [the interface](docs/TUI.md), and [the command line](docs/CLI.md).
 
 ## Quick start
 
@@ -51,6 +48,7 @@ Requirements:
 - Git recommended
 - Ripgrep recommended
 - Any instruction-following model through Ollama or another configured provider (native tool calling is used when available, and emulated when it is not)
+- A terminal at least 80×24; UTF-8 and truecolour are used when available and degraded cleanly when not
 
 Run directly from the source directory:
 
@@ -58,9 +56,7 @@ Run directly from the source directory:
 ./start.sh --workspace /path/to/repository
 ```
 
-Then open `http://127.0.0.1:4242`.
-
-Run one autonomous task without the browser UI:
+That opens the interface. Run one autonomous task headlessly instead:
 
 ```bash
 ./start.sh run "Map this repository, repair the highest-impact defect, add tests, and verify the result." \
@@ -72,7 +68,7 @@ Install to your user account:
 
 ```bash
 ./install.sh
-maskshift --workspace /path/to/repository
+cd /path/to/repository && maskshift
 ```
 
 The installer copies MaskShift to `~/.local/lib/maskshift` and links `~/.local/bin/maskshift`. It does not run `npm install`.
@@ -156,29 +152,80 @@ Native tool calling remains preferable where a model supports it properly — it
 token-efficient and less error-prone — so leave `auto` alone unless a model is known to need
 otherwise.
 
-## The cockpit
+## The interface
 
-The cockpit is a single-page, maximalist black/red/white Phantom UI for the daemon — torn clip-path plates, halftone screens, poster type on a hard skew, and comic-panel motion over target/model pickers, live run telemetry, a plan pane, tool traces, a source browser, and a persistent host terminal, all in one view (pictured at the top of this document). A target-lock reticle marks the idle state, and every view switch plays its own cut rather than one repeated wipe — a shard rake into Heist, vertical slats into Files, an ink splat into Arsenal, an all-out-attack ray burst into Network, and a jagged tear into Mod Shop — so the transition itself tells you where you landed. Cyan/magenta/gold are reserved, consistent accents for MCP, skills, and scheduled automations rather than decoration, so the same color always means the same category, everywhere in the UI. All motion is off under `prefers-reduced-motion` or the motion setting, and no UI text renders below 10px.
+`maskshift` opens a full-screen terminal interface built on a bespoke,
+zero-dependency renderer: a diffing frame buffer, an ANSI-aware layout engine,
+and a raw-mode key decoder. The look is one idea carried everywhere — the
+**stencil frame**. Every surface is a notched panel with an inset title tab on
+the top rail and a stamp on the bottom rail, and the panel that owns the keyboard
+is promoted from a hairline to a heavy crimson rule, so focus is never in doubt.
 
-**Arsenal** searches every native tool and skill in the catalog, so you can see exactly what a run has access to before it uses it:
+Crimson is identity and focus, gold is keys and the operator, bone is text, and
+each capability class keeps a fixed accent — cyanide for tools, violet for
+skills, azure for MCP — so the same colour always means the same category. The
+palette is generated for truecolour, 256-colour and 16-colour terminals from one
+set of hex values, and `NO_COLOR`, `MASKSHIFT_COLOR=off` and `MASKSHIFT_ASCII=1`
+all produce a clean, aligned fallback.
 
-![Tools and skills catalog](docs/screenshots/capabilities-1920x1080.png)
+Six views, switched with `1`–`6`, plus a right rail on `ctrl+b`:
 
-**Network** lists every discovered Model Context Protocol server — bundled, workspace-configured, or pulled from the live MCP Registry — and connects one on demand:
+**03 ARSENAL** searches every native tool and skill in the catalogue, with a
+dossier pane showing the parameter schema, so you can see exactly what a run has
+access to before it uses it — and run any tool yourself with `x`:
 
-![MCP server grid](docs/screenshots/mcp-1920x1080.png)
+![Tools and skills catalogue](docs/screenshots/arsenal.svg)
 
-**Mod Shop** manages scheduled automations, installed plugins, external agent bridges, and browser profiles from one tab:
+**04 NETWORK** lists every discovered Model Context Protocol server — bundled,
+workspace-configured, or pulled from the live MCP Registry — and connects one on
+demand:
 
-![Mod Shop automation view](docs/screenshots/garage-1920x1080.png)
+![MCP network](docs/screenshots/network.svg)
 
-**Settings** (the Velvet Room) tune the core engine — default model, permission mode, agent turn/subagent limits, indexing, and checkpoint behavior — without touching `config.json` by hand:
+**05 MOD SHOP** manages scheduled automations, installed plugins, external agent
+bridges, browser profiles and background processes from one view:
 
-![Core settings dialog](docs/screenshots/settings-1920x1080.png)
+![Mod shop](docs/screenshots/modshop.svg)
 
-The layout collapses into a tabbed mobile navigation at narrow widths, so the same run, files, tools, MCP, and mod-shop views work from a phone:
+**`ctrl+k`** opens a fuzzy command palette over every action MaskShift can
+perform, so nothing is buried behind a key you have to memorise:
 
-<img src="docs/screenshots/cockpit-412x915.png" alt="MaskShift cockpit on a mobile viewport" width="360">
+![Command palette](docs/screenshots/palette.svg)
+
+**`f2`** tunes the core engine — default model, permission mode, agent turn and
+subagent limits, indexing and checkpoint behaviour — without editing
+`config.json` by hand:
+
+![Settings](docs/screenshots/settings.svg)
+
+The rail carries the live plan of attack, loadout telemetry (which tools, skills
+and MCP servers the current run has actually summoned, plus token flow), the raw
+event bus, and a Git pulse:
+
+![Live loadout telemetry](docs/screenshots/loadout.svg)
+
+Below 108 columns the rail hides itself and the header sheds telemetry chips, so
+the same six views work in a narrow split pane. Full key reference and slash
+commands: [docs/TUI.md](docs/TUI.md). The screenshots above are generated from
+the real renderer by `node ./scripts/capture-tui.mjs`.
+
+## The command line
+
+Everything the interface can do is also a subcommand, and every subcommand
+supports `--json`, so MaskShift composes with shell pipelines and CI:
+
+```bash
+maskshift run "make the failing tests pass"     # one headless run, streamed
+maskshift tools run shell_exec '{"command":"npm test"}'
+maskshift mcp registry playwright && maskshift mcp install io.github.microsoft/playwright-mcp
+maskshift automation create nightly --schedule "every 6h" --prompt "Review the diff and fix regressions"
+maskshift workspace search "checkpoint restore" --json | jq -r '.[].path'
+maskshift doctor
+```
+
+`maskshift daemon` stays resident so scheduled automations keep firing with no
+interface at all — that is what the bundled systemd user unit runs. Full command
+reference: [docs/CLI.md](docs/CLI.md).
 
 ## MCP: everything available, nothing dumped into context
 
@@ -266,7 +313,7 @@ The Mod Shop schedules three kinds of work:
 - direct native-tool calls;
 - unrestricted host shell commands.
 
-Schedules accept an ISO timestamp, intervals such as `every 15m`, and five-field cron expressions. One-shot ISO automations disarm after completion. Runs and failures are persisted in SQLite and streamed into the cockpit event feed.
+Schedules accept an ISO timestamp, intervals such as `every 15m`, and five-field cron expressions. One-shot ISO automations disarm after completion. Runs and failures are persisted in SQLite and streamed into the interface event feed.
 
 ## Browser automation
 
@@ -283,7 +330,7 @@ Overdrive mode does not ask permission before executing. It still keeps recovery
 - isolated worktrees for parallel delegates;
 - append-only JSONL audit records;
 - persistent event and run history;
-- explicit Retreat control in the cockpit.
+- an explicit retreat control (`esc`) in the interface, and `maskshift` run cancellation from any view.
 
 These are recovery features, not a sandbox. Read [the permissive execution model](docs/PERMISSIVE_MODE.md) before binding MaskShift beyond loopback.
 
@@ -307,32 +354,46 @@ worktrees/                  isolated agent worktrees
 ## Commands
 
 ```text
-maskshift [serve] [--workspace PATH] [--host HOST] [--port PORT] [--no-open]
-maskshift run "PROMPT" [--workspace PATH] [--model PROVIDER:MODEL]
-maskshift doctor [--json]
-maskshift --help
-maskshift --version
+maskshift [tui] [PROMPT]                 open the interface (the default command)
+maskshift run "PROMPT"                   one headless run, streamed to stdout
+maskshift exec "COMMAND"                 shell command through the tool layer
+maskshift doctor [--json]                environment and provider diagnostics
+maskshift daemon                         resident automation scheduler, no interface
+maskshift workspace <open|info|tree|search|index|read|checkpoint|checkpoints|restore|list>
+maskshift session   <list|show|new|rename|delete|export|runs>
+maskshift tools     <list|show|run>
+maskshift skills    <list|show>
+maskshift mcp       <list|connect|disconnect|tools|call|add|remove|registry|install>
+maskshift plugins   <list|install|activate|deactivate|reload|scaffold>
+maskshift automation <list|create|run|pause|resume|delete>
+maskshift browser   <list|launch|tabs|close>
+maskshift config    <show|get|set|path>
+maskshift models | lsp | bridges | ps | logs | events
+maskshift help [COMMAND]
 ```
+
+Global flags: `--workspace PATH`, `--model REF`, `--config PATH`, `--json`, `--no-color`.
 
 Useful development commands:
 
 ```bash
-npm run check     # syntax validation across source and browser JavaScript
-npm test          # native unit and integration suite
-npm run smoke     # full daemon/API/tool-calling agent smoke test
+npm run check     # syntax validation across every source module
+npm test          # native unit and integration suite, including renderer tests
+npm run smoke     # end-to-end tool-calling agent run plus a full interface paint
 npm run verify    # check + tests + smoke
 npm run docs      # regenerate tool and skill inventory
+npm run capture   # regenerate the interface screenshots in docs/screenshots
 ```
 
 ## Deployment
 
-- `deploy/maskshift.service`: permissive user-level systemd service.
-- `Dockerfile` and `compose.yaml`: portable deployment with `/workspace` and `/data` volumes.
+- `deploy/maskshift.service`: permissive user-level systemd service; it runs `maskshift daemon`, not an interface.
+- `Dockerfile` and `compose.yaml`: portable deployment with `/workspace` and `/data` volumes. MaskShift is a terminal application, so run it with a TTY attached (`docker run -it`, or `docker compose run --rm maskshift`).
 
 A container limits MaskShift to the files, sockets, devices, and credentials mounted into that container. For truly maximal host authority, run the user service directly instead of Docker.
 
 ## Status
 
-Version `1.0.0` is a complete local product baseline rather than a UI mockup. The included automated suite covers configuration isolation, SQLite/FTS memory, nullable automation updates, modern and legacy MCP negotiation, lazy MCP dispatch, native host tools, repository indexing, plugin hot loading, one-shot scheduling, clean-state Git checkpoint restoration, HTTP APIs, and a two-turn tool-calling agent run.
+Version `1.0.0` is a complete local product baseline rather than a mockup. The included automated suite covers configuration isolation, SQLite/FTS memory, nullable automation updates, modern and legacy MCP negotiation, lazy MCP dispatch, native host tools, repository indexing, plugin hot loading, one-shot scheduling, clean-state Git checkpoint restoration, the CLI command surface, the terminal renderer, and a two-turn tool-calling agent run.
 
 MaskShift is released under the GNU General Public License v3.0.

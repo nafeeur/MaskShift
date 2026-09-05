@@ -13,7 +13,7 @@ MaskShift installer
 Usage: ./install.sh [--prefix PATH] [--systemd-user] [--uninstall]
 
   --prefix PATH     Install under PATH (default: ~/.local)
-  --systemd-user    Install and enable the user-level systemd service
+  --systemd-user    Install and enable the user-level automation daemon service
   --uninstall       Remove the installed application and command link
 USAGE
 }
@@ -107,7 +107,7 @@ if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
   echo "Add $BIN_DIR to PATH to invoke 'maskshift' directly."
 fi
 if ((INSTALL_SERVICE)); then
-  echo "User service enabled. Open http://127.0.0.1:4242"
-else
-  echo "Start with: $BIN_LINK --workspace /path/to/repository"
+  echo "Automation daemon enabled: systemctl --user status maskshift.service"
 fi
+echo "Start the interface with: $BIN_LINK"
+echo "Or run headless with:     $BIN_LINK run \"make the tests pass\""

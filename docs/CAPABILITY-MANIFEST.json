@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-09-03T05:48:08.940Z",
+  "generatedAt": "2026-09-05T16:47:23.027Z",
   "version": "1.0.0",
   "nativeToolCount": 148,
-  "bundledSkillCount": 36,
+  "bundledSkillCount": 44,
   "curatedMcpCount": 8,
   "tools": [
     {
@@ -1350,7 +1350,7 @@
         "description": "Design system architecture with explicit requirements, boundaries, data flows, tradeoffs, failure modes, and evolution paths."
       },
       "bodyChars": 615,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.718Z"
     },
     {
       "name": "backend-api",
@@ -1363,7 +1363,7 @@
         "description": "Design and implement reliable local or network APIs with validation, streaming, cancellation, observability, and stable contracts."
       },
       "bodyChars": 535,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.718Z"
     },
     {
       "name": "browser-automation",
@@ -1376,7 +1376,7 @@
         "description": "Automate and verify browser workflows using accessibility-first locators, deterministic waits, screenshots, and failure artifacts."
       },
       "bodyChars": 450,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.718Z"
     },
     {
       "name": "build-repair",
@@ -1389,7 +1389,7 @@
         "description": "Repair broken builds, type checks, packaging, and startup paths across environments with minimal, verifiable changes."
       },
       "bodyChars": 496,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.718Z"
     },
     {
       "name": "ci-cd",
@@ -1402,7 +1402,7 @@
         "description": "Create and repair CI/CD pipelines with caching, parallelism, reproducibility, artifacts, and actionable failures."
       },
       "bodyChars": 509,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.718Z"
     },
     {
       "name": "code-review",
@@ -1415,7 +1415,7 @@
         "description": "Review changes for real correctness, maintainability, regressions, missing tests, and integration defects with low-noise findings."
       },
       "bodyChars": 586,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.718Z"
     },
     {
       "name": "codebase-indexing",
@@ -1428,7 +1428,7 @@
         "description": "Build and maintain scalable repository indexes for lexical, structural, symbol, and semantic retrieval with bounded context."
       },
       "bodyChars": 611,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.718Z"
     },
     {
       "name": "cpp-qt",
@@ -1441,7 +1441,7 @@
         "description": "Implement and debug modern C++ and Qt applications, including signals/slots, models, threading, CMake, rendering, and ownership."
       },
       "bodyChars": 588,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.718Z"
     },
     {
       "name": "data-analysis",
@@ -1454,7 +1454,7 @@
         "description": "Analyze datasets reproducibly, validate quality, calculate defensible metrics, and produce clear artifacts."
       },
       "bodyChars": 490,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.718Z"
     },
     {
       "name": "database-migrations",
@@ -1467,7 +1467,7 @@
         "description": "Evolve persistent schemas safely with compatible migrations, backfills, rollback strategy, and integrity checks."
       },
       "bodyChars": 527,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.718Z"
     },
     {
       "name": "debugging",
@@ -1480,7 +1480,7 @@
         "description": "Diagnose and repair software failures using evidence, reproduction, instrumentation, and regression tests rather than speculative edits."
       },
       "bodyChars": 549,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.721Z"
     },
     {
       "name": "dependency-upgrade",
@@ -1493,7 +1493,7 @@
         "description": "Upgrade libraries and runtimes with compatibility research, focused changes, lockfile integrity, and regression verification."
       },
       "bodyChars": 520,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.721Z"
     },
     {
       "name": "docker-kubernetes",
@@ -1506,7 +1506,7 @@
         "description": "Containerize and operate development services with reproducible images, health checks, persistent state, and clear networking."
       },
       "bodyChars": 520,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.721Z"
     },
     {
       "name": "documentation",
@@ -1519,7 +1519,21 @@
         "description": "Write accurate user, operator, API, and architecture documentation grounded in the implemented product."
       },
       "bodyChars": 530,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.721Z"
+    },
+    {
+      "name": "docx",
+      "description": "Use this skill whenever the user wants to create, read, edit, or manipulate Word documents (.docx) or Word templates (.dotx). Triggers include: any mention of 'Word doc', 'word document', '.docx', '.dotx', or requests to produce professional documents with formatting like tables of contents, page numbers, or letterheads. Also use when extracting or reorganizing content from .docx or .dotx files, inserting or replacing images in documents, find-and-replace in Word files, working with tracked changes or comments, or converting content into a polished Word document. If the user asks for a 'report', 'memo', 'letter', 'template', or similar deliverable as a Word or .docx file (to download, email or print), use this skill. However, if they ask for a document, page, report, memo, or notes WITHOUT naming a file format and the session offers a dedicated document or page skill or connector, use that instead. Do NOT use for PDFs, spreadsheets, Google Docs, or coding unrelated to document generation.",
+      "path": "../../../root/.claude/skills/synced/a4481896-b89c-449e-a11d-7b2d047e6ce3_d06b37e9-9318-4502-ad2e-d8f06ef9935c/docx",
+      "file": "../../../root/.claude/skills/synced/a4481896-b89c-449e-a11d-7b2d047e6ce3_d06b37e9-9318-4502-ad2e-d8f06ef9935c/docx/SKILL.md",
+      "source": "local",
+      "meta": {
+        "name": "docx",
+        "description": "Use this skill whenever the user wants to create, read, edit, or manipulate Word documents (.docx) or Word templates (.dotx). Triggers include: any mention of 'Word doc', 'word document', '.docx', '.dotx', or requests to produce professional documents with formatting like tables of contents, page numbers, or letterheads. Also use when extracting or reorganizing content from .docx or .dotx files, inserting or replacing images in documents, find-and-replace in Word files, working with tracked changes or comments, or converting content into a polished Word document. If the user asks for a 'report', 'memo', 'letter', 'template', or similar deliverable as a Word or .docx file (to download, email or print), use this skill. However, if they ask for a document, page, report, memo, or notes WITHOUT naming a file format and the session offers a dedicated document or page skill or connector, use that instead. Do NOT use for PDFs, spreadsheets, Google Docs, or coding unrelated to document generation.",
+        "license": "Proprietary. LICENSE.txt has complete terms"
+      },
+      "bodyChars": 5945,
+      "updatedAt": "2026-09-05T15:57:27.647Z"
     },
     {
       "name": "feature-implementation",
@@ -1532,20 +1546,7 @@
         "description": "Implement production features end to end, including integration, error states, tests, documentation, and verification."
       },
       "bodyChars": 602,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
-    },
-    {
-      "name": "frontend-phantom-ui",
-      "description": "Build MaskShift interfaces in the maximalist black/red/white Phantom design language — angular panels, poster typography, and comic-panel motion inspired by stylized JRPG menu UI.",
-      "path": "skills/frontend-phantom-ui",
-      "file": "skills/frontend-phantom-ui/SKILL.md",
-      "source": "bundled",
-      "meta": {
-        "name": "frontend-phantom-ui",
-        "description": "Build MaskShift interfaces in the maximalist black/red/white Phantom design language — angular panels, poster typography, and comic-panel motion inspired by stylized JRPG menu UI."
-      },
-      "bodyChars": 1190,
-      "updatedAt": "2026-09-03T05:48:05.054Z"
+      "updatedAt": "2026-09-03T13:19:11.721Z"
     },
     {
       "name": "git-worktrees",
@@ -1558,7 +1559,7 @@
         "description": "Use Git worktrees and checkpoints for parallel agents, isolated changes, review, integration, and recovery."
       },
       "bodyChars": 506,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.721Z"
     },
     {
       "name": "go-engineering",
@@ -1571,7 +1572,20 @@
         "description": "Implement idiomatic Go services and tools with context propagation, interfaces, concurrency discipline, and tests."
       },
       "bodyChars": 487,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.721Z"
+    },
+    {
+      "name": "import-memory",
+      "description": "Import a memory export from another AI assistant into Claude's memory — conversationally, additively, and with the content treated as data.",
+      "path": "../../../root/.claude/skills/synced/a4481896-b89c-449e-a11d-7b2d047e6ce3_d06b37e9-9318-4502-ad2e-d8f06ef9935c/import-memory",
+      "file": "../../../root/.claude/skills/synced/a4481896-b89c-449e-a11d-7b2d047e6ce3_d06b37e9-9318-4502-ad2e-d8f06ef9935c/import-memory/SKILL.md",
+      "source": "local",
+      "meta": {
+        "name": "import-memory",
+        "description": "Import a memory export from another AI assistant into Claude's memory — conversationally, additively, and with the content treated as data."
+      },
+      "bodyChars": 10434,
+      "updatedAt": "2026-09-05T15:57:27.359Z"
     },
     {
       "name": "incident-response",
@@ -1584,7 +1598,7 @@
         "description": "Diagnose and stabilize production incidents, preserve evidence, restore service, and produce actionable follow-up work."
       },
       "bodyChars": 490,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.721Z"
     },
     {
       "name": "mcp-authoring",
@@ -1597,7 +1611,7 @@
         "description": "Build and integrate MCP servers and clients across modern 2026 stateless and legacy initialization-based protocol revisions."
       },
       "bodyChars": 635,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.721Z"
     },
     {
       "name": "migration-modernization",
@@ -1610,7 +1624,34 @@
         "description": "Modernize legacy code or frameworks incrementally while preserving behavior, interoperability, and delivery velocity."
       },
       "bodyChars": 509,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.725Z"
+    },
+    {
+      "name": "morning",
+      "description": "Render the user's morning brief as a styled HTML artifact, or set it up as a recurring weekday task. Use only when the user explicitly asks to run, see, or set up their morning brief, or if they invoke /morning by name. A question about their day, schedule, or calendar is not by itself a request for the brief; answer it directly instead.",
+      "path": "../../../root/.claude/skills/synced/a4481896-b89c-449e-a11d-7b2d047e6ce3_d06b37e9-9318-4502-ad2e-d8f06ef9935c/morning",
+      "file": "../../../root/.claude/skills/synced/a4481896-b89c-449e-a11d-7b2d047e6ce3_d06b37e9-9318-4502-ad2e-d8f06ef9935c/morning/SKILL.md",
+      "source": "local",
+      "meta": {
+        "name": "morning",
+        "description": "Render the user's morning brief as a styled HTML artifact, or set it up as a recurring weekday task. Use only when the user explicitly asks to run, see, or set up their morning brief, or if they invoke /morning by name. A question about their day, schedule, or calendar is not by itself a request for the brief; answer it directly instead."
+      },
+      "bodyChars": 17571,
+      "updatedAt": "2026-09-05T15:57:27.657Z"
+    },
+    {
+      "name": "pdf",
+      "description": "Use this skill whenever the user wants to do anything with PDF files. This includes reading or extracting text/tables from PDFs, combining or merging multiple PDFs into one, splitting PDFs apart, rotating pages, adding watermarks, creating new PDFs, filling PDF forms, encrypting/decrypting PDFs, extracting images, and OCR on scanned PDFs to make them searchable. If the user mentions a .pdf file or asks to produce one, use this skill.",
+      "path": "../../../root/.claude/skills/synced/a4481896-b89c-449e-a11d-7b2d047e6ce3_d06b37e9-9318-4502-ad2e-d8f06ef9935c/pdf",
+      "file": "../../../root/.claude/skills/synced/a4481896-b89c-449e-a11d-7b2d047e6ce3_d06b37e9-9318-4502-ad2e-d8f06ef9935c/pdf/SKILL.md",
+      "source": "local",
+      "meta": {
+        "name": "pdf",
+        "description": "Use this skill whenever the user wants to do anything with PDF files. This includes reading or extracting text/tables from PDFs, combining or merging multiple PDFs into one, splitting PDFs apart, rotating pages, adding watermarks, creating new PDFs, filling PDF forms, encrypting/decrypting PDFs, extracting images, and OCR on scanned PDFs to make them searchable. If the user mentions a .pdf file or asks to produce one, use this skill.",
+        "license": "Proprietary. LICENSE.txt has complete terms"
+      },
+      "bodyChars": 7513,
+      "updatedAt": "2026-09-05T15:57:27.531Z"
     },
     {
       "name": "performance",
@@ -1623,7 +1664,7 @@
         "description": "Profile and optimize latency, throughput, memory, context usage, and startup costs using measured bottlenecks."
       },
       "bodyChars": 579,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.725Z"
     },
     {
       "name": "plugin-authoring",
@@ -1636,7 +1677,21 @@
         "description": "Create modular MaskShift plugins that add tools, skills, providers, hooks, UI panels, or MCP catalog sources without coupling core policy."
       },
       "bodyChars": 513,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.725Z"
+    },
+    {
+      "name": "pptx",
+      "description": "Use this skill any time a .pptx or .potx file is involved in any way — as input, output, or both. This includes: creating slide decks, pitch decks, or presentations as PowerPoint (.pptx) files; reading, parsing, or extracting text from any .pptx or .potx file (even if the extracted content will be used elsewhere, like in an email, summary, or creating a different type of slide deck); editing, modifying, or updating existing presentations; combining or splitting slide files; working with templates (.potx), layouts, speaker notes, or comments. Trigger whenever the user asks for a PowerPoint or .pptx file, or references a .pptx or .potx filename, regardless of what they plan to do with the content afterward. However, when the user asks for a deck, slides, a slide deck, or a presentation without naming a file format, default to using a dedicated slide-deck artifact type or a separate slides skill if this session offers one; otherwise, use this skill.",
+      "path": "../../../root/.claude/skills/synced/a4481896-b89c-449e-a11d-7b2d047e6ce3_d06b37e9-9318-4502-ad2e-d8f06ef9935c/pptx",
+      "file": "../../../root/.claude/skills/synced/a4481896-b89c-449e-a11d-7b2d047e6ce3_d06b37e9-9318-4502-ad2e-d8f06ef9935c/pptx/SKILL.md",
+      "source": "local",
+      "meta": {
+        "name": "pptx",
+        "description": "Use this skill any time a .pptx or .potx file is involved in any way — as input, output, or both. This includes: creating slide decks, pitch decks, or presentations as PowerPoint (.pptx) files; reading, parsing, or extracting text from any .pptx or .potx file (even if the extracted content will be used elsewhere, like in an email, summary, or creating a different type of slide deck); editing, modifying, or updating existing presentations; combining or splitting slide files; working with templates (.potx), layouts, speaker notes, or comments. Trigger whenever the user asks for a PowerPoint or .pptx file, or references a .pptx or .potx filename, regardless of what they plan to do with the content afterward. However, when the user asks for a deck, slides, a slide deck, or a presentation without naming a file format, default to using a dedicated slide-deck artifact type or a separate slides skill if this session offers one; otherwise, use this skill.",
+        "license": "Proprietary. LICENSE.txt has complete terms"
+      },
+      "bodyChars": 20375,
+      "updatedAt": "2026-09-05T15:57:27.647Z"
     },
     {
       "name": "prompt-evals",
@@ -1649,7 +1704,7 @@
         "description": "Create evaluations for agent prompts, tool routing, context retrieval, and coding outcomes using reproducible tasks and scoring."
       },
       "bodyChars": 634,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.725Z"
     },
     {
       "name": "python-engineering",
@@ -1662,7 +1717,7 @@
         "description": "Build maintainable Python applications and automation with typed boundaries, packaging, environments, tests, and robust subprocess handling."
       },
       "bodyChars": 512,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.725Z"
     },
     {
       "name": "refactoring",
@@ -1675,7 +1730,7 @@
         "description": "Restructure code safely while preserving behavior, reducing duplication, clarifying ownership, and maintaining compatibility."
       },
       "bodyChars": 471,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.725Z"
     },
     {
       "name": "release",
@@ -1688,7 +1743,7 @@
         "description": "Prepare reproducible production releases with versioning, changelogs, packaging, smoke tests, and rollback notes."
       },
       "bodyChars": 543,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.725Z"
     },
     {
       "name": "repo-cartography",
@@ -1701,7 +1756,7 @@
         "description": "Map unfamiliar repositories and identify the correct files, dependency paths, conventions, and verification commands before implementation."
       },
       "bodyChars": 610,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.725Z"
     },
     {
       "name": "rust-engineering",
@@ -1714,7 +1769,7 @@
         "description": "Implement reliable Rust systems with ownership-aware design, errors, async cancellation, tests, and workspace conventions."
       },
       "bodyChars": 404,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.725Z"
     },
     {
       "name": "scientific-computing",
@@ -1727,7 +1782,7 @@
         "description": "Implement numerically sound scientific and engineering software with units, validation, reproducibility, and performance awareness."
       },
       "bodyChars": 540,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.725Z"
     },
     {
       "name": "security-audit",
@@ -1740,7 +1795,7 @@
         "description": "Audit code and dependencies for concrete exploitable weaknesses while preserving MaskShift’s intentionally permissive local execution philosophy."
       },
       "bodyChars": 683,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.729Z"
     },
     {
       "name": "self-improving-skills",
@@ -1753,7 +1808,46 @@
         "description": "Capture durable, non-obvious workflow knowledge as reusable skills and improve it from verified outcomes."
       },
       "bodyChars": 592,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.729Z"
+    },
+    {
+      "name": "skill-creator",
+      "description": "Create new skills, modify and improve existing skills, and measure skill performance. Use when users want to create a skill from scratch, edit, or optimize an existing skill, run evals to test a skill, benchmark skill performance with variance analysis, or optimize a skill's description for better triggering accuracy.",
+      "path": "../../../root/.claude/skills/synced/a4481896-b89c-449e-a11d-7b2d047e6ce3_d06b37e9-9318-4502-ad2e-d8f06ef9935c/skill-creator",
+      "file": "../../../root/.claude/skills/synced/a4481896-b89c-449e-a11d-7b2d047e6ce3_d06b37e9-9318-4502-ad2e-d8f06ef9935c/skill-creator/SKILL.md",
+      "source": "local",
+      "meta": {
+        "name": "skill-creator",
+        "description": "Create new skills, modify and improve existing skills, and measure skill performance. Use when users want to create a skill from scratch, edit, or optimize an existing skill, run evals to test a skill, benchmark skill performance with variance analysis, or optimize a skill's description for better triggering accuracy."
+      },
+      "bodyChars": 32807,
+      "updatedAt": "2026-09-05T15:57:27.415Z"
+    },
+    {
+      "name": "startup-hook-skill",
+      "description": "Creating and developing startup hooks for Claude Code on the web. Use when the user wants to set up a repository for Claude Code on the web, create a SessionStart hook to ensure their project can run tests and linters during web sessions.",
+      "path": "../../../root/.claude/skills/session-start-hook",
+      "file": "../../../root/.claude/skills/session-start-hook/SKILL.md",
+      "source": "local",
+      "meta": {
+        "name": "startup-hook-skill",
+        "description": "Creating and developing startup hooks for Claude Code on the web. Use when the user wants to set up a repository for Claude Code on the web, create a SessionStart hook to ensure their project can run tests and linters during web sessions."
+      },
+      "bodyChars": 4618,
+      "updatedAt": "2026-09-03T13:19:11.772Z"
+    },
+    {
+      "name": "terminal-phantom-ui",
+      "description": "Build MaskShift terminal interfaces in the Phantom Protocol design language — stencil frames with notched title tabs, a crimson-and-bone palette that degrades to 16 colours, and the ANSI width discipline that keeps a TUI aligned.",
+      "path": "skills/terminal-phantom-ui",
+      "file": "skills/terminal-phantom-ui/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "terminal-phantom-ui",
+        "description": "Build MaskShift terminal interfaces in the Phantom Protocol design language — stencil frames with notched title tabs, a crimson-and-bone palette that degrades to 16 colours, and the ANSI width discipline that keeps a TUI aligned."
+      },
+      "bodyChars": 5346,
+      "updatedAt": "2026-09-05T16:47:15.135Z"
     },
     {
       "name": "test-engineering",
@@ -1766,7 +1860,7 @@
         "description": "Design and implement high-signal unit, integration, end-to-end, property, and regression tests for changed behavior."
       },
       "bodyChars": 625,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.729Z"
     },
     {
       "name": "typescript-engineering",
@@ -1779,7 +1873,7 @@
         "description": "Build strict TypeScript applications with stable runtime validation, modular architecture, and browser/server correctness."
       },
       "bodyChars": 484,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.729Z"
     },
     {
       "name": "ui-visual-qa",
@@ -1792,7 +1886,7 @@
         "description": "Inspect web user interfaces for clipping, overlap, responsiveness, focus, loading, empty, error, and interaction-state defects."
       },
       "bodyChars": 500,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.729Z"
     },
     {
       "name": "web-research",
@@ -1805,7 +1899,21 @@
         "description": "Research changing technical facts from primary sources and convert findings into implementation decisions with traceability."
       },
       "bodyChars": 567,
-      "updatedAt": "2026-09-02T19:41:25.000Z"
+      "updatedAt": "2026-09-03T13:19:11.729Z"
+    },
+    {
+      "name": "xlsx",
+      "description": "Use this skill any time a spreadsheet file is the primary input or output. This means any task where the user wants to: open, read, edit, or fix an existing .xlsx, .xlsm, .xltx, .csv, or .tsv file (e.g., adding columns, computing formulas, formatting, charting, cleaning messy data); create a new spreadsheet from scratch or from other data sources; or convert between tabular file formats. Trigger especially when the user references a spreadsheet file by name or path — even casually (like \\\"the xlsx in my downloads\\\") — and wants something done to it or produced from it. Also trigger for cleaning or restructuring messy tabular data files (malformed rows, misplaced headers, junk data) into proper spreadsheets. The deliverable must be a spreadsheet file. Do NOT trigger when the primary deliverable is a Word document, HTML report, standalone Python script, database pipeline, or Google Sheets API integration, even if tabular data is involved.",
+      "path": "../../../root/.claude/skills/synced/a4481896-b89c-449e-a11d-7b2d047e6ce3_d06b37e9-9318-4502-ad2e-d8f06ef9935c/xlsx",
+      "file": "../../../root/.claude/skills/synced/a4481896-b89c-449e-a11d-7b2d047e6ce3_d06b37e9-9318-4502-ad2e-d8f06ef9935c/xlsx/SKILL.md",
+      "source": "local",
+      "meta": {
+        "name": "xlsx",
+        "description": "Use this skill any time a spreadsheet file is the primary input or output. This means any task where the user wants to: open, read, edit, or fix an existing .xlsx, .xlsm, .xltx, .csv, or .tsv file (e.g., adding columns, computing formulas, formatting, charting, cleaning messy data); create a new spreadsheet from scratch or from other data sources; or convert between tabular file formats. Trigger especially when the user references a spreadsheet file by name or path — even casually (like \\\"the xlsx in my downloads\\\") — and wants something done to it or produced from it. Also trigger for cleaning or restructuring messy tabular data files (malformed rows, misplaced headers, junk data) into proper spreadsheets. The deliverable must be a spreadsheet file. Do NOT trigger when the primary deliverable is a Word document, HTML report, standalone Python script, database pipeline, or Google Sheets API integration, even if tabular data is involved.",
+        "license": "Proprietary. LICENSE.txt has complete terms"
+      },
+      "bodyChars": 7504,
+      "updatedAt": "2026-09-05T15:57:27.647Z"
     }
   ],
   "mcpServers": [

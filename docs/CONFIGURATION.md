@@ -8,9 +8,6 @@ The full example is [`maskshift.config.example.json`](../maskshift.config.exampl
 
 | Field | Default | Meaning |
 |---|---:|---|
-| `host` | `127.0.0.1` | HTTP bind address. |
-| `port` | `4242` | HTTP port; CLI `--port 0` selects an ephemeral port. |
-| `autoOpen` | `true` | Open the cockpit after the daemon starts. |
 | `permissionMode` | `overdrive` | Routing/display mode; overdrive does not prompt per command. |
 | `filesystemScope` | `host` | Native file tools may resolve host paths. |
 | `networkAccess` | `unrestricted` | Declares network intent for prompts and telemetry. |
@@ -26,6 +23,20 @@ The full example is [`maskshift.config.example.json`](../maskshift.config.exampl
 | `autoCheckpoint` | `true` | Capture recoverable state before autonomous runs. |
 | `autoLoadCapabilities` | `true` | Prime tools and skills from prompt relevance. |
 | `autoConnectMcp` | `true` | Permit relevance-driven MCP connection. |
+
+## Terminal interface
+
+| Field | Default | Meaning |
+|---|---:|---|
+| `ui.density` | `maximal` | Reserved for future layout density presets. |
+| `ui.rail` | `plan` | Rail section shown first: `plan`, `telemetry`, `events` or `git`. |
+| `ui.railVisible` | `true` | Whether the right rail starts visible. It hides itself below 108 columns regardless. |
+| `ui.unicode` | `null` | Force Unicode box drawing on or off. `null` auto-detects from the locale. |
+| `ui.colorDepth` | `null` | Force `0`, `4`, `8` or `24`-bit colour. `null` auto-detects. |
+| `ui.expandToolOutput` | `false` | Start the transcript with tool output expanded. |
+
+Environment overrides: `MASKSHIFT_COLOR=off|basic|full`, `MASKSHIFT_ASCII=1`,
+plus the standard `NO_COLOR` and `FORCE_COLOR`.
 
 ## Repository indexing
 
