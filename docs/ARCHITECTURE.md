@@ -5,10 +5,10 @@
 MaskShift separates **capability availability** from **model-context cost**. The harness may know about hundreds or thousands of local tools, skills, MCP servers, and plugins, but a run starts with a small always-available kernel. The capability controller searches the entire catalog and activates only what the current task or step requires.
 
 ```text
-Browser cockpit / CLI
+Terminal interface (TUI) / CLI subcommands
         │
         ▼
-Local HTTP daemon ───── SSE event stream ───── audit + telemetry
+In-process runtime ───── event bus ───── audit + telemetry
         │
         ├── Agent engine
         │     ├── prompt + instruction builder
@@ -103,20 +103,46 @@ MaskShift’s default execution target is the account running the daemon. Native
 
 The tool registry still attaches risk and read/write metadata for routing, display, and audit purposes. In `overdrive` mode those labels do not create approval prompts.
 
-## Web cockpit
+## Terminal interface
 
-The UI is static HTML, CSS, and browser JavaScript served by the same local daemon. It has no frontend build step and no framework dependency. It communicates through JSON APIs and a Server-Sent Events stream.
+MaskShift ships one interface and it runs in the terminal. There is no HTTP
+server, no browser and no frontend build step; the TUI is a set of ES modules
+under `src/tui/` that talk to the same in-process runtime objects the CLI uses.
+
+The renderer is written from scratch against Node's built-ins:
+
+- `theme.mjs` — the Phantom Protocol palette, generated for truecolor, 256-colour
+  and 16-colour terminals from one set of hex values.
+- `text.mjs` — ANSI-aware measurement, slicing and wrapping, including wide-glyph
+  handling, so styled strings keep panel alignment.
+- `screen.mjs` — an alternate-screen frame buffer that diffs against the previous
+  frame and rewrites only the rows that changed.
+- `input.mjs` — a raw-mode decoder for control keys, CSI sequences, modifiers and
+  bracketed paste.
+- `box.mjs` / `layout.mjs` — the stencil panel language and the column/row
+  composition helpers.
+- `widgets.mjs`, `overlays.mjs`, `views/` — editors, lists, viewports, the command
+  palette, forms, and the six views.
 
 Primary views:
 
-- Cockpit: chat, run state, plan, telemetry, event feed, Git pulse.
-- Files: workspace tree and bounded source preview.
-- Loadout: searchable native tools and skills.
-- MCP Grid: imported servers, connection state, and official registry installer.
-- Pit Garage: automations, plugins, external-agent bridges, and browser profiles.
-- Host Terminal: direct unrestricted command execution.
+- 01 HEIST: transcript, composer, plan, live tool calls.
+- 02 FILES: workspace tree and syntax-tinted source preview.
+- 03 ARSENAL: searchable native tools and skills with parameter dossiers.
+- 04 NETWORK: MCP servers, connection state, and the official registry installer.
+- 05 MOD SHOP: automations, plugins, agent bridges, browsers, processes.
+- 06 TERMINAL: direct unrestricted command execution.
 
-At compact widths, a six-position racing strip preserves access to all views and new-run creation; the MaskShift brand opens the session drawer.
+The right rail carries the plan, live loadout telemetry, the raw event bus and a
+Git pulse. Below 108 columns the rail hides itself and the header sheds telemetry
+chips, so the interface stays usable at 80×24.
+
+## Command line
+
+`src/cli/` wraps the same runtime for non-interactive use. Every capability the
+TUI exposes has a subcommand, and every subcommand supports `--json`, so MaskShift
+composes with shell pipelines and CI. `maskshift daemon` keeps the automation
+scheduler resident with no interface at all.
 
 ## Extension boundary
 

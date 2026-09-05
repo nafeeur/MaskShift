@@ -2,7 +2,7 @@
 
 MaskShift is intentionally a **permissive local coding harness**, not a sandbox. The default `overdrive` mode gives the model access to host-level tools without per-action confirmation.
 
-The supported deployment boundary is a trusted local machine or a controlled development environment. The daemon binds to `127.0.0.1` by default. Do not expose its HTTP API directly to an untrusted network.
+The supported deployment boundary is a trusted local machine or a controlled development environment. MaskShift is a terminal application: it opens no listening socket and exposes no network API. Anyone with access to the terminal running it has the authority of the account running it.
 
 Security-sensitive bug reports should include the affected version, reproduction steps, expected boundary, and whether the issue is reachable from loopback, a configured reverse proxy, a plugin, an MCP server, or a model-generated command.
 

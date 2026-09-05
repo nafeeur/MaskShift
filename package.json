@@ -1,7 +1,7 @@
 {
   "name": "maskshift",
   "version": "1.0.0",
-  "description": "A maximalist, model-agnostic coding harness with lazy skills, tools, MCP and multi-agent orchestration.",
+  "description": "A maximalist, model-agnostic coding harness for the terminal, with lazy skills, tools, MCP and multi-agent orchestration.",
   "type": "module",
   "private": true,
   "bin": {
@@ -12,16 +12,19 @@
   },
   "scripts": {
     "start": "node --no-warnings ./bin/maskshift.mjs",
-    "dev": "node --no-warnings --watch ./bin/maskshift.mjs --no-open",
+    "dev": "node --no-warnings --watch ./bin/maskshift.mjs",
     "check": "node --no-warnings ./scripts/check.mjs",
     "test": "node --no-warnings --test ./tests/*.test.mjs",
     "smoke": "node --no-warnings ./scripts/smoke-test.mjs",
     "verify": "npm run check && npm test && npm run smoke",
     "docs": "node --no-warnings ./scripts/generate-docs.mjs",
+    "capture": "node --no-warnings ./scripts/capture-tui.mjs",
     "doctor": "node --no-warnings ./bin/maskshift.mjs doctor"
   },
   "keywords": [
     "coding-agent",
+    "tui",
+    "cli",
     "mcp",
     "agent-skills",
     "ai",

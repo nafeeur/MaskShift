@@ -48,7 +48,7 @@ function envProviderDefaults() {
       autoDiscover: true,
       models: [],
       headers: {
-        'HTTP-Referer': 'http://127.0.0.1:4242',
+        'HTTP-Referer': 'https://github.com/nafeeur/MaskShift',
         'X-Title': 'MaskShift',
       },
     },
@@ -90,9 +90,6 @@ export function defaultConfig() {
   return {
     version: 1,
     home,
-    host: process.env.MASKSHIFT_HOST || '127.0.0.1',
-    port: Number(process.env.MASKSHIFT_PORT || 4242),
-    autoOpen: true,
     permissionMode: 'overdrive',
     filesystemScope: 'host',
     networkAccess: 'unrestricted',
@@ -156,11 +153,14 @@ export function defaultConfig() {
     providers: envProviderDefaults(),
     mcpServers: {},
     hooks: {},
+    // Terminal interface preferences.
     ui: {
       density: 'maximal',
-      motion: true,
-      telemetry: true,
-      terminalHeight: 260,
+      rail: 'plan',
+      railVisible: true,
+      unicode: null,
+      colorDepth: null,
+      expandToolOutput: false,
     },
   };
 }

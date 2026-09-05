@@ -32,9 +32,15 @@ Permissive is not invisible. MaskShift records and exposes:
 
 ## Recommended operating boundary
 
-The default HTTP bind is `127.0.0.1`. Keep it on loopback unless you place it behind an authenticated reverse proxy or a private access layer that you control.
+MaskShift listens on nothing. There is no HTTP server, no socket and no remote
+control surface: the interface and the CLI run in the same process as the agent,
+under your account, on your machine.
 
-Do not expose an unauthenticated overdrive daemon directly to a shared network. The HTTP API includes direct tool execution and host terminal endpoints by design.
+That removes the network attack surface but not the local one. Anyone who can run
+`maskshift` in your shell can run any command your account can run, so treat the
+MaskShift home directory and any shared terminal multiplexer session as
+credentials. If you run `maskshift daemon` for automations, remember that its
+armed automations execute unattended with the same authority.
 
 Run MaskShift as the user whose files and developer credentials it should access. Running as root gives the agent root authority and is rarely necessary.
 

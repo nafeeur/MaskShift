@@ -1,5 +1,5 @@
 [Unit]
-Description=MaskShift maximalist coding harness
+Description=MaskShift automation daemon
 After=network-online.target
 Wants=network-online.target
 
@@ -8,7 +8,9 @@ Type=simple
 WorkingDirectory=%h
 Environment=MASKSHIFT_HOME=%h/.maskshift
 EnvironmentFile=-%h/.config/maskshift/env
-ExecStart=%h/.local/bin/maskshift serve --workspace %h --host 127.0.0.1 --port 4242 --no-open
+# The daemon runs no interface; it keeps scheduled automations firing.
+# Use the `maskshift` command in a terminal for the TUI.
+ExecStart=%h/.local/bin/maskshift daemon --workspace %h
 Restart=on-failure
 RestartSec=3
 TimeoutStopSec=30

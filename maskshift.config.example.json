@@ -1,9 +1,6 @@
 {
   "version": 1,
   "home": "~/.maskshift",
-  "host": "127.0.0.1",
-  "port": 4242,
-  "autoOpen": true,
   "permissionMode": "overdrive",
   "filesystemScope": "host",
   "networkAccess": "unrestricted",
@@ -85,7 +82,7 @@
       "autoDiscover": true,
       "models": [],
       "headers": {
-        "HTTP-Referer": "http://127.0.0.1:4242",
+        "HTTP-Referer": "https://github.com/nafeeur/MaskShift",
         "X-Title": "MaskShift"
       }
     },
@@ -169,8 +166,10 @@
   "hooks": {},
   "ui": {
     "density": "maximal",
-    "motion": true,
-    "telemetry": true,
-    "terminalHeight": 260
+    "rail": "plan",
+    "railVisible": true,
+    "unicode": null,
+    "colorDepth": null,
+    "expandToolOutput": false
   }
 }

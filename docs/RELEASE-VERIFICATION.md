@@ -14,7 +14,7 @@ Verification date: 2026-09-02
 - Host terminal verification: **passed**.
 - Runtime inventory: **143 native tools, 36 bundled skills, eight curated MCP starters**.
 
-The integration suite covers configuration isolation, SQLite/FTS memory, nullable automation updates, modern stateless MCP, legacy initialized MCP, lazy qualified MCP dispatch, host filesystem/shell tools, repository indexing, trusted plugin hot loading, one-shot automation cleanup, clean-repository Git checkpoint restoration, the local HTTP API, and the model/tool loop.
+The integration suite covers configuration isolation, SQLite/FTS memory, nullable automation updates, modern stateless MCP, legacy initialized MCP, lazy qualified MCP dispatch, host filesystem/shell tools, repository indexing, trusted plugin hot loading, one-shot automation cleanup, clean-repository Git checkpoint restoration, the CLI command surface, the terminal renderer, and the model/tool loop.
 
 ## Distribution checks
 
@@ -30,11 +30,18 @@ The integration suite covers configuration isolation, SQLite/FTS memory, nullabl
 - `compose.yaml` parse: passed.
 - Dockerfile static assertions: passed. A container image was not built in the release environment because no Docker or Podman daemon was available.
 
-## Browser cockpit QA
+## Terminal interface QA
 
-The live daemon was exercised in Chromium at 1920×1080, 1366×768, 900×900, and 412×915. The Run, Files, Loadout, MCP, Garage, and Settings views rendered without browser console errors or horizontal viewport overflow. Compact mode retained all primary navigation and session access.
+The interface is verified by rendering real frames against a synthetic terminal.
+`tests/tui.test.mjs` paints all six views, all four rail sections and all eleven
+overlays at 132×36, then repaints at 72×20, asserting that every row is exactly
+the terminal width and that the frame is exactly the terminal height — the
+renderer's equivalent of "no horizontal overflow". The same assertions run inside
+`npm run smoke` against a completed agent run.
 
-Screenshots are retained under `docs/screenshots/`.
+Colour degradation (truecolor, 256-colour, 16-colour, `NO_COLOR`) and the raw-mode
+key decoder (control keys, CSI sequences, modifiers, bracketed paste) have direct
+unit coverage.
 
 ## Operational boundary
 

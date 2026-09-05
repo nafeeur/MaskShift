@@ -6,7 +6,7 @@ import { createRuntime } from '../src/runtime.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const home = await fsp.mkdtemp(path.join(os.tmpdir(), 'maskshift-docs-'));
-const runtime = await createRuntime({ workspacePath: root, configOverrides: { home, autoIndex: false, autoOpen: false } });
+const runtime = await createRuntime({ workspacePath: root, configOverrides: { home, autoIndex: false } });
 
 function cell(value) {
   return String(value ?? '').replaceAll('|', '\\|').replaceAll('\n', ' ');
