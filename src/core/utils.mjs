@@ -139,12 +139,14 @@ export function parseArgs(argv) {
 }
 
 export async function commandExists(command) {
-  const paths = (process.env.PATH || '').split(path.delimiter);
-  for (const base of paths) {
-    const candidate = path.join(base, command);
+  if (typeof command !== 'string' || !command) return null;
+  const candidates = path.isAbsolute(command) || command.includes(path.sep)
+    ? [path.resolve(command)]
+    : (process.env.PATH || '').split(path.delimiter).map((base) => path.join(base, command));
+  for (const candidate of candidates) {
     try {
       await fsp.access(candidate, fs.constants.X_OK);
-      return candidate;
+      if ((await fsp.stat(candidate)).isFile()) return candidate;
     } catch { /* keep searching */ }
   }
   return null;

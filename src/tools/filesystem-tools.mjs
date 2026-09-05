@@ -229,7 +229,17 @@ export function registerFilesystemTools(registry, { workspaceManager, config }) 
     execute: async (args, context) => {
       const from = resolveTarget(args.from, context);
       const to = resolveTarget(args.to, context);
+      await fsp.lstat(from);
+      if (from === to) return { from, to };
       await ensureDir(path.dirname(to));
+      if (!args.overwrite) {
+        try {
+          await fsp.lstat(to);
+          throw new Error(`Destination already exists: ${to}`);
+        } catch (error) {
+          if (error.code !== 'ENOENT') throw error;
+        }
+      }
       if (args.overwrite) await fsp.rm(to, { recursive: true, force: true });
       await fsp.rename(from, to);
       return { from, to };

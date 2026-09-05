@@ -379,11 +379,14 @@ Useful development commands:
 ```bash
 npm run check     # syntax validation across every source module
 npm test          # native unit and integration suite, including renderer tests
+npm run test:tools # all-native-tool scenarios and edge-case regressions
 npm run smoke     # end-to-end tool-calling agent run plus a full interface paint
 npm run verify    # check + tests + smoke
 npm run docs      # regenerate tool and skill inventory
 npm run capture   # regenerate the interface screenshots in docs/screenshots
 ```
+
+Per-tool coverage and live-integration limits: [verification report](docs/TOOL_VERIFICATION.md).
 
 ## Deployment
 

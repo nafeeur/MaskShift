@@ -19,7 +19,8 @@
     "verify": "npm run check && npm test && npm run smoke",
     "docs": "node --no-warnings ./scripts/generate-docs.mjs",
     "capture": "node --no-warnings ./scripts/capture-tui.mjs",
-    "doctor": "node --no-warnings ./bin/maskshift.mjs doctor"
+    "doctor": "node --no-warnings ./bin/maskshift.mjs doctor",
+    "test:tools": "node --no-warnings --test ./tests/all-tools.test.mjs ./tests/tool-edge-cases.test.mjs"
   },
   "keywords": [
     "coding-agent",

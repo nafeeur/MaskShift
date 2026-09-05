@@ -88,7 +88,7 @@ export function registerSearchTools(registry, { indexer, workspaceManager, confi
       const result = await runCommand(`rg ${flags.map(shellQuote).join(' ')} ${shellQuote(root)}`, {
         cwd: context.workspacePath || process.cwd(), timeoutMs: 60_000, maxOutputChars: 2_000_000, signal: context.signal,
       });
-      if (result.code !== 0 && !result.stdout) throw new Error(result.stderr || `rg --files exited ${result.code}`);
+      if (![0, 1].includes(result.code)) throw new Error(result.stderr || `rg --files exited ${result.code}`);
       const query = String(args.query || '').toLowerCase();
       let files = result.stdout.split('\n').filter(Boolean);
       if (query) files = files.filter((file) => file.toLowerCase().includes(query));

@@ -29,7 +29,7 @@ export function registerProjectTools(registry, { workspaceManager, indexer, stor
     inputSchema: { type: 'object', properties: { path: { type: 'string', default: '.' }, depth: { type: 'integer', minimum: 0, maximum: 20, default: 4 }, includeHidden: { type: 'boolean', default: false }, maxEntries: { type: 'integer', minimum: 1, maximum: 50000, default: 3000 } } },
     execute: async (args, context) => {
       if (!context.workspaceId) throw new Error('Project tree requires a workspace');
-      const result = await workspaceManager.listFiles(context.workspaceId, args);
+      const result = await workspaceManager.listFiles(context.workspaceId, { ...args, target: args.path || '.' });
       return { ...result, tree: truncate(treeText(result.entries), config.get().maxToolOutputChars) };
     },
   });

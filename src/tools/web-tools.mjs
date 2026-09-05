@@ -115,9 +115,10 @@ export function registerWebTools(registry, { config }) {
         const contentType = response.headers.get('content-type') || '';
         const text = await response.text();
         const maxChars = Math.min(args.maxChars || 200_000, 2_000_000);
+        const mode = args.mode || 'auto';
         let content;
-        if (args.mode === 'json' || (args.mode === 'auto' && contentType.includes('json'))) content = safeJsonParse(text, text);
-        else if (args.mode === 'readable' || (args.mode === 'auto' && contentType.includes('html'))) content = truncate(htmlToText(text), maxChars);
+        if (mode === 'json' || (mode === 'auto' && contentType.includes('json'))) content = safeJsonParse(text, text);
+        else if (mode === 'readable' || (mode === 'auto' && contentType.includes('html'))) content = truncate(htmlToText(text), maxChars);
         else content = truncate(text, maxChars);
         return {
           url: response.url, status: response.status, ok: response.ok, statusText: response.statusText,

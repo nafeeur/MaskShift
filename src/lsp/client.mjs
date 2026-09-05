@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 import { id, truncate } from '../core/utils.mjs';
 
 function languageId(file) {
@@ -154,12 +154,12 @@ export class LanguageServerClient {
     for (const [uri, edits] of Object.entries(changes)) {
       const file = new URL(uri);
       if (file.protocol !== 'file:') continue;
-      applied.push(await this.applyTextEdits(file.pathname, edits));
+      applied.push(await this.applyTextEdits(fileURLToPath(file), edits));
     }
     for (const change of edit?.documentChanges || []) {
       if (!change.textDocument?.uri || !change.edits) continue;
       const file = new URL(change.textDocument.uri);
-      if (file.protocol === 'file:') applied.push(await this.applyTextEdits(file.pathname, change.edits));
+      if (file.protocol === 'file:') applied.push(await this.applyTextEdits(fileURLToPath(file), change.edits));
     }
     return applied;
   }
