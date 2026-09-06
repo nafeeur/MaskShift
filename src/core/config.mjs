@@ -131,6 +131,9 @@ export function defaultConfig() {
       models: {},
     },
     defaultModel: process.env.MASKSHIFT_MODEL || 'ollama:auto',
+    // provider:model reference for image_read's description step, e.g. "ollama:llava".
+    // Left null, it is auto-detected from models already pulled on the Ollama provider.
+    visionModel: process.env.MASKSHIFT_VISION_MODEL || null,
     dataFile: path.join(home, 'maskshift.sqlite'),
     logFile: path.join(home, 'logs', 'maskshift.log'),
     auditFile: path.join(home, 'logs', 'audit.jsonl'),

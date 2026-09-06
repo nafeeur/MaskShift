@@ -1,7 +1,7 @@
 {
   "generatedAt": "2026-09-05T16:47:23.027Z",
   "version": "1.0.0",
-  "nativeToolCount": 148,
+  "nativeToolCount": 149,
   "bundledSkillCount": 44,
   "curatedMcpCount": 8,
   "tools": [
@@ -492,6 +492,15 @@
       "alwaysAvailable": false
     },
     {
+      "name": "image_read",
+      "title": "Read an image (OCR + description)",
+      "description": "Read an image file: extract any visible text with OCR, and — if a local vision model is available — generate a natural-language description or answer a question about it. Works even when the active chat model has no native vision support, because the description is produced out of band and returned as plain text.",
+      "category": "documents",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
       "name": "notebook_edit",
       "title": "Edit Jupyter notebook cell",
       "description": "Replace, insert, or delete one cell in a Jupyter (.ipynb) notebook by index. Replacing or inserting a code cell clears its stale outputs and execution count.",
@@ -512,7 +521,7 @@
     {
       "name": "pdf_read",
       "title": "Extract PDF text",
-      "description": "Extract text from a PDF using pdftotext (poppler-utils), with optional page range and layout preservation.",
+      "description": "Extract text from a PDF using pdftotext (poppler-utils), with optional page range and layout preservation. Falls back to rendering pages and running OCR when the PDF has little or no extractable text layer (scans, photographed pages).",
       "category": "documents",
       "readOnly": true,
       "risk": "normal",

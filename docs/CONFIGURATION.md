@@ -23,6 +23,7 @@ The full example is [`maskshift.config.example.json`](../maskshift.config.exampl
 | `autoCheckpoint` | `true` | Capture recoverable state before autonomous runs. |
 | `autoLoadCapabilities` | `true` | Prime tools and skills from prompt relevance. |
 | `autoConnectMcp` | `true` | Permit relevance-driven MCP connection. |
+| `visionModel` | `null` | `provider:model` reference used by `image_read` to describe images (e.g. `ollama:llava`). `null` auto-detects a vision-capable model already pulled on the Ollama provider; override with `MASKSHIFT_VISION_MODEL`. |
 
 ## Terminal interface
 
@@ -54,6 +55,23 @@ shift+drag.
 
 Embeddings are best-effort: if the configured Ollama endpoint or model is unreachable, `repo_search` and repository context construction silently fall back to lexical FTS only. Embeddings are keyed by content hash and carried over across reindexes, so unchanged files are never re-embedded.
 
+## Images and scanned PDFs
+
+`image_read` and the OCR fallback in `pdf_read` give any model — including ones with no native
+vision support — access to what's in an image or a scanned PDF, by running the extraction out of
+band and returning plain text:
+
+| Step | Tool | Requires |
+|---|---|---|
+| Text extraction (OCR) | `image_read`, `pdf_read` fallback | `tesseract` on `PATH` |
+| Page rendering (scanned PDFs) | `pdf_read` fallback | `pdftoppm` (poppler-utils) on `PATH` |
+| Natural-language description | `image_read` | An Ollama vision model (`ollama pull llava`, `moondream`, `qwen2.5vl`, ...) |
+
+Each step degrades independently: without `tesseract`/`pdftoppm`, OCR is skipped with a note in
+the result; without a discoverable vision model, the description step is skipped the same way.
+`pdf_read` only attempts the OCR fallback when the PDF's extractable text layer looks too sparse
+for its page count, so normal text PDFs are unaffected.
+
 ## Environment variables
 
 ```text
@@ -64,6 +82,7 @@ MASKSHIFT_PORT
 MASKSHIFT_MODEL
 MASKSHIFT_DEBUG
 MASKSHIFT_EMBED_MODEL
+MASKSHIFT_VISION_MODEL
 OLLAMA_BASE_URL
 OPENAI_API_KEY
 OPENAI_BASE_URL

@@ -17,7 +17,7 @@ In-process runtime ───── event bus ───── audit + telemetry
         │     ├── capability controller
         │     └── plan / tool / subagent loop
         │
-        ├── Native tool registry (148 tools)
+        ├── Native tool registry (149 tools)
         ├── Skill manager (metadata eager, body lazy)
         ├── MCP manager (definition eager, connection/schema lazy)
         ├── Workspace + index + checkpoint managers
