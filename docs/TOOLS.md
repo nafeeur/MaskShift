@@ -1,6 +1,6 @@
 # Native Tool Inventory
 
-Generated from the MaskShift 1.0.0 runtime. **148 native tools** are available before plugins or MCP servers add more capabilities.
+Generated from the MaskShift 1.0.0 runtime. **149 native tools** are available before plugins or MCP servers add more capabilities.
 
 Only activated descriptors enter a model request; this document is the complete local catalog.
 
@@ -93,13 +93,14 @@ Only activated descriptors enter a model request; this document is the complete 
 | `sqlite_query` | write | database-write | Open any SQLite database directly through Node native SQLite, execute parameterized SQL, and return structured rows. Write statements are allowed. |
 | `sqlite_schema` | read | normal | Return tables, views, indexes, triggers, and CREATE statements from a SQLite database. |
 
-## documents (3)
+## documents (4)
 
 | Tool | Access | Risk | Description |
 |---|---|---|---|
+| `image_read` | read | normal | Read an image file: extract any visible text with OCR, and — if a local vision model is available — generate a natural-language description or answer a question about it. Works even when the active chat model has no native vision support, because the description is produced out of band and returned as plain text. |
 | `notebook_edit` | write | write | Replace, insert, or delete one cell in a Jupyter (.ipynb) notebook by index. Replacing or inserting a code cell clears its stale outputs and execution count. |
 | `notebook_read` | read | normal | Read a Jupyter (.ipynb) notebook and return each cell's index, type, source, and a bounded summary of its outputs. |
-| `pdf_read` | read | normal | Extract text from a PDF using pdftotext (poppler-utils), with optional page range and layout preservation. |
+| `pdf_read` | read | normal | Extract text from a PDF using pdftotext (poppler-utils), with optional page range and layout preservation. Falls back to rendering pages and running OCR when the PDF has little or no extractable text layer (scans, photographed pages). |
 
 ## filesystem (10)
 

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
+import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { commandExists, shellQuote } from '../src/core/utils.mjs';
 import { createProject, runtimeForTest, jsonServer, respondJson, waitFor } from './helpers.mjs';
@@ -9,6 +10,27 @@ import { createProject, runtimeForTest, jsonServer, respondJson, waitFor } from 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const coverage = new Map();
 let inventory;
+
+// Minimal valid 1x1 red PNG, built by hand so the fixture needs no image library.
+function pngChunk(type, data) {
+  const typeBuf = Buffer.from(type, 'ascii');
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(data.length);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(zlib.crc32(Buffer.concat([typeBuf, data])));
+  return Buffer.concat([length, typeBuf, data, crc]);
+}
+function makeFixturePng() {
+  const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(1, 0); // width
+  ihdr.writeUInt32BE(1, 4); // height
+  ihdr.writeUInt8(8, 8); // bit depth
+  ihdr.writeUInt8(2, 9); // color type: RGB
+  const scanline = Buffer.from([0, 255, 0, 0]); // filter byte + one red pixel
+  const idat = zlib.deflateSync(scanline);
+  return Buffer.concat([signature, pngChunk('IHDR', ihdr), pngChunk('IDAT', idat), pngChunk('IEND', Buffer.alloc(0))]);
+}
 
 async function setup(t, overrides = {}) {
   const project = await createProject(t);
@@ -171,6 +193,19 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
     await call('notebook_read', { path: 'fixture.ipynb' }, r => assert.equal(r.cells[0].source, '1+1'));
     await call('notebook_edit', { path: 'fixture.ipynb', cellIndex: 0, source: '2+2', editMode: 'replace', cellType: 'code' });
     await call('notebook_read', { path: 'fixture.ipynb' }, r => assert.equal(r.cells[0].source, '2+2'));
+  });
+
+  await suite.test('image OCR and description fallback', async (t) => {
+    const { call, project } = await setup(t);
+    await fsp.writeFile(path.join(project, 'fixture.png'), makeFixturePng());
+    // No tesseract/vision model guaranteed on this host, so this exercises the graceful-degradation
+    // path (both steps report a note) as much as the happy path — either way it's a real assertion.
+    await call('image_read', { path: 'fixture.png' }, (r) => {
+      assert.equal(r.path.endsWith('fixture.png'), true);
+      assert.ok(r.sizeBytes > 0);
+      assert.ok(Array.isArray(r.notes));
+      assert.ok(r.ocrText !== undefined && r.description !== undefined);
+    });
   });
 
   await suite.test('automation and plugin lifecycle in disposable home', async (t) => {

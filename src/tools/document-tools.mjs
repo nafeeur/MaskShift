@@ -1,5 +1,32 @@
 import fsp from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { absolutePath, commandExists, runCommand, shellQuote, truncate } from '../core/utils.mjs';
+
+// Renders a PDF page range to images and OCRs them, for PDFs with little or no extractable
+// text layer (scans, photographed pages). Bounded to maxPages so one huge scan can't hang.
+async function ocrScannedPdf(target, { firstPage, lastPage, totalPages, maxPages, signal }) {
+  const start = firstPage || 1;
+  const end = Math.min(lastPage || totalPages || start + maxPages - 1, start + maxPages - 1, totalPages || Infinity);
+  const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'maskshift-pdf-ocr-'));
+  try {
+    const prefix = path.join(tempDir, 'page');
+    const render = await runCommand(
+      `pdftoppm -png -r 200 -f ${start} -l ${end} ${shellQuote(target)} ${shellQuote(prefix)}`,
+      { timeoutMs: 120_000, signal },
+    );
+    if (render.code !== 0) throw new Error(`pdftoppm failed (${render.code}): ${render.stderr || 'unknown error'}`);
+    const files = (await fsp.readdir(tempDir)).filter((file) => file.startsWith('page') && file.endsWith('.png')).sort();
+    const pages = [];
+    for (const file of files) {
+      const ocr = await runCommand(`tesseract ${shellQuote(path.join(tempDir, file))} stdout`, { timeoutMs: 60_000, signal });
+      pages.push(ocr.stdout.trim());
+    }
+    return pages.join('\n\n');
+  } finally {
+    await fsp.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
 
 async function readNotebook(target) {
   const raw = await fsp.readFile(target, 'utf8');
@@ -32,9 +59,9 @@ function summarizeOutputs(outputs = []) {
 export function registerDocumentTools(registry) {
   registry.register({
     name: 'pdf_read', title: 'Extract PDF text',
-    description: 'Extract text from a PDF using pdftotext (poppler-utils), with optional page range and layout preservation.',
+    description: 'Extract text from a PDF using pdftotext (poppler-utils), with optional page range and layout preservation. Falls back to rendering pages and running OCR when the PDF has little or no extractable text layer (scans, photographed pages).',
     category: 'documents', readOnly: true,
-    keywords: ['pdf', 'document', 'extract text', 'poppler'],
+    keywords: ['pdf', 'document', 'extract text', 'poppler', 'scanned', 'ocr'],
     inputSchema: {
       type: 'object', required: ['path'],
       properties: {
@@ -43,6 +70,8 @@ export function registerDocumentTools(registry) {
         lastPage: { type: 'integer', minimum: 1 },
         layout: { type: 'boolean', default: true },
         maxChars: { type: 'integer', minimum: 1000, maximum: 2000000, default: 500000 },
+        ocrFallback: { type: 'boolean', default: true, description: 'Render and OCR pages when the PDF looks scanned (little/no extractable text).' },
+        maxOcrPages: { type: 'integer', minimum: 1, maximum: 50, default: 15 },
       },
     },
     execute: async (args, context) => {
@@ -60,10 +89,39 @@ export function registerDocumentTools(registry) {
       if (result.code !== 0) throw new Error(`pdftotext failed (${result.code}): ${result.stderr || 'unknown error'}`);
       const info = await runCommand(`pdfinfo ${shellQuote(target)}`, { timeoutMs: 10_000 }).catch(() => null);
       const totalPages = Number(info?.stdout?.match(/^Pages:\s+(\d+)/m)?.[1]) || null;
+
+      const rawText = result.stdout || '';
+      let text = rawText;
+      let ocrFallbackUsed = false;
+      let note = null;
+      const looksScanned = rawText.trim().length < (totalPages || 1) * 20;
+
+      if (looksScanned && args.ocrFallback !== false) {
+        const [tesseractAvailable, pdftoppmAvailable] = await Promise.all([commandExists('tesseract'), commandExists('pdftoppm')]);
+        if (tesseractAvailable && pdftoppmAvailable) {
+          try {
+            const ocrText = await ocrScannedPdf(target, {
+              firstPage: args.firstPage, lastPage: args.lastPage, totalPages,
+              maxPages: args.maxOcrPages || 15, signal: context.signal,
+            });
+            if (ocrText.trim().length > rawText.trim().length) {
+              text = ocrText;
+              ocrFallbackUsed = true;
+            }
+          } catch (error) {
+            note = `OCR fallback failed: ${error.message}`;
+          }
+        } else {
+          note = 'This PDF looks scanned (little or no extractable text); install tesseract and poppler-utils (pdftoppm) to enable OCR fallback.';
+        }
+      }
+
       return {
         path: target, totalPages,
-        text: truncate(result.stdout, maxChars),
-        truncated: result.stdout.length > maxChars,
+        text: truncate(text, maxChars),
+        truncated: text.length > maxChars,
+        ocrFallbackUsed,
+        ...(note ? { note } : {}),
       };
     },
   });
