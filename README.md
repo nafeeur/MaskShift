@@ -10,6 +10,7 @@
 </p>
 
 <p align="center">
+  <img alt="npm version" src="https://img.shields.io/npm/v/maskshift?style=flat-square&color=cb3837">
   <img alt="Node 22+" src="https://img.shields.io/badge/node-%E2%89%A522-3ecf8e?style=flat-square">
   <img alt="Runtime dependencies: none" src="https://img.shields.io/badge/runtime%20deps-0-4aa8ff?style=flat-square">
   <img alt="148 tools" src="https://img.shields.io/badge/tools-148-2bd9c0?style=flat-square">
@@ -60,7 +61,20 @@ runtime dependency tree, no HTTP server, no browser, no listening socket.
 - Git and ripgrep recommended
 - Any instruction-following model through Ollama or another configured provider
 
-**Run from the source directory**
+**Install from npm**
+
+```bash
+npm install -g maskshift
+cd /path/to/repository && maskshift
+```
+
+Or run it without installing anything:
+
+```bash
+npx maskshift --workspace /path/to/repository
+```
+
+**Or run from the source directory**
 
 ```bash
 git clone https://github.com/nafeeur/MaskShift.git
@@ -68,7 +82,7 @@ cd MaskShift
 ./start.sh --workspace /path/to/repository
 ```
 
-**Or install to your user account**
+**Or install to your user account from source**
 
 ```bash
 ./install.sh
@@ -76,7 +90,7 @@ cd /path/to/repository && maskshift
 ```
 
 The installer copies MaskShift to `~/.local/lib/maskshift` and links `~/.local/bin/maskshift`.
-It does not run `npm install`, because there is nothing to install.
+It does not run `npm install`, because there is nothing to install — MaskShift has zero runtime dependencies.
 
 ## Run it with Ollama
 
