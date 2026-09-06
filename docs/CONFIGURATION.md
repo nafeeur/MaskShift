@@ -34,9 +34,12 @@ The full example is [`maskshift.config.example.json`](../maskshift.config.exampl
 | `ui.unicode` | `null` | Force Unicode box drawing on or off. `null` auto-detects from the locale. |
 | `ui.colorDepth` | `null` | Force `0`, `4`, `8` or `24`-bit colour. `null` auto-detects. |
 | `ui.expandToolOutput` | `false` | Start the transcript with tool output expanded. |
+| `ui.mouse` | `click` | `click` for press, release and drag; `hover` adds pointer-over highlighting at the cost of a report per cell crossed; `off` returns text selection to the terminal. |
 
 Environment overrides: `MASKSHIFT_COLOR=off|basic|full`, `MASKSHIFT_ASCII=1`,
-plus the standard `NO_COLOR` and `FORCE_COLOR`.
+`MASKSHIFT_MOUSE=click|hover|off`, plus the standard `NO_COLOR` and
+`FORCE_COLOR`. While the mouse is on, most terminals still select text on
+shift+drag.
 
 ## Repository indexing
 

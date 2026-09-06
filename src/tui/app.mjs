@@ -11,6 +11,7 @@ import { hstack, overlay as paintOverlay, split, vstack } from './layout.mjs';
 import { ConfirmOverlay, FormOverlay, PaletteOverlay, PickerOverlay, TextOverlay } from './overlays.mjs';
 import * as rail from './rail.mjs';
 import { RAIL_TABS } from './rail.mjs';
+import { LAYER, Regions } from './regions.mjs';
 import { Screen } from './screen.mjs';
 import { Theme } from './theme.mjs';
 import { fit, oneLine, truncate, wrap } from './text.mjs';
@@ -41,10 +42,13 @@ export class MaskShiftTui {
       ...(preferences.colorDepth === null || preferences.colorDepth === undefined ? {} : { depth: Number(preferences.colorDepth) }),
       ...(preferences.unicode === null || preferences.unicode === undefined ? {} : { unicode: Boolean(preferences.unicode) }),
     });
-    this.screen = new Screen({ theme: this.theme, output });
+    this.screen = new Screen({ theme: this.theme, output, mouse: resolveMouseMode(preferences) });
     this.keyboard = new Keyboard({ input });
     this.spinner = new Spinner();
     this.toasts = new Toasts();
+    // Rebuilt every frame; see regions.mjs.
+    this.regions = new Regions();
+    this.dragging = null;
 
     this.views = VIEWS.map((module) => module.meta);
     this.modules = new Map(VIEWS.map((module) => [module.meta.id, module]));
@@ -152,6 +156,7 @@ export class MaskShiftTui {
     this.screen.enter();
     this.screen.setTitle('MaskShift');
     this.keyboard.on('key', (event) => this.onKey(event));
+    this.keyboard.on('mouse', (event) => this.onMouse(event));
     this.keyboard.start();
     this.ticker = setInterval(() => this.tick(), 120);
 
@@ -297,6 +302,8 @@ export class MaskShiftTui {
     const theme = this.theme;
     const bodyHeight = Math.max(4, rows - 4);
     this.bodyRegion = { row: 2, column: 0, width: columns, height: bodyHeight };
+    // Click targets describe the frame being drawn, so they are rebuilt with it.
+    this.regions.clear();
 
     const showRail = this.railVisible && columns >= 108;
     const [mainWidth, railWidth] = showRail
@@ -363,6 +370,75 @@ export class MaskShiftTui {
       this.toast(error.message, 'error');
       this.requestRender();
     }
+  }
+
+  // ------------------------------------------------------------------- mouse
+
+  /**
+   * Route a mouse report to whatever was painted under it.
+   *
+   * Zones are resolved against the last frame, which is the frame the user was
+   * looking at when they clicked. A press latches its zone so a drag keeps
+   * talking to the scrollbar it started on even once the pointer leaves it.
+   */
+  onMouse(event) {
+    if (this.screen.mouse === 'off') return;
+    try {
+      if (event.type === 'wheel') { this.onWheel(event); return; }
+
+      if (event.type === 'drag') {
+        if (this.dragging?.onDrag) this.dragging.onDrag(this, event, this.dragging);
+        else return;
+        this.requestRender();
+        return;
+      }
+
+      if (event.type === 'move') {
+        const zone = this.regions.hit(event.row, event.column, { need: 'onPress' });
+        const id = zone?.id ?? null;
+        if (id === this.regions.hoverId) return;
+        this.regions.hoverId = id;
+        this.requestRender();
+        return;
+      }
+
+      if (event.type === 'release') {
+        const zone = this.dragging;
+        this.dragging = null;
+        this.regions.pressedId = null;
+        if (zone?.onRelease) { zone.onRelease(this, event, zone); this.requestRender(); }
+        return;
+      }
+
+      if (event.type !== 'press') return;
+
+      // An open overlay owns the screen: a click outside it dismisses rather
+      // than reaching through to the view behind.
+      if (this.overlay && !this.regions.covered(event.row, event.column, LAYER.overlay)) {
+        if (this.overlay.dismissOnOutsideClick !== false) this.closeOverlay();
+        this.requestRender();
+        return;
+      }
+
+      const zone = this.regions.hit(event.row, event.column, { need: 'onPress' });
+      if (!zone) return;
+      this.dragging = zone.onDrag ? zone : null;
+      this.regions.pressedId = zone.id;
+      zone.onPress(this, event, zone);
+      this.requestRender();
+    } catch (error) {
+      this.toast(error.message, 'error');
+      this.requestRender();
+    }
+  }
+
+  // The wheel scrolls whatever the pointer is over, focused or not, which is
+  // what every other scrolling surface on the machine does.
+  onWheel(event) {
+    const zone = this.regions.hit(event.row, event.column, { need: 'onWheel' });
+    if (!zone) return;
+    zone.onWheel(this, event, zone);
+    this.requestRender();
   }
 
   globalKey(event) {
@@ -1162,6 +1238,30 @@ export class MaskShiftTui {
     });
   }
 
+  /** Step the permission mode along. Bound to a click on the header chip. */
+  async cyclePermissionMode() {
+    const modes = ['overdrive', 'balanced', 'review'];
+    const current = this.runtime.config.get().permissionMode || 'overdrive';
+    const next = modes[(modes.indexOf(current) + 1) % modes.length];
+    await this.runtime.config.update({ permissionMode: next });
+    this.toast(`Permission mode: ${next.toUpperCase()}`, 'info');
+  }
+
+  /**
+   * Mouse reporting suppresses the terminal's own selection, so it has to be
+   * reachable without knowing the environment variable. Most terminals still
+   * select on shift+drag while tracking is on.
+   */
+  async setMouseMode(mode) {
+    if (!MOUSE_MODES.includes(mode)) return;
+    this.screen.setMouse(mode);
+    const ui = { ...(this.runtime.config.get().ui || {}), mouse: mode };
+    await this.runtime.config.update({ ui });
+    this.toast(mode === 'off'
+      ? 'Mouse off — the terminal owns selection again'
+      : `Mouse: ${mode} (shift+drag still selects text)`, 'info');
+  }
+
   openSettings() {
     const config = this.runtime.config.get();
     this.overlay = new FormOverlay({
@@ -1180,6 +1280,14 @@ export class MaskShiftTui {
         { name: 'autoIndex', label: 'auto index repositories', type: 'toggle', value: config.autoIndex },
         { name: 'autoCheckpoint', label: 'auto checkpoint before run', type: 'toggle', value: config.autoCheckpoint },
         { name: 'autoLoadCapabilities', label: 'auto prime capabilities', type: 'toggle', value: config.autoLoadCapabilities },
+        {
+          name: 'mouse', label: 'mouse', type: 'select', value: this.screen.mouse,
+          options: [
+            { label: 'CLICK', value: 'click' },
+            { label: 'CLICK + HOVER', value: 'hover' },
+            { label: 'OFF (terminal selects)', value: 'off' },
+          ],
+        },
       ],
       onSubmit: async (values) => {
         await this.runtime.config.update({
@@ -1190,8 +1298,10 @@ export class MaskShiftTui {
           autoIndex: values.autoIndex,
           autoCheckpoint: values.autoCheckpoint,
           autoLoadCapabilities: values.autoLoadCapabilities,
+          ui: { ...(config.ui || {}), mouse: values.mouse },
         });
         this.autoLoad = values.autoLoadCapabilities;
+        this.screen.setMouse(values.mouse);
         this.toast('Settings saved', 'success');
       },
     });
@@ -1236,6 +1346,8 @@ export class MaskShiftTui {
       action('tools.search', 'arsenal', 'Search tools'),
       action('skills.search', 'arsenal', 'Search skills'),
       action('capabilities.toggleTools', 'arsenal', 'Expand or collapse tool output', 't'),
+      action('mouse.cycle', 'system', 'Mouse: click / click + hover / off'),
+      action('permission.cycle', 'system', 'Cycle the permission mode'),
       action('doctor', 'system', 'Run diagnostics'),
       action('settings', 'system', 'Settings', 'f2'),
       action('logs', 'system', 'Tail the MaskShift log'),
@@ -1259,6 +1371,12 @@ export class MaskShiftTui {
       case 'workspace.inspect': void this.showInspection(); break;
       case 'workspace.checkpoint': void this.createCheckpoint(); break;
       case 'workspace.restore': this.openCheckpointPicker(); break;
+      case 'mouse.cycle': {
+        const next = MOUSE_MODES[(MOUSE_MODES.indexOf(this.screen.mouse) + 1) % MOUSE_MODES.length];
+        await this.setMouseMode(next);
+        break;
+      }
+      case 'permission.cycle': await this.cyclePermissionMode(); break;
       case 'view.chat': this.switchView(0); break;
       case 'view.files': this.switchView(1); break;
       case 'view.arsenal': this.switchView(2); break;
@@ -1480,6 +1598,24 @@ function compact(value) {
   if (value < 1000) return String(value);
   if (value < 1_000_000) return `${(value / 1000).toFixed(1)}k`;
   return `${(value / 1_000_000).toFixed(1)}M`;
+}
+
+export const MOUSE_MODES = ['off', 'click', 'hover'];
+
+/**
+ * Mouse reporting takes the terminal's own text selection away from the user,
+ * so it stays overridable: MASKSHIFT_MOUSE wins, then the stored preference,
+ * and the default is click tracking without hover motion — hover floods the
+ * wire with a report per cell, which is wasteful over SSH.
+ */
+export function resolveMouseMode(preferences = {}) {
+  const override = String(process.env.MASKSHIFT_MOUSE || '').toLowerCase();
+  if (override === 'off' || override === '0' || override === 'false') return 'off';
+  if (MOUSE_MODES.includes(override)) return override;
+  const stored = preferences.mouse;
+  if (stored === false) return 'off';
+  if (MOUSE_MODES.includes(stored)) return stored;
+  return 'click';
 }
 
 export async function startTui(runtime, options = {}) {

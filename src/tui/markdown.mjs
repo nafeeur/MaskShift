@@ -49,7 +49,9 @@ export function highlight(theme, line, language = '') {
 export function inline(theme, text) {
   let value = String(text ?? '');
   value = value.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, label, href) => theme.paint(label, { fg: theme.palette.azure, underline: true }) + theme.paint(` ${href}`, { fg: theme.palette.ash }));
-  value = value.replace(/`([^`]+)`/g, (match, code) => theme.paint(` ${code} `, { fg: theme.palette.cyanide, bg: theme.palette.raised }));
+  // The chip's padding only reads as padding if the background is actually
+  // visible; against the panel, `raised` was a two-space gap and nothing else.
+  value = value.replace(/`([^`]+)`/g, (match, code) => theme.paint(` ${code} `, { fg: theme.palette.cyanide, bg: theme.palette.edge }));
   value = value.replace(/\*\*([^*]+)\*\*/g, (match, bold) => theme.paint(bold, { fg: theme.palette.chalk, bold: true }));
   value = value.replace(/(?<![*\w])\*([^*\n]+)\*(?!\w)/g, (match, italics) => theme.paint(italics, { italic: true }));
   value = value.replace(/~~([^~]+)~~/g, (match, struck) => theme.paint(struck, { fg: theme.palette.ash }));
@@ -88,32 +90,53 @@ function codeBlock(theme, width, language, lines) {
   return out;
 }
 
+/**
+ * Tables are laid out as ` cell │ cell │ cell `, so a column of width w owns
+ * w + 2 columns and each of the (n - 1) separators owns one more.
+ *
+ * The separator row has to be built from exactly those numbers or the crossings
+ * drift out of line with the pipes above them — which is what happened when it
+ * was assembled independently of the leading pad.
+ */
 function tableBlock(theme, width, rows) {
-  const cells = rows.map((row) => row.slice(1, -1).split('|').map((cell) => cell.trim()));
+  const cells = rows.map((row) => row.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|').map((cell) => cell.trim()));
   const columns = Math.max(...cells.map((row) => row.length));
-  const widths = new Array(columns).fill(3);
+  const widths = new Array(columns).fill(1);
   for (const row of cells) {
-    for (const [index, cell] of row.entries()) {
-      if (/^:?-{2,}:?$/.test(cell)) continue;
-      widths[index] = Math.max(widths[index], Math.min(38, visibleWidth(cell)));
+    for (let index = 0; index < columns; index += 1) {
+      const cell = row[index];
+      if (cell === undefined || /^:?-{2,}:?$/.test(cell)) continue;
+      widths[index] = Math.max(widths[index], Math.min(38, visibleWidth(inline(theme, cell))));
     }
   }
-  const total = widths.reduce((sum, value) => sum + value + 3, 1);
-  if (total > width) {
-    const excess = total - width;
+
+  // Shrink from the widest column down until the row fits, so one long cell
+  // cannot squeeze every other column into uselessness.
+  const measure = () => widths.reduce((sum, value) => sum + value + 2, 0) + (columns - 1);
+  let guard = 0;
+  while (measure() > width && guard < 500) {
+    guard += 1;
     const widest = widths.indexOf(Math.max(...widths));
-    widths[widest] = Math.max(6, widths[widest] - excess);
+    if (widths[widest] <= 3) break;
+    widths[widest] -= 1;
   }
+
+  const cross = theme.unicode ? '┼' : '+';
+  const dash = theme.unicode ? '─' : '-';
+  const pipe = theme.unicode ? '│' : '|';
   const out = [];
   for (const [index, row] of cells.entries()) {
-    if (row.every((cell) => /^:?-{2,}:?$/.test(cell))) {
-      out.push(theme.paint(widths.map((value) => repeat(theme.unicode ? '─' : '-', value + 2)).join(theme.unicode ? '┼' : '+'), { fg: theme.roles.border }));
+    if (row.length && row.every((cell) => /^:?-{2,}:?$/.test(cell))) {
+      out.push(theme.paint(widths.map((value) => repeat(dash, value + 2)).join(cross), { fg: theme.roles.border }));
       continue;
     }
-    const separator = theme.paint(theme.unicode ? '│' : '|', { fg: theme.roles.border });
-    const painted = row.map((cell, column) => {
-      const text = fit(inline(theme, cell), widths[column] ?? 8);
-      return ` ${index === 0 ? theme.paint(stripAnsi(text), { fg: theme.palette.crimson, bold: true }) : text} `;
+    const separator = theme.paint(pipe, { fg: theme.roles.border });
+    const painted = widths.map((value, column) => {
+      const cell = row[column] ?? '';
+      const text = index === 0
+        ? theme.paint(fit(cell, value), { fg: theme.palette.crimson, bold: true })
+        : fit(inline(theme, cell), value);
+      return ` ${text} `;
     });
     out.push(painted.join(separator));
   }

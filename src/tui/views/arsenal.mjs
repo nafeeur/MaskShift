@@ -109,7 +109,15 @@ export function render(app, region) {
     stamp: `${list.length} of ${app.arsenalTab === 'tools' ? tools : skills}`,
     detail: detail(app, Math.max(30, Math.floor(region.width * 0.4) - 4)),
     detailTitle: app.arsenalList.current?.name ? truncate(app.arsenalList.current.name, 30) : 'DOSSIER',
+    onTab: (target, id) => { target.arsenalTab = id; target.arsenalList.first(); },
+    onActivate: (target, item) => activate(target, item),
   });
+}
+
+// Enter, and a click on the already-selected row, do the same thing.
+function activate(app, item) {
+  if (item?.kind === 'skill') void app.loadSkillBody(item.name);
+  else if (item?.kind === 'tool') app.openToolRunner(item);
 }
 
 export function handle(app, event) {
@@ -119,9 +127,7 @@ export function handle(app, event) {
     return true;
   }
   if (event.name === 'enter' && app.focus === 'arsenal') {
-    const item = app.arsenalList.current;
-    if (item?.kind === 'skill') { void app.loadSkillBody(item.name); return true; }
-    if (item?.kind === 'tool') { app.openToolRunner(item); return true; }
+    activate(app, app.arsenalList.current);
     return true;
   }
   return handleCatalog(app, event, {

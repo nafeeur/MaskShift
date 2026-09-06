@@ -161,6 +161,8 @@ export function defaultConfig() {
       unicode: null,
       colorDepth: null,
       expandToolOutput: false,
+      // 'click' | 'hover' | 'off'. Overridden by MASKSHIFT_MOUSE.
+      mouse: 'click',
     },
   };
 }

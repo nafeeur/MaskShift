@@ -170,6 +170,7 @@
     "railVisible": true,
     "unicode": null,
     "colorDepth": null,
-    "expandToolOutput": false
+    "expandToolOutput": false,
+    "mouse": "click"
   }
 }
