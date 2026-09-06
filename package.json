@@ -1,6 +1,6 @@
 {
   "name": "maskshift",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A maximalist, model-agnostic coding harness for the terminal, with lazy skills, tools, MCP and multi-agent orchestration.",
   "type": "module",
   "bin": {
