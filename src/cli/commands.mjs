@@ -117,7 +117,7 @@ const workspaceCommands = {
       for (const entry of result.entries) {
         const depth = (entry.path.match(/[/\\]/g) || []).length;
         const indent = '  '.repeat(depth);
-        const tone = entry.type === 'directory' ? ui.theme.palette.gold : ui.theme.roles.text;
+        const tone = entry.type === 'directory' ? ui.theme.roles.accent : ui.theme.roles.text;
         ui.line(ui.theme.paint(`${indent}${entry.type === 'directory' ? ui.marks.arrowDown : ui.marks.dot} ${entry.name}`, { fg: tone }));
       }
       if (result.truncated) ui.warn('Listing truncated; raise --limit for more.');
@@ -133,7 +133,7 @@ const workspaceCommands = {
       if (context.ui.emit(hits)) return;
       const { ui } = context;
       for (const hit of hits) {
-        ui.line(ui.theme.paint(`${hit.path}${hit.startLine ? `:${hit.startLine}` : ''}`, { fg: ui.theme.palette.gold, bold: true }));
+        ui.line(ui.theme.paint(`${hit.path}${hit.startLine ? `:${hit.startLine}` : ''}`, { fg: ui.theme.roles.accent, bold: true }));
         ui.paragraph(oneLine(hit.snippet || hit.content || '', ui.width * 2));
         ui.line();
       }
@@ -367,7 +367,7 @@ const toolCommands = {
       const required = new Set(descriptor.inputSchema?.required || []);
       ui.section('parameters');
       ui.table([
-        { key: 'name', label: 'name', tone: (row, theme) => theme.palette.azure },
+        { key: 'name', label: 'name', tone: (row, theme) => theme.roles.info },
         { key: 'type', label: 'type' },
         { key: 'required', label: 'required' },
         { key: 'description', label: 'description', max: 60 },
@@ -843,7 +843,7 @@ const inventoryCommands = {
         const models = provider.models || [];
         if (!models.length) { ui.line(ui.theme.paint('  no models reported', { fg: ui.theme.roles.border })); continue; }
         for (const model of models) {
-          ui.line(ui.theme.paint(`  ${provider.id}:${model.id || model}`, { fg: ui.theme.palette.gold }));
+          ui.line(ui.theme.paint(`  ${provider.id}:${model.id || model}`, { fg: ui.theme.roles.accent }));
         }
       }
     },
@@ -870,7 +870,7 @@ const inventoryCommands = {
       const print = (event) => {
         if (ui.json) { ui.write(JSON.stringify(event)); return; }
         ui.line(ui.theme.paint(String(event.timestamp).slice(11, 19), { fg: ui.theme.roles.border })
-          + ui.theme.paint(` ${fitType(event.type)}`, { fg: ui.theme.palette.crimson, bold: true })
+          + ui.theme.paint(` ${fitType(event.type)}`, { fg: ui.theme.roles.primary, bold: true })
           + ui.theme.paint(` ${oneLine(JSON.stringify(event.payload ?? {}), ui.width - 34)}`, { fg: ui.theme.roles.muted }));
       };
       for (const event of runtime.eventBus.recent(Number(context.args.limit || 60))) print(event);

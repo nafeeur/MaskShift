@@ -2,8 +2,10 @@
 
 import { glyphs } from '../box.mjs';
 import { renderMarkdown } from '../markdown.mjs';
-import { fit, truncate, wrap } from '../text.mjs';
-import { detailBlock, handleCatalog, renderCatalog } from './catalog.mjs';
+import { truncate, wrap } from '../text.mjs';
+import { SPACE } from '../tokens.mjs';
+import { gutter } from '../type.mjs';
+import { detailBlock, handleCatalog, listRow, renderCatalog } from './catalog.mjs';
 import { fuzzy, highlightMatch } from '../widgets.mjs';
 
 const RISK_TONES = { high: 'danger', elevated: 'warning', normal: 'muted', low: 'muted' };
@@ -30,23 +32,30 @@ export function items(app) {
     .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
 }
 
+const NAME_WIDTH = 24;
+const ACCESS_WIDTH = 5;
+
 function row(app, item, selected, width) {
   const { theme } = app;
   const mark = glyphs(theme);
-  const accent = item.kind === 'tool' ? theme.palette.cyanide : theme.palette.violet;
-  const active = app.activeCapabilities.has(item.name);
-  const name = highlightMatch(theme, truncate(item.name, 26), item.positions, theme.palette.gold);
-  const badgeText = item.kind === 'tool'
+  // A capability's class is a constant: cyan is a tool wherever it appears,
+  // violet is a skill. Access is a caution, not a failure, so writes are gold
+  // rather than the crimson that belongs to focus.
+  const accent = item.kind === 'tool' ? theme.roles.tool : theme.roles.skill;
+  const loaded = app.activeCapabilities.has(item.name);
+  const access = item.kind === 'tool'
     ? (item.readOnly ? 'READ' : 'WRITE')
-    : (item.category || 'SKILL').slice(0, 5).toUpperCase();
-  const tone = item.kind === 'tool' && !item.readOnly ? theme.palette.crimson : theme.roles.border;
-  const head = theme.paint(active ? mark.diamond : mark.dot, { fg: active ? theme.palette.gold : theme.roles.border })
-    + ' ' + theme.paint(fit(name, 26), { fg: accent, bold: true })
-    + theme.paint(fit(badgeText, 6), { fg: tone })
-    + (width - 36 >= 10 ? theme.paint(truncate(item.description || '', width - 36), { fg: theme.roles.muted }) : '');
-  return selected
-    ? theme.paint(mark.spine, { fg: theme.palette.crimson }) + theme.paint(fit(head, width - 1), { bg: theme.palette.raised })
-    : ` ${fit(head, width - 1)}`;
+    : (item.category || 'SKILL').slice(0, ACCESS_WIDTH).toUpperCase();
+  return listRow(app, {
+    selected, width,
+    marker: loaded ? mark.lamp : '',
+    markerTone: theme.roles.accent,
+    cells: [
+      { text: highlightMatch(theme, truncate(item.name, NAME_WIDTH), item.positions, theme.roles.accent, accent), width: NAME_WIDTH },
+      { text: access, width: ACCESS_WIDTH, tone: item.kind === 'tool' && !item.readOnly ? theme.roles.warning : theme.roles.muted },
+      { text: item.description || '', tone: theme.roles.muted },
+    ],
+  });
 }
 
 function schemaLines(app, schema, width) {
@@ -55,12 +64,11 @@ function schemaLines(app, schema, width) {
   const required = new Set(schema.required || []);
   const lines = [];
   for (const [name, property] of Object.entries(schema.properties)) {
-    const label = theme.paint(name, { fg: theme.palette.azure, bold: true })
-      + theme.paint(` ${property.type || 'any'}`, { fg: theme.roles.border })
-      + (required.has(name) ? theme.paint(' required', { fg: theme.palette.crimson }) : '');
-    lines.push(fit(label, width));
-    for (const piece of wrap(property.description || '', width - 2)) {
-      lines.push(`  ${theme.paint(piece, { fg: theme.roles.muted })}`);
+    lines.push(theme.paint(name, { fg: theme.roles.info, bold: true })
+      + theme.paint(` ${property.type || 'any'}`, { fg: theme.roles.faint })
+      + (required.has(name) ? theme.paint('  required', { fg: theme.roles.warning }) : ''));
+    for (const piece of wrap(property.description || '', Math.max(8, width - SPACE.indent))) {
+      lines.push(' '.repeat(SPACE.indent) + theme.paint(piece, { fg: theme.roles.muted }));
     }
   }
   return lines;
@@ -70,26 +78,27 @@ export function detail(app, width) {
   const item = app.arsenalList.current;
   if (!item) return null;
   const { theme } = app;
+  // The pane's own rule already carries the item's name; repeating it as the
+  // first heading inside was the same duplication the panel titles had.
   if (item.kind === 'tool') {
     return detailBlock(app, width, [
-      { heading: item.name },
-      ...wrap(item.description || '', width).map((line) => line),
+      item.description || '',
       { field: 'category', value: item.category },
       { field: 'access', value: item.readOnly ? 'read only' : 'writes / executes', tone: item.readOnly ? theme.roles.success : theme.roles.danger },
       { field: 'risk', value: item.risk || 'normal', tone: theme.role(RISK_TONES[item.risk] || 'muted') },
       { field: 'always on', value: item.alwaysAvailable ? 'yes' : 'summoned on demand' },
       { heading: 'parameters' },
-      { raw: schemaLines(app, item.schema, width) },
+      { raw: schemaLines(app, item.schema, Math.max(8, width - SPACE.gutter)) },
     ]);
   }
   const body = app.skillBodies.get(item.name);
+  const text = Math.max(8, width - SPACE.gutter);
   return detailBlock(app, width, [
-    { heading: item.name },
-    ...wrap(item.description || '', width),
+    item.description || '',
     { field: 'source', value: item.category },
     { field: 'file', value: item.file || '' },
     { heading: 'body' },
-    { raw: body ? renderMarkdown(theme, body, width) : [theme.paint('Press ↵ to load the skill body.', { fg: theme.roles.border, italic: true })] },
+    { raw: body ? renderMarkdown(theme, body, text) : [theme.paint('Press ↵ to load the skill body.', { fg: theme.roles.muted, italic: true })] },
   ]);
 }
 
@@ -99,16 +108,16 @@ export function render(app, region) {
   const tools = app.tools.length;
   const skills = app.skills.length;
   return renderCatalog(app, region, {
-    title: 'ARSENAL', index: '03',
     tabs: [{ id: 'tools', label: 'TOOLS', count: tools }, { id: 'skills', label: 'SKILLS', count: skills }],
     activeTab: app.arsenalTab,
     filter: app.arsenalFilter, filterFocus: 'arsenal-filter', listFocus: 'arsenal',
-    placeholder: 'SEARCH EVERY CAPABILITY',
+    placeholder: 'Search every capability',
     list: app.arsenalList,
     row: (item, selected, width) => row(app, item, selected, width),
-    stamp: `${list.length} of ${app.arsenalTab === 'tools' ? tools : skills}`,
+    stamp: `${list.length} OF ${app.arsenalTab === 'tools' ? tools : skills}`,
     detail: detail(app, Math.max(30, Math.floor(region.width * 0.4) - 4)),
     detailTitle: app.arsenalList.current?.name ? truncate(app.arsenalList.current.name, 30) : 'DOSSIER',
+    detailStamp: app.arsenalList.current?.kind === 'tool' ? 'TOOL' : 'SKILL',
     onTab: (target, id) => { target.arsenalTab = id; target.arsenalList.first(); },
     onActivate: (target, item) => activate(target, item),
   });

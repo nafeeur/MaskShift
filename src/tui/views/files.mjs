@@ -5,8 +5,10 @@ import { highlight } from '../markdown.mjs';
 import { hstack } from '../layout.mjs';
 import { split } from '../layout.mjs';
 import { LAYER, listZone, viewportZone } from '../regions.mjs';
-import { expandTabs, fit, padStart, truncate } from '../text.mjs';
-import { sidePane } from './catalog.mjs';
+import { expandTabs, fit, truncate } from '../text.mjs';
+import { SPACE } from '../tokens.mjs';
+import { gutter } from '../type.mjs';
+import { filterRow, listRow, sidePane } from './catalog.mjs';
 
 const ICONS = {
   directory: { unicode: '▾', ascii: '/' },
@@ -28,23 +30,30 @@ function sizeLabel(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)}M`;
 }
 
+const SIZE_WIDTH = 6;
+
 function treeRow(app, item, selected, width) {
   const { theme } = app;
   const mark = glyphs(theme);
   const icon = (theme.unicode ? ICONS[item.type]?.unicode : ICONS[item.type]?.ascii) || mark.dot;
   const depth = (item.path.match(/[/\\]/g) || []).length;
-  const indent = '  '.repeat(Math.min(6, depth));
+  const indent = ' '.repeat(SPACE.indent * Math.min(6, depth));
   const isDirectory = item.type === 'directory';
-  const colour = isDirectory ? theme.palette.gold : theme.roles.text;
   const collapsed = isDirectory && app.collapsedDirs.has(item.path);
   const glyph = isDirectory ? (collapsed ? mark.arrowRight : mark.arrowDown) : icon;
-  const name = truncate(item.name, Math.max(6, width - indent.length - 10));
-  const size = item.type === 'file' ? theme.paint(padStart(sizeLabel(item.size), 6), { fg: theme.roles.border }) : '      ';
-  const body = `${indent}${theme.paint(glyph, { fg: isDirectory ? theme.palette.crimson : theme.roles.border })} ${theme.paint(name, { fg: colour, bold: isDirectory })}`;
-  const line = fit(body, Math.max(0, width - 7)) + size;
-  return selected
-    ? theme.paint(`${mark.spine}`, { fg: theme.palette.crimson }) + theme.paint(fit(line, width - 1), { bg: theme.palette.raised })
-    : ` ${fit(line, width - 1)}`;
+  // Depth is indentation and a directory is brighter and bolder than the files
+  // it holds — a container that reads quieter than its contents inverts the
+  // hierarchy the indentation just established. Neither needs a hue: a crimson
+  // glyph on every folder made the tree look like an error list.
+  const name = theme.paint(`${indent}${glyph} `, { fg: isDirectory ? theme.roles.label : theme.roles.faint })
+    + theme.paint(item.name, { fg: isDirectory ? theme.roles.heading : theme.roles.text, bold: isDirectory });
+  return listRow(app, {
+    selected, width,
+    cells: [
+      { text: name },
+      { text: item.type === 'file' ? sizeLabel(item.size) : '', width: SIZE_WIDTH, align: 'right', tone: theme.roles.faint },
+    ],
+  });
 }
 
 export function visibleEntries(app) {
@@ -55,35 +64,36 @@ export function visibleEntries(app) {
 export function render(app, region) {
   const { theme } = app;
   const { width, height } = region;
-  const [treeWidth, previewWidth] = split(width, [{ weight: 1, min: 26, max: 52 }, { weight: 2, min: 30 }]);
+  // The tree carries indentation, a glyph, a name and a size on one row, so it
+  // needs enough width to show a real filename before the size column; at the
+  // old minimum every path in a nested directory arrived pre-truncated.
+  const [treeWidth, previewWidth] = split(width, [{ weight: 1, min: 34, max: 56 }, { weight: 2, min: 30 }]);
 
   const entries = visibleEntries(app);
   app.fileList.setItems(entries.map((entry) => ({ ...entry, id: entry.path })));
   const listHeight = height - 4;
-  const filterRow = app.fileFilter.value || app.focus === 'file-filter'
-    ? theme.paint(' ⌕ ', { fg: theme.palette.crimson }) + app.fileFilter.render(theme, treeWidth - 7, { focused: app.focus === 'file-filter' }).text
-    : theme.paint(' ⌕ FILTER PATHS', { fg: theme.roles.border });
+  const filter = filterRow(app, app.fileFilter, app.focus === 'file-filter', treeWidth - 4, 'Filter paths');
 
   const rows = app.fileList.render(theme, treeWidth - 4, listHeight, (item, selected, itemWidth) => treeRow(app, item, selected, itemWidth));
   const tree = panel({
-    theme, width: treeWidth, height, title: 'WORKSPACE MAP', index: '02',
-    stamp: `${entries.length} nodes`, focused: app.focus === 'files',
-    body: [fit(filterRow, treeWidth - 4), '', ...rows],
+    theme, width: treeWidth, height, title: 'WORKSPACE',
+    stamp: `${entries.length} NODES`, focused: app.focus === 'files',
+    body: [filter, '', ...rows],
   });
 
   const current = app.fileList.current;
   const previewBody = [];
   if (app.previewError) {
-    previewBody.push(theme.paint(app.previewError, { fg: theme.roles.danger }));
+    previewBody.push(gutter(theme) + theme.paint(app.previewError, { fg: theme.roles.danger }));
   } else if (!app.previewLines.length) {
-    previewBody.push(theme.paint('Select a file to read it here.', { fg: theme.roles.border, italic: true }));
+    previewBody.push(gutter(theme) + theme.paint('Select a file to read it here.', { fg: theme.roles.muted, italic: true }));
   } else {
     const extension = (current?.name || app.previewPath || '').match(/\.[a-z0-9]+$/i)?.[0]?.toLowerCase();
     const language = LANGUAGE_BY_EXT[extension] || '';
     const gutterWidth = String(app.previewLines.length).length + 1;
     const painted = app.previewLines.map((line, index) => (
-      theme.paint(fit(String(index + 1), gutterWidth), { fg: theme.roles.border })
-      + theme.paint(theme.unicode ? '│ ' : '| ', { fg: theme.roles.border })
+      theme.paint(fit(String(index + 1), gutterWidth), { fg: theme.roles.faint })
+      + theme.paint(`${glyphs(theme).bar} `, { fg: theme.roles.border })
       + highlight(theme, expandTabs(line), language)
     ));
     app.preview.set(painted);
@@ -94,7 +104,7 @@ export function render(app, region) {
   const preview = sidePane(app, {
     width: previewWidth, height,
     title: app.previewPath ? truncate(app.previewPath, 40) : 'SOURCE VIEW',
-    stamp: app.previewLines.length ? `${app.previewLines.length} lines` : '',
+    stamp: app.previewLines.length ? `${app.previewLines.length} LINES` : '',
     focused: app.focus === 'preview',
     body: previewBody,
   });

@@ -1,79 +1,147 @@
 // Shared chrome for the catalogue views (arsenal, network, mod shop):
-// a tab row, a filter, a scrolling list and a detail pane.
+// a section switcher, a filter, a scrolling list and a detail pane.
+//
+// Three views render through this file, so it is where list rows earn their
+// consistency. `listRow` owns the selection treatment and the column geometry;
+// a view supplies cells and a marker and gets a row that lines up with every
+// other row in the product. Before that each view hand-rolled `fit` calls with
+// its own magic numbers, and no two lists shared a column edge.
 
-import { glyphs, panel, rule } from '../box.mjs';
+import { frameColour, glyphs, panel, rule } from '../box.mjs';
 import { hstack, split } from '../layout.mjs';
 import { LAYER, listZone, viewportZone } from '../regions.mjs';
 import { fit, visibleWidth, wrap } from '../text.mjs';
+import { FIELD_LABEL_WIDTH, SPACE } from '../tokens.mjs';
+import { columns, field, gutter, label as typeLabel } from '../type.mjs';
 
 /**
- * The section tabs. `origin` is the screen cell of the row's first column, so
- * each chip can claim the columns it lands on as a click target.
+ * The section switcher inside a pane.
+ *
+ * Marked by weight and an underline, never by a fill: the active view tab at
+ * the top of the screen is the one filled chip in the interface, and a second
+ * lit chip inside the pane below it made the pair ambiguous.
+ *
+ * `origin` is the screen cell of the row's first column, so each label can
+ * claim the columns it lands on as a click target.
  */
 export function tabRow(app, tabs, active, width, { origin = null, onPick = null } = {}) {
   const { theme } = app;
   const mark = glyphs(theme);
+
+  // Counts are the first thing to go when the strip will not fit. The mod shop
+  // carries five sections, and truncating the switcher mid-word — "BROWSER 0
+  // ·…" — hides a section rather than a number.
+  const cost = (withCounts) => tabs.reduce((sum, tab) => sum
+    + visibleWidth(tab.label)
+    + (withCounts && tab.count !== undefined ? String(tab.count).length + 1 : 0), 0)
+    + 3 * Math.max(0, tabs.length - 1);
+  const withCounts = cost(true) <= width;
+
   let column = origin?.column ?? 0;
-  const parts = [];
-
+  let out = '';
   for (const [index, tab] of tabs.entries()) {
-    const label = tab.count === undefined ? ` ${tab.label} ` : ` ${tab.label} ${tab.count} `;
+    if (index > 0) {
+      out += theme.paint(` ${mark.dot} `, { fg: theme.roles.border });
+      column += 3;
+    }
+    const isActive = tab.id === active;
     const hovered = app.regions?.hoverId === `catalog:tab:${tab.id}`;
-    parts.push(tab.id === active
-      ? theme.paint(label, { fg: theme.palette.ink, bg: theme.palette.gold, bold: true })
-      : theme.paint(label, { fg: hovered ? theme.roles.text : theme.roles.muted, bold: hovered }));
+    const showCount = withCounts && tab.count !== undefined;
+    out += theme.paint(tab.label, {
+      fg: isActive ? theme.roles.heading : (hovered ? theme.roles.text : theme.roles.muted),
+      bold: isActive,
+      underline: isActive,
+    });
+    if (showCount) out += theme.paint(` ${tab.count}`, { fg: theme.roles.faint });
 
+    const span = visibleWidth(tab.label) + (showCount ? String(tab.count).length + 1 : 0);
     if (origin && onPick) {
       app.regions?.add({
-        row: origin.row,
-        column,
-        width: visibleWidth(label),
-        height: 1,
-        id: `catalog:tab:${tab.id}`,
-        layer: LAYER.body + 1,
+        row: origin.row, column, width: span, height: 1,
+        id: `catalog:tab:${tab.id}`, layer: LAYER.body + 1,
         onPress: (target) => onPick(target, tab.id),
       });
     }
-    column += visibleWidth(label) + (index < tabs.length - 1 ? 1 : 0);
+    column += span;
   }
 
-  return fit(parts.join(theme.paint(mark.pipe, { fg: theme.roles.border })), width);
+  return fit(out, width);
 }
 
-export function filterRow(app, field, focused, width, placeholder) {
-  const { theme } = app;
-  const prefix = theme.paint(theme.unicode ? ' ⌕ ' : ' / ', { fg: focused ? theme.palette.crimson : theme.roles.border });
-  if (!field.value && !focused) return fit(prefix + theme.paint(placeholder, { fg: theme.roles.border }), width);
-  const rendered = field.render(theme, Math.max(4, width - 4), { focused });
-  return fit(prefix + rendered.text, width);
-}
-
-export function detailBlock(app, width, sections) {
+/** The filter field. Its magnifier sits in the shared gutter like any marker. */
+export function filterRow(app, field_, focused, width, placeholder) {
   const { theme } = app;
   const mark = glyphs(theme);
+  const prefix = gutter(theme, mark.search, { tone: focused ? theme.roles.primary : theme.roles.muted });
+  const room = Math.max(4, width - SPACE.gutter);
+  if (!field_.value && !focused) {
+    return fit(prefix + theme.paint(placeholder, { fg: theme.roles.muted }), width);
+  }
+  return fit(prefix + field_.render(theme, room, { focused }).text, width);
+}
+
+/**
+ * One row of a catalogue list.
+ *
+ * Selection is a raised surface plus a rail in the gutter — not a colour on
+ * the text, which would fight whatever the row's own tones are trying to say.
+ * `marker` is the row's own state glyph and shows only when the row is not
+ * selected, so the gutter never has to hold two things at once.
+ */
+export function listRow(app, { selected, marker = '', markerTone = null, cells, width }) {
+  const { theme } = app;
+  const mark = glyphs(theme);
+  const lead = selected
+    ? gutter(theme, mark.spine, { tone: theme.roles.primary })
+    : gutter(theme, marker, { tone: markerTone || theme.roles.faint });
+  const body = columns(theme, cells, Math.max(0, width - SPACE.gutter));
+  const line = fit(`${lead}${body}`, width);
+  return selected ? theme.paint(line, { bg: theme.roles.surfaceRaised }) : line;
+}
+
+/**
+ * The detail pane's contents.
+ *
+ * Sections are `{ heading }`, `{ field, value }`, `{ raw }` or a bare string.
+ * Every one of them starts its text on the same column, which is why the
+ * dossier no longer has its headings, its labels and its prose on three
+ * different left edges.
+ */
+export function detailBlock(app, width, sections) {
+  const { theme } = app;
+  const text = Math.max(8, width - SPACE.gutter);
   const lines = [];
   for (const section of sections) {
     if (section === null || section === undefined) continue;
-    if (typeof section === 'string') { lines.push(...wrap(section, width)); continue; }
+    if (typeof section === 'string') {
+      for (const piece of wrap(section, text)) lines.push(gutter(theme) + theme.paint(piece, { fg: theme.roles.text }));
+      continue;
+    }
     if (section.heading) {
       if (lines.length) lines.push('');
-      lines.push(theme.paint(`${mark.spine} ${section.heading.toUpperCase()}`, { fg: theme.palette.crimson, bold: true }));
+      lines.push(gutter(theme) + typeLabel(theme, section.heading, { tone: theme.roles.label }));
       continue;
     }
     if (section.field) {
-      const label = theme.paint(fit(section.field.toUpperCase(), 15), { fg: theme.roles.muted });
-      const body = wrap(String(section.value ?? ''), Math.max(8, width - 15));
-      lines.push(`${label}${theme.paint(body[0] ?? '', { fg: section.tone || theme.roles.text })}`);
-      for (const piece of body.slice(1)) lines.push(`${' '.repeat(15)}${theme.paint(piece, { fg: section.tone || theme.roles.text })}`);
+      const value = String(section.value ?? '');
+      if (!value) continue;
+      const room = Math.max(8, text - FIELD_LABEL_WIDTH);
+      // A value that exactly fills its column leaves an empty continuation
+      // behind, which showed up as a stray blank row between two fields.
+      const body = wrap(value, room).filter((piece, index) => index === 0 || piece);
+      lines.push(gutter(theme) + field(theme, section.field) + theme.paint(body[0] ?? '', { fg: section.tone || theme.roles.text }));
+      for (const piece of body.slice(1)) {
+        lines.push(gutter(theme) + ' '.repeat(FIELD_LABEL_WIDTH) + theme.paint(piece, { fg: section.tone || theme.roles.text }));
+      }
       continue;
     }
-    if (section.raw) { lines.push(...section.raw); continue; }
+    if (section.raw) { lines.push(...section.raw.map((line) => gutter(theme) + line)); continue; }
   }
   return lines;
 }
 
 /**
- * A secondary pane that sits beside a framed one.
+ * A secondary pane beside a framed one.
  *
  * It deliberately has no frame of its own: butting two boxes together drew two
  * vertical rules with nothing between them. The neighbouring frame is the
@@ -87,7 +155,7 @@ export function sidePane(app, { width, height, title, stamp, focused, body }) {
     rule(theme, inner, title, {
       stamp,
       active: focused,
-      colour: focused ? theme.roles.borderActive : theme.roles.border,
+      colour: frameColour(theme, focused),
       weight: focused ? 'heavy' : 'light',
     }),
     ...body,
@@ -106,21 +174,32 @@ export function renderCatalog(app, region, spec) {
 
   // Panel frame plus one column of padding on each side.
   const listInner = listWidth - 4;
-  const header = [];
-  if (spec.tabs?.length) {
-    header.push(tabRow(app, spec.tabs, spec.activeTab, listInner, {
-      origin: { row: region.row + 1, column: region.column + 2 },
+
+  // The section switcher rides the panel's own top rail. It used to sit on the
+  // first body row, which left the rail above it blank and cost a row of list.
+  // The rail's capacity is the panel width less its two corners and the space
+  // on either side of the label.
+  const railWidth = Math.max(8, listWidth - 6);
+  const sections = spec.tabs?.length
+    ? tabRow(app, spec.tabs, spec.activeTab, railWidth, {
+      origin: { row: region.row, column: region.column + 3 },
       onPick: (target, id) => spec.onTab?.(target, id),
-    }));
-  }
-  header.push(filterRow(app, spec.filter, app.focus === spec.filterFocus, listInner, spec.placeholder || 'FILTER'));
-  header.push('');
+    }).trimEnd()
+    : '';
+
+  const header = [
+    filterRow(app, spec.filter, app.focus === spec.filterFocus, listInner, spec.placeholder || 'Filter'),
+    '',
+  ];
 
   const listHeight = Math.max(1, height - 2 - header.length);
   const rows = spec.list.render(theme, listInner, listHeight, spec.row);
 
+  // No title on the rail: the view tab at the top of the screen already names
+  // this pane, and printing "03 ARSENAL" one row under an "03 ARSENAL" chip
+  // was the single most repetitive thing on screen.
   const listPanel = panel({
-    theme, width: listWidth, height, title: spec.title, index: spec.index,
+    theme, width: listWidth, height, titleRaw: sections, note: spec.note || '',
     stamp: spec.stamp, focused: app.focus === spec.listFocus || app.focus === spec.filterFocus,
     body: [...header, ...rows],
   });
@@ -150,7 +229,7 @@ export function renderCatalog(app, region, spec) {
 
   if (!hasDetail) return { lines: listPanel, cursor: null };
 
-  const detailLines = spec.detail ?? [theme.paint('Nothing selected.', { fg: theme.roles.border, italic: true })];
+  const detailLines = spec.detail ?? [gutter(theme) + theme.paint('Nothing selected.', { fg: theme.roles.muted, italic: true })];
   app.detail.set(detailLines);
   const detailBody = app.detail.render(height - 1, detailWidth - 2);
   const detail = sidePane(app, {

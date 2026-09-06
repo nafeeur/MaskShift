@@ -4,6 +4,10 @@ import { Writable } from 'node:stream';
 import { MaskShiftTui } from '../src/tui/app.mjs';
 import { decode, matches } from '../src/tui/input.mjs';
 import { panel } from '../src/tui/box.mjs';
+import { sweepLine, spin } from '../src/tui/motion.mjs';
+import { statusGlyph, statusOf } from '../src/tui/status.mjs';
+import { SPACE } from '../src/tui/tokens.mjs';
+import { transcriptLines } from '../src/tui/views/chat.mjs';
 import { renderMarkdown } from '../src/tui/markdown.mjs';
 import { Screen } from '../src/tui/screen.mjs';
 import { Theme, detectDepth } from '../src/tui/theme.mjs';
@@ -45,19 +49,129 @@ test('text measurement ignores ANSI and respects wide characters', () => {
 
 test('panels render at an exact width in both focus states', () => {
   for (const focused of [true, false]) {
-    const lines = panel({ theme, width: 40, height: 6, title: 'ARSENAL', index: '03', stamp: '12', body: ['a', 'b'], focused });
+    const lines = panel({ theme, width: 40, height: 6, title: 'ARSENAL', stamp: '12', body: ['a', 'b'], focused });
     assert.equal(lines.length, 6);
     for (const line of lines) assert.equal(visibleWidth(line), 40);
   }
+
+  // A pane may hand its top rail a pre-painted strip — a section switcher —
+  // and the geometry has to survive it.
+  const railed = panel({
+    theme, width: 40, height: 5, titleRaw: theme.paint('TOOLS · SKILLS', { fg: theme.roles.label }),
+    note: '9', stamp: '12', body: ['a'], focused: true,
+  });
+  assert.equal(railed.length, 5);
+  for (const line of railed) assert.equal(visibleWidth(line), 40);
+  assert.ok(stripAnsi(railed[0]).includes('TOOLS · SKILLS'));
 });
 
 test('markdown renders headings, lists, code and diffs inside the column', () => {
   const lines = renderMarkdown(theme, '# Title\n\n- one\n- two\n\n```js\nconst a = 1;\n```\n\n```diff\n+ added\n- removed\n```\n', 40);
   assert.ok(lines.length > 6);
   for (const line of lines) assert.ok(visibleWidth(line) <= 40, `"${stripAnsi(line)}" overflowed`);
-  assert.ok(lines.some((line) => stripAnsi(line).includes('TITLE')));
+  // Chrome is upper case; content keeps the case its author wrote. Shouting a
+  // model's own headings back at the operator is what made replies read as
+  // louder than the interface around them.
+  assert.ok(lines.some((line) => stripAnsi(line).includes('Title')));
+  assert.ok(!lines.some((line) => stripAnsi(line).includes('TITLE')));
   assert.ok(lines.some((line) => stripAnsi(line).includes('const a = 1;')));
   assert.ok(lines.some((line) => stripAnsi(line).includes('+ added')));
+  // A reply never ends on whitespace: the transcript owns the gap between
+  // turns, and a trailing blank doubled every one of them.
+  assert.notEqual(lines.at(-1), '');
+  assert.notEqual(lines[0], '');
+});
+
+test('every transcript row shares one left edge', async (t) => {
+  const project = await createProject(t);
+  const runtime = await runtimeForTest(t, project);
+  const app = new MaskShiftTui(runtime, {
+    workspacePath: project, output: new FakeTerminal(120, 32), headless: true, theme,
+  });
+  await app.bootstrap();
+  app.view = 'chat';
+  app.messages = [
+    { role: 'user', created_at: new Date().toISOString(), meta: {}, content: 'Refactor the renderer.' },
+    {
+      role: 'assistant',
+      created_at: new Date().toISOString(),
+      meta: { modelRef: 'ollama:qwen3-coder' },
+      content: '## Plan\n\nDiff the frame instead.\n\n- read the module\n- add a test\n',
+    },
+    { role: 'tool', meta: { toolName: 'fs_read', isError: false }, content: '94 lines' },
+  ];
+
+  // The bug this replaced: a speaker chip, a user line, a model paragraph and
+  // a tool result each began on a different column inside the same pane.
+  //
+  // The invariant is that the first `SPACE.gutter` columns of every row belong
+  // to the marker — one glyph at most, then blanks — so text can only ever
+  // begin at the gutter's far edge, whatever kind of row it is.
+  // A blank row inside a turn keeps its rail and nothing else, which is how
+  // the rail stays continuous down a reply; those aside, every row must clear
+  // the gutter before it starts.
+  const rows = transcriptLines(app, 80).map(stripAnsi).filter((line) => line.trim());
+  for (const line of rows) {
+    assert.equal(line.slice(1, SPACE.gutter), ' '.repeat(SPACE.gutter - 1), `row overran its gutter: "${line}"`);
+  }
+  // And the three kinds of row really do put their first character there.
+  const starts = new Set(rows
+    .filter((line) => /OPERATOR|MASKSHIFT|fs_read|Diff the frame/.test(line))
+    .map((line) => line.slice(SPACE.gutter).length - line.slice(SPACE.gutter).trimStart().length));
+  assert.deepEqual([...starts], [0], `speaker, prose and tool rows drifted apart: ${[...starts].join(', ')}`);
+  assert.ok(rows.some((line) => line.includes('OPERATOR')));
+  assert.ok(rows.some((line) => line.includes('MASKSHIFT')));
+  assert.ok(rows.some((line) => line.includes('fs_read')));
+});
+
+test('the active view is named once per screen', async (t) => {
+  const project = await createProject(t);
+  const runtime = await runtimeForTest(t, project);
+  const app = new MaskShiftTui(runtime, {
+    workspacePath: project, output: new FakeTerminal(132, 34), headless: true, theme,
+  });
+  await app.bootstrap();
+  await app.loadFileTree();
+
+  // Panels used to repeat the tab strip's own label one row beneath it, which
+  // stacked two identical chips in the top-left corner of every view.
+  for (const view of ['chat', 'arsenal', 'network', 'modshop', 'terminal']) {
+    app.view = view;
+    app.focus = app.defaultFocus();
+    app.screen.invalidate();
+    const frame = app.snapshot().map(stripAnsi);
+    const title = app.views.find((entry) => entry.id === view).title;
+    const hits = frame.filter((line) => line.includes(title)).length;
+    assert.equal(hits, 1, `${view}: "${title}" appears on ${hits} rows`);
+  }
+});
+
+test('a headless render is a still, and a live one moves', () => {
+  const frozen = new Theme({ depth: 24, unicode: true, frozen: true });
+  assert.equal(frozen.motion.elapsed, 0);
+  assert.equal(spin(frozen, 'dots'), spin(frozen, 'dots'));
+  // The sweep is a pure function of phase, so a moving band really moves and a
+  // frozen one really does not.
+  const still = sweepLine(frozen, '-', 20, { base: '#111111', highlight: '#ffffff', phase: 0 });
+  const moved = sweepLine(frozen, '-', 20, { base: '#111111', highlight: '#ffffff', phase: 0.5 });
+  assert.notEqual(still, moved);
+  assert.equal(visibleWidth(still), 20);
+  assert.equal(visibleWidth(moved), 20);
+});
+
+test('one status vocabulary answers for every subsystem', () => {
+  // A failed run, a failed plan step and a failed tool used to be three
+  // different reds with three different glyphs.
+  for (const value of ['failed', 'error', 'FAILED']) {
+    assert.equal(statusOf(value).kind, 'fail');
+    assert.equal(statusOf(value).tone, 'danger');
+  }
+  assert.equal(statusOf('connected').kind, 'done');
+  assert.equal(statusOf('in_progress').kind, 'active');
+  assert.equal(statusOf('max steps').label, 'STEP LIMIT');
+  // Anything a subsystem invents still renders legibly rather than silently.
+  assert.equal(statusOf('reticulating').label, 'RETICULATING');
+  assert.equal(visibleWidth(stripAnsi(statusGlyph(theme, 'running', { animate: false }))), 1);
 });
 
 test('the key decoder handles control, escape, modifier and paste sequences', () => {

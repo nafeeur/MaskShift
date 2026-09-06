@@ -2,6 +2,8 @@
 // scrollable lists and viewports, spinners and toasts.
 
 import { glyphs } from './box.mjs';
+import { DURATION } from './tokens.mjs';
+import { SPINNERS, presence, spin } from './motion.mjs';
 import { fit, repeat, truncate } from './text.mjs';
 
 export class TextField {
@@ -97,7 +99,7 @@ export class TextField {
   render(theme, width, { focused = true } = {}) {
     const mark = glyphs(theme);
     if (!this.value) {
-      const hint = theme.paint(truncate(this.placeholder, width), { fg: theme.roles.border, italic: true });
+      const hint = theme.paint(truncate(this.placeholder, width), { fg: theme.roles.muted, italic: true });
       return { text: fit(hint, width), cursorColumn: 0 };
     }
     const shown = this.mask ? repeat(mark.dot, this.value.length) : this.value;
@@ -351,7 +353,14 @@ export class Viewport {
     return window.map((line) => fit(line, width));
   }
 
-  // A one-column scrollbar rendered alongside the viewport.
+  /**
+   * A one-column scrollbar.
+   *
+   * The track is drawn only when there is something to scroll, and the thumb
+   * is a neutral rather than crimson: a permanently lit accent bar down the
+   * side of the transcript was the second-loudest thing on the screen and it
+   * carried no state at all.
+   */
   scrollbar(theme, height) {
     const mark = glyphs(theme);
     if (this.lines.length <= height) return new Array(height).fill(' ');
@@ -361,34 +370,39 @@ export class Viewport {
     const top = Math.round(ratio * track);
     return new Array(height).fill(null).map((value, index) => (
       index >= top && index < top + thumb
-        ? theme.paint(mark.spine, { fg: theme.roles.primary })
-        : theme.paint(mark.spine, { fg: theme.roles.border })
+        ? theme.paint(mark.spine, { fg: theme.roles.hairline })
+        : theme.paint(mark.bar, { fg: theme.roles.border })
     ));
   }
 }
 
-const SPINNERS = {
-  unicode: ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'],
-  ascii: ['|', '/', '-', '\\'],
-  pulse: ['◜', '◝', '◞', '◟'],
-};
-
+/**
+ * A spinner is now a view onto the shared clock rather than a counter of its
+ * own. Two spinners on screen at once used to drift apart because each
+ * advanced on the frames it happened to be painted for; they now turn together
+ * whatever the repaint rate, and freeze together in a headless capture.
+ */
 export class Spinner {
-  constructor(kind = 'unicode') {
-    this.frames = SPINNERS[kind] || SPINNERS.unicode;
-    this.tick = 0;
+  constructor(kind = 'dots') {
+    this.kind = SPINNERS[kind] ? kind : 'dots';
   }
 
-  advance() { this.tick = (this.tick + 1) % 10_000; }
+  /** Kept so the render loop can call it unconditionally; the clock advances. */
+  advance() {}
 
-  frame(theme) {
-    const frames = theme.unicode ? this.frames : SPINNERS.ascii;
-    return frames[this.tick % frames.length];
-  }
+  frame(theme, kind = null) { return spin(theme, kind || this.kind); }
 }
 
+/**
+ * Transient notices.
+ *
+ * A toast that simply vanishes between two frames reads as a glitch, so each
+ * one arrives over `DURATION.base` and leaves over `DURATION.toastFade`, with
+ * both its rail and its text resolved against the surface underneath. There is
+ * no alpha channel in a terminal; the fade is a colour mix.
+ */
 export class Toasts {
-  constructor({ limit = 4, ttlMs = 4200 } = {}) {
+  constructor({ limit = 4, ttlMs = DURATION.toast } = {}) {
     this.items = [];
     this.limit = limit;
     this.ttlMs = ttlMs;
@@ -397,9 +411,12 @@ export class Toasts {
 
   push(message, tone = 'info') {
     this.counter += 1;
-    this.items.push({ id: this.counter, message, tone, expiresAt: Date.now() + this.ttlMs });
+    this.items.push({ id: this.counter, message, tone, createdAt: Date.now(), expiresAt: Date.now() + this.ttlMs });
     if (this.items.length > this.limit) this.items.shift();
   }
+
+  /** True while anything is on screen, so the loop keeps painting the fade. */
+  get animating() { return this.items.length > 0; }
 
   prune() {
     const now = Date.now();
@@ -410,15 +427,22 @@ export class Toasts {
 
   render(theme, width) {
     const mark = glyphs(theme);
+    const now = Date.now();
     const tones = {
       info: theme.roles.info, success: theme.roles.success,
       warn: theme.roles.warning, error: theme.roles.danger,
     };
     return this.items.map((item) => {
       const colour = tones[item.tone] || theme.roles.info;
+      const level = theme.motion.frozen
+        ? 1
+        : presence(item.expiresAt - now, { ageMs: now - item.createdAt });
+      const surface = theme.mixed(theme.roles.surface, theme.roles.surfaceRaised, level);
       const body = truncate(item.message, width - 4);
-      return theme.paint(`${mark.spine} `, { fg: colour })
-        + theme.paint(fit(body, width - 2), { fg: theme.roles.text, bg: theme.palette.raised });
+      return theme.paint(`${mark.spine} `, { fg: theme.mixed(theme.roles.surface, colour, level) })
+        + theme.paint(fit(body, width - 2), {
+          fg: theme.mixed(surface, theme.roles.text, level), bg: surface,
+        });
     });
   }
 }
@@ -445,10 +469,20 @@ export function fuzzy(query, target) {
   return { score: score - Math.floor(haystack.length / 24), positions };
 }
 
-export function highlightMatch(theme, text, positions, colour) {
-  if (!positions?.length) return text;
-  const set = new Set(positions);
+/**
+ * Paint matched characters brighter than the rest.
+ *
+ * `base` matters: painting the whole string afterwards would leave the reset
+ * that closes each highlighted character stranding every character after it
+ * back on the default colour. Painting both halves here keeps one pass.
+ */
+export function highlightMatch(theme, text, positions, colour, base = null) {
+  const set = new Set(positions || []);
+  const bright = colour || theme.roles.accent;
+  if (!set.size) return base ? theme.paint(text, { fg: base, bold: true }) : text;
   return [...String(text)].map((character, index) => (
-    set.has(index) ? theme.paint(character, { fg: colour || theme.roles.accent, bold: true }) : character
+    set.has(index)
+      ? theme.paint(character, { fg: bright, bold: true })
+      : (base ? theme.paint(character, { fg: base, bold: true }) : character)
   )).join('');
 }

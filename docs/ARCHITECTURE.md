@@ -119,8 +119,14 @@ The renderer is written from scratch against Node's built-ins:
   frame and rewrites only the rows that changed.
 - `input.mjs` — a raw-mode decoder for control keys, CSI sequences, modifiers and
   bracketed paste.
-- `box.mjs` / `layout.mjs` — the stencil panel language and the column/row
-  composition helpers.
+- `tokens.mjs` — the design system: the palette, the spacing scale, the
+  breakpoints and the documented rules about when each token may be used.
+- `type.mjs` / `status.mjs` / `motion.mjs` — the type ramp and the gutter
+  primitive that keeps every pane on one grid, the single status vocabulary
+  every subsystem's state resolves through, and the wall clock every animation
+  is driven from.
+- `box.mjs` / `layout.mjs` — the panel language and the column/row composition
+  helpers.
 - `widgets.mjs`, `overlays.mjs`, `views/` — editors, lists, viewports, the command
   palette, forms, and the six views.
 
@@ -155,6 +161,21 @@ A plugin exports `activate(api)` and may:
 - return a cleanup function.
 
 Plugins run in the daemon process with the same authority as MaskShift. Activation and deactivation update the live tool registry without restarting the server.
+
+Install through the Mod Shop (`5`), the `maskshift plugins` subcommands, or the tool directly:
+
+```text
+plugin_install source=/absolute/path/to/plugin kind=local
+plugin_install source=https://github.com/example/maskshift-plugin.git kind=git
+plugin_install source=@scope/maskshift-plugin kind=auto
+```
+
+A complete worked example is in [`examples/plugins/telemetry-pack`](../examples/plugins/telemetry-pack).
+
+MaskShift also detects compatible local coding CLIs — Claude Code, Codex, OpenCode, GitHub
+Copilot CLI, Nous Hermes, Aider, plus any custom `agentBridges` entry — and can delegate scoped
+work to them while retaining the parent run, telemetry and repository context. These CLIs are
+not vendored; a bridge activates when the executable is on `PATH`.
 
 ## Recovery model
 

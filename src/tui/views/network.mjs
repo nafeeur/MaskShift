@@ -1,13 +1,14 @@
 // 04 NETWORK — MCP servers: installed, discovered and the official registry.
 
-import { glyphs } from '../box.mjs';
 import { fit, truncate, wrap } from '../text.mjs';
-import { detailBlock, handleCatalog, renderCatalog } from './catalog.mjs';
+import { statusGlyph, statusOf } from '../status.mjs';
+import { SPACE } from '../tokens.mjs';
+import { detailBlock, handleCatalog, listRow, renderCatalog } from './catalog.mjs';
 import { fuzzy } from '../widgets.mjs';
 
-const STATUS_TONES = {
-  connected: 'success', available: 'info', disabled: 'muted', disconnected: 'warning',
-};
+const NAME_WIDTH = 28;
+const STATUS_WIDTH = 11;
+const COUNT_WIDTH = 9;
 
 export function items(app) {
   const query = app.mcpFilter.value.trim();
@@ -33,19 +34,26 @@ export function items(app) {
 
 function row(app, item, selected, width) {
   const { theme } = app;
-  const mark = glyphs(theme);
-  const tone = theme.role(STATUS_TONES[item.status] || 'muted');
-  const lamp = item.status === 'connected' ? mark.lamp : mark.ring;
-  const count = item.toolCount ? `${item.toolCount} tools` : (item.kind === 'registry' ? 'registry' : '');
-  const room = width - 54;
-  const head = theme.paint(` ${lamp} `, { fg: tone })
-    + theme.paint(fit(truncate(item.name, 28), 29), { fg: theme.palette.azure, bold: true })
-    + theme.paint(fit(String(item.status).toUpperCase(), 12), { fg: tone })
-    + theme.paint(fit(count, 10), { fg: theme.roles.border })
-    + (room >= 10 ? theme.paint(truncate(item.description, room), { fg: theme.roles.muted }) : '');
-  return selected
-    ? theme.paint(mark.spine, { fg: theme.palette.crimson }) + theme.paint(fit(head, width - 1), { bg: theme.palette.raised })
-    : ` ${fit(head, width - 1)}`;
+  // Server state resolves through the shared vocabulary, so a connected server
+  // wears the same green lamp as a completed run and a missing one the same
+  // dark lamp as a paused automation.
+  const state = statusOf(item.status);
+  const tone = theme.role(state.tone);
+  const count = item.toolCount ? `${item.toolCount} TOOLS` : '';
+  return listRow(app, {
+    selected, width,
+    marker: statusGlyph(theme, item.status, { animate: false }),
+    markerTone: tone,
+    cells: [
+      // The lamp in the gutter and the status column already carry this row's
+      // state and its class; colouring the name as well put two blues on one
+      // line saying the same thing.
+      { text: truncate(item.name, NAME_WIDTH), width: NAME_WIDTH, tone: theme.roles.text, bold: true },
+      { text: state.label, width: STATUS_WIDTH, tone },
+      { text: count, width: COUNT_WIDTH, tone: theme.roles.faint },
+      { text: item.description || '', tone: theme.roles.muted },
+    ],
+  });
 }
 
 export function detail(app, width) {
@@ -53,10 +61,10 @@ export function detail(app, width) {
   if (!item) return null;
   const { theme } = app;
   const server = item.raw || {};
+  const state = statusOf(item.status);
   const sections = [
-    { heading: item.name },
-    ...wrap(item.description || 'No description published.', width),
-    { field: 'status', value: String(item.status).toUpperCase(), tone: theme.role(STATUS_TONES[item.status] || 'muted') },
+    item.description || 'No description published.',
+    { field: 'status', value: state.label, tone: theme.role(state.tone) },
   ];
   if (item.kind === 'server') {
     sections.push(
@@ -71,11 +79,12 @@ export function detail(app, width) {
     const tools = app.mcpTools.get(item.name);
     if (tools?.length) {
       sections.push({ heading: 'exposed tools' });
+      const room = Math.max(8, width - SPACE.gutter);
       sections.push({
         raw: tools.slice(0, 40).map((tool) => fit(
-          theme.paint(` ${tool.name}`, { fg: theme.palette.cyanide })
-          + theme.paint(`  ${truncate(tool.description || '', Math.max(0, width - tool.name.length - 4))}`, { fg: theme.roles.muted }),
-          width,
+          theme.paint(tool.name, { fg: theme.roles.tool })
+          + theme.paint(`  ${truncate(tool.description || '', Math.max(0, room - tool.name.length - 2))}`, { fg: theme.roles.muted }),
+          room,
         )),
       });
     }
@@ -94,17 +103,16 @@ export function render(app, region) {
   app.mcpList.setItems(list);
   const connected = app.mcpServers.filter((server) => server.status === 'connected').length;
   return renderCatalog(app, region, {
-    title: 'NETWORK', index: '04',
     tabs: [
       { id: 'installed', label: 'INSTALLED', count: app.mcpServers.length },
       { id: 'registry', label: 'REGISTRY', count: app.registryResults.length },
     ],
     activeTab: app.mcpTab,
     filter: app.mcpFilter, filterFocus: 'mcp-filter', listFocus: 'network',
-    placeholder: app.mcpTab === 'registry' ? 'SEARCH THE OFFICIAL REGISTRY, THEN ↵' : 'FILTER INSTALLED SERVERS',
+    placeholder: app.mcpTab === 'registry' ? 'Search the official registry, then ↵' : 'Filter installed servers',
     list: app.mcpList,
     row: (item, selected, width) => row(app, item, selected, width),
-    stamp: `${connected} connected`,
+    stamp: `${connected} CONNECTED`,
     detail: detail(app, Math.max(30, Math.floor(region.width * 0.4) - 4)),
     detailTitle: app.mcpList.current?.name ? truncate(app.mcpList.current.name, 30) : 'SERVER',
     onTab: (target, id) => { target.mcpTab = id; target.mcpList.first(); },

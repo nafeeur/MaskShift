@@ -1,6 +1,13 @@
 // MaskShift terminal theme: "Phantom Protocol".
-// A crimson-and-bone heist palette rendered with truecolor, 256-colour and
-// 16-colour fallbacks so the identity survives on any terminal.
+//
+// The palette itself lives in tokens.mjs; this file is the renderer that puts
+// it on the wire, degrading truecolor to 256 and 16 colours so the identity
+// survives on any terminal. Nothing here decides what a colour means.
+
+import { Motion } from './motion.mjs';
+import { NEUTRAL, PALETTE, ROLES, SIGNAL, BRAND } from './tokens.mjs';
+
+export { PALETTE, ROLES, NEUTRAL, BRAND, SIGNAL };
 
 export const ESC = String.fromCharCode(27);
 const CSI = `${ESC}[`;
@@ -67,51 +74,6 @@ function to16([r, g, b]) {
   return 30 + bit + bright;
 }
 
-// The palette. Every colour is a hex string so the renderer can degrade it.
-export const PALETTE = {
-  ink: '#0a090d',
-  well: '#111017',
-  panel: '#16151d',
-  raised: '#1e1c27',
-  edge: '#37324a',
-  hairline: '#4a4460',
-  ash: '#6f6a80',
-  smoke: '#9d97ad',
-  bone: '#ece7dd',
-  chalk: '#ffffff',
-  crimson: '#ff2d55',
-  blood: '#c0102f',
-  ember: '#ff6b3d',
-  gold: '#ffb648',
-  toxic: '#4fe08b',
-  azure: '#5cc8ff',
-  violet: '#b184ff',
-  cyanide: '#2ee6c5',
-};
-
-export const ROLES = {
-  text: PALETTE.bone,
-  muted: PALETTE.ash,
-  dim: PALETTE.smoke,
-  primary: PALETTE.crimson,
-  primaryDeep: PALETTE.blood,
-  accent: PALETTE.gold,
-  success: PALETTE.toxic,
-  warning: PALETTE.gold,
-  danger: PALETTE.crimson,
-  info: PALETTE.azure,
-  tool: PALETTE.cyanide,
-  skill: PALETTE.violet,
-  mcp: PALETTE.azure,
-  user: PALETTE.gold,
-  assistant: PALETTE.bone,
-  border: PALETTE.edge,
-  borderActive: PALETTE.crimson,
-  surface: PALETTE.panel,
-  surfaceRaised: PALETTE.raised,
-  background: PALETTE.ink,
-};
-
 export function supportsUnicode() {
   if (process.env.MASKSHIFT_ASCII === '1') return false;
   if (process.platform === 'win32') return Boolean(process.env.WT_SESSION || process.env.TERM_PROGRAM);
@@ -120,11 +82,15 @@ export function supportsUnicode() {
 }
 
 export class Theme {
-  constructor({ depth = detectDepth(), unicode = supportsUnicode() } = {}) {
+  constructor({ depth = detectDepth(), unicode = supportsUnicode(), motion = null, frozen = false } = {}) {
     this.depth = depth;
     this.unicode = unicode;
     this.palette = PALETTE;
     this.roles = ROLES;
+    // Animations read the clock through the theme so a headless render can
+    // freeze every moving part at once.
+    this.motion = motion || new Motion({ frozen });
+    this.mixCache = new Map();
   }
 
   get enabled() { return this.depth > 0; }
@@ -178,6 +144,28 @@ export class Theme {
       out += `${attrs}${this.fg(mix(fromHex, toHex, index / last))}${character}${this.reset}`;
     }
     return out;
+  }
+
+  /**
+   * Blend two colours, memoised.
+   *
+   * Terminals have no alpha channel, so "40% crimson" has to be resolved
+   * against the surface it will sit on before it goes on the wire. Sweeps and
+   * fades call this per column, hence the cache.
+   */
+  mixed(fromHex, toHex, ratio) {
+    const key = `${fromHex}|${toHex}|${Math.round(ratio * 100)}`;
+    let value = this.mixCache.get(key);
+    if (value === undefined) {
+      value = mix(fromHex, toHex, ratio);
+      this.mixCache.set(key, value);
+    }
+    return value;
+  }
+
+  /** A colour softened toward the surface it is drawn on. */
+  soften(hex, ratio = 0.5, surface = null) {
+    return this.mixed(surface || this.roles.surface, hex, 1 - ratio);
   }
 
   role(name) { return this.roles[name] || PALETTE.bone; }

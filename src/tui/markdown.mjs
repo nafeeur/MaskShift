@@ -2,9 +2,16 @@
 //
 // Model replies are markdown; this turns them into styled lines that fit the
 // chat column, including fenced code, diffs, tables, lists and quotes.
+//
+// Two rules separate this from the chrome that surrounds it. Content keeps the
+// case its author wrote — an earlier revision upper-cased every heading, so a
+// model's prose shouted back at the operator from inside a quiet panel. And
+// content never borrows crimson: identity and focus own that colour, so
+// keywords, headings and table headers are drawn from the code palette below.
 
 import { glyphs } from './box.mjs';
 import { fit, padEnd, repeat, stripAnsi, truncate, visibleWidth, wrap, expandTabs } from './text.mjs';
+import { SPACE } from './tokens.mjs';
 
 const KEYWORDS = new Set([
   'const', 'let', 'var', 'function', 'class', 'return', 'if', 'else', 'for', 'while', 'break',
@@ -19,18 +26,19 @@ const KEYWORDS = new Set([
 
 const TOKEN = /(\/\/[^\n]*|#[^\n]*|\/\*[\s\S]*?\*\/)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)|(\b\d[\w.]*\b)|(\b[A-Za-z_$][\w$]*\b)|([{}()[\].,;:=+\-*/%<>!&|?^~])/g;
 
+// The code palette. Calm, conventional, and deliberately free of crimson.
 export function highlight(theme, line, language = '') {
   if (!theme.enabled) return line;
-  const comment = theme.palette.ash;
-  const string = theme.palette.toxic;
-  const number = theme.palette.gold;
-  const keyword = theme.palette.crimson;
-  const symbol = theme.palette.smoke;
-  const identifier = theme.palette.bone;
+  const comment = theme.roles.muted;
+  const string = theme.roles.success;
+  const number = theme.roles.accent;
+  const keyword = theme.roles.skill;
+  const symbol = theme.roles.dim;
+  const identifier = theme.roles.text;
   if (['json', 'jsonc'].includes(language)) {
     return line.replace(/("(?:[^"\\]|\\.)*")(\s*:)?|(\b-?\d[\d.eE+-]*\b)|\b(true|false|null)\b/g,
       (match, text, colon, digits, literal) => {
-        if (text) return theme.paint(text, { fg: colon ? theme.palette.azure : string }) + (colon || '');
+        if (text) return theme.paint(text, { fg: colon ? theme.roles.info : string }) + (colon || '');
         if (digits) return theme.paint(digits, { fg: number });
         return theme.paint(literal, { fg: keyword });
       });
@@ -48,13 +56,13 @@ export function highlight(theme, line, language = '') {
 // Inline spans: `code`, **bold**, *italic*, ~~strike~~, [text](url).
 export function inline(theme, text) {
   let value = String(text ?? '');
-  value = value.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, label, href) => theme.paint(label, { fg: theme.palette.azure, underline: true }) + theme.paint(` ${href}`, { fg: theme.palette.ash }));
-  // The chip's padding only reads as padding if the background is actually
-  // visible; against the panel, `raised` was a two-space gap and nothing else.
-  value = value.replace(/`([^`]+)`/g, (match, code) => theme.paint(` ${code} `, { fg: theme.palette.cyanide, bg: theme.palette.edge }));
-  value = value.replace(/\*\*([^*]+)\*\*/g, (match, bold) => theme.paint(bold, { fg: theme.palette.chalk, bold: true }));
+  value = value.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, label, href) => theme.paint(label, { fg: theme.roles.info, underline: true }) + theme.paint(` ${href}`, { fg: theme.roles.faint }));
+  // Inline code is a raised surface, not a colour: it has to survive next to a
+  // green string literal and a violet keyword without claiming to be either.
+  value = value.replace(/`([^`]+)`/g, (match, code) => theme.paint(` ${code} `, { fg: theme.roles.text, bg: theme.roles.surfaceRaised }));
+  value = value.replace(/\*\*([^*]+)\*\*/g, (match, bold) => theme.paint(bold, { fg: theme.roles.heading, bold: true }));
   value = value.replace(/(?<![*\w])\*([^*\n]+)\*(?!\w)/g, (match, italics) => theme.paint(italics, { italic: true }));
-  value = value.replace(/~~([^~]+)~~/g, (match, struck) => theme.paint(struck, { fg: theme.palette.ash }));
+  value = value.replace(/~~([^~]+)~~/g, (match, struck) => theme.paint(struck, { fg: theme.roles.muted }));
   return value;
 }
 
@@ -62,8 +70,10 @@ function codeBlock(theme, width, language, lines) {
   const mark = glyphs(theme);
   const out = [];
   const label = (language || 'text').toUpperCase();
-  const head = theme.paint(` ${label} `, { fg: theme.palette.ink, bg: theme.palette.hairline, bold: true });
-  out.push(head + theme.paint(repeat(theme.unicode ? '┄' : '-', Math.max(0, width - visibleWidth(label) - 2)), { fg: theme.roles.border }));
+  // The language is a caption on the opening rule, not a filled chip: a solid
+  // block on every fenced block put three of them in a single reply.
+  const head = theme.paint(`${label} `, { fg: theme.roles.muted });
+  out.push(head + theme.paint(repeat(mark.tick, Math.max(0, width - visibleWidth(label) - 1)), { fg: theme.roles.border }));
   const gutterWidth = String(lines.length).length + 1;
   const isDiff = language === 'diff' || language === 'patch';
   for (const [index, raw] of lines.entries()) {
@@ -71,22 +81,22 @@ function codeBlock(theme, width, language, lines) {
     let tint = null;
     let body = source;
     if (isDiff) {
-      if (source.startsWith('+')) tint = theme.palette.toxic;
-      else if (source.startsWith('-')) tint = theme.palette.crimson;
-      else if (source.startsWith('@@')) tint = theme.palette.azure;
-      body = theme.paint(source, { fg: tint || theme.palette.smoke });
+      if (source.startsWith('+')) tint = theme.roles.success;
+      else if (source.startsWith('-')) tint = theme.roles.danger;
+      else if (source.startsWith('@@')) tint = theme.roles.info;
+      body = theme.paint(source, { fg: tint || theme.roles.dim });
     } else {
       body = highlight(theme, source, language);
     }
-    const gutter = theme.paint(padEnd(String(index + 1), gutterWidth), { fg: theme.roles.border });
-    const spine = theme.paint(mark.pipe, { fg: tint || theme.roles.border });
+    const gutter = theme.paint(padEnd(String(index + 1), gutterWidth), { fg: theme.roles.faint });
+    const spine = theme.paint(mark.bar, { fg: tint ? theme.soften(tint, 0.55) : theme.roles.border });
     for (const [wrapIndex, piece] of wrap(body, Math.max(8, width - gutterWidth - 2)).entries()) {
       out.push(wrapIndex === 0
         ? `${gutter}${spine} ${piece}`
         : `${' '.repeat(gutterWidth)}${spine} ${piece}`);
     }
   }
-  out.push(theme.paint(repeat(theme.unicode ? '┄' : '-', width), { fg: theme.roles.border }));
+  out.push(theme.paint(repeat(mark.tick, width), { fg: theme.roles.border }));
   return out;
 }
 
@@ -134,7 +144,7 @@ function tableBlock(theme, width, rows) {
     const painted = widths.map((value, column) => {
       const cell = row[column] ?? '';
       const text = index === 0
-        ? theme.paint(fit(cell, value), { fg: theme.palette.crimson, bold: true })
+        ? theme.paint(fit(cell, value), { fg: theme.roles.label, bold: true })
         : fit(inline(theme, cell), value);
       return ` ${text} `;
     });
@@ -174,28 +184,30 @@ export function renderMarkdown(theme, text, width) {
     if (heading) {
       const level = heading[1].length;
       const label = heading[2].trim();
+      // Three weights, no ornament and no case change. A gradient wordmark
+      // belongs on the front door; inside a reply it is just loud.
       if (level === 1) {
-        out.push(theme.gradient(truncate(label.toUpperCase(), width - 2), theme.palette.crimson, theme.palette.gold, { bold: true }));
-        out.push(theme.paint(repeat(theme.unicode ? '━' : '=', Math.min(width, visibleWidth(label) + 2)), { fg: theme.palette.blood }));
+        out.push(theme.paint(truncate(label, width), { fg: theme.roles.heading, bold: true }));
+        out.push(theme.paint(repeat(mark.tick, Math.min(width, visibleWidth(label))), { fg: theme.roles.borderStrong }));
       } else if (level === 2) {
-        out.push(theme.paint(mark.spine, { fg: theme.palette.crimson }) + theme.paint(` ${truncate(label.toUpperCase(), width - 2)}`, { fg: theme.palette.chalk, bold: true }));
+        out.push(theme.paint(truncate(label, width), { fg: theme.roles.text, bold: true }));
       } else {
-        out.push(theme.paint(`${mark.arrowRight} ${truncate(label, width - 2)}`, { fg: theme.palette.gold, bold: true }));
+        out.push(theme.paint(truncate(label, width), { fg: theme.roles.label, bold: true }));
       }
       index += 1;
       continue;
     }
 
     if (/^\s*([-*_])\s*\1\s*\1[\s\S]*$/.test(line) && stripAnsi(line).replace(/[\s\-*_]/g, '') === '') {
-      out.push(theme.paint(repeat(theme.unicode ? '╌' : '-', width), { fg: theme.roles.border }));
+      out.push(theme.paint(repeat(mark.rule, width), { fg: theme.roles.border }));
       index += 1;
       continue;
     }
 
     const quote = /^\s*>\s?(.*)$/.exec(line);
     if (quote) {
-      for (const piece of wrap(inline(theme, quote[1]), width - 2)) {
-        out.push(theme.paint(`${mark.spine} `, { fg: theme.palette.violet }) + theme.paint(piece, { fg: theme.palette.smoke, italic: true }));
+      for (const piece of wrap(inline(theme, quote[1]), width - SPACE.indent)) {
+        out.push(theme.paint(`${mark.bar} `, { fg: theme.roles.borderStrong }) + theme.paint(piece, { fg: theme.roles.dim, italic: true }));
       }
       index += 1;
       continue;
@@ -203,11 +215,14 @@ export function renderMarkdown(theme, text, width) {
 
     const bullet = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/.exec(line);
     if (bullet) {
-      const depth = Math.floor(bullet[1].length / 2);
-      const indent = '  '.repeat(depth);
+      const depth = Math.floor(bullet[1].length / SPACE.indent);
+      const indent = ' '.repeat(SPACE.indent * depth);
       const isOrdered = /\d/.test(bullet[2]);
-      const marker = isOrdered ? bullet[2] : mark.diamond;
-      const prefix = `${indent}${theme.paint(marker, { fg: depth ? theme.palette.violet : theme.palette.crimson, bold: true })} `;
+      // Depth reads from the marker, not from a colour: a solid crimson
+      // diamond on every top-level bullet made a four-item list the loudest
+      // thing in the reply.
+      const marker = isOrdered ? bullet[2] : [mark.bullet, mark.dash, mark.dot][Math.min(2, depth)];
+      const prefix = `${indent}${theme.paint(marker, { fg: depth ? theme.roles.faint : theme.roles.muted })} `;
       const body = wrap(inline(theme, bullet[3]), Math.max(4, width - visibleWidth(stripAnsi(prefix))));
       out.push(`${prefix}${body[0] ?? ''}`);
       for (const piece of body.slice(1)) out.push(`${' '.repeat(visibleWidth(stripAnsi(prefix)))}${piece}`);
@@ -219,6 +234,11 @@ export function renderMarkdown(theme, text, width) {
     out.push(...wrap(inline(theme, line), width));
     index += 1;
   }
-  // Collapse runs of blank lines so replies stay dense.
-  return out.filter((value, position) => !(value === '' && out[position - 1] === ''));
+  // Collapse runs of blank lines so replies stay dense, and never hand back a
+  // trailing one: the transcript owns the space between turns, and a reply
+  // that ends in whitespace doubled every gap after a fenced block.
+  const dense = out.filter((value, position) => !(value === '' && out[position - 1] === ''));
+  while (dense.length && dense[dense.length - 1] === '') dense.pop();
+  while (dense.length && dense[0] === '') dense.shift();
+  return dense;
 }
