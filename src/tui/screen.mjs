@@ -21,13 +21,16 @@ export const ANSI = {
   reset: `${CSI}0m`,
   bracketedPasteOn: `${CSI}?2004h`,
   bracketedPasteOff: `${CSI}?2004l`,
-  mouseOn: `${CSI}?1000h${CSI}?1006h`,
-  mouseOff: `${CSI}?1000l${CSI}?1006l`,
+  // ?1000 button reports, ?1002 adds drag, ?1003 adds bare hover motion, and
+  // ?1006 is the SGR encoding — the only one that addresses a cell past
+  // column 223 and survives a UTF-8 stream.
+  mouseOn: (hover = false) => `${CSI}?1000h${CSI}?${hover ? 1003 : 1002}h${CSI}?1006h`,
+  mouseOff: `${CSI}?1006l${CSI}?1003l${CSI}?1002l${CSI}?1000l`,
   moveTo: (row, column) => `${CSI}${row + 1};${column + 1}H`,
 };
 
 export class Screen {
-  constructor({ output = process.stdout, theme } = {}) {
+  constructor({ output = process.stdout, theme, mouse = 'click' } = {}) {
     this.output = output;
     this.theme = theme;
     this.previous = [];
@@ -35,6 +38,9 @@ export class Screen {
     this.cursor = null;
     this.title = null;
     this.onResize = null;
+    // 'off' | 'click' (press, release, drag) | 'hover' (adds bare motion).
+    this.mouse = mouse;
+    this.mouseActive = false;
     this.handleResize = () => {
       this.previous = [];
       if (this.onResize) this.onResize(this.size);
@@ -57,6 +63,7 @@ export class Screen {
     this.active = true;
     this.previous = [];
     this.write(`${ANSI.altScreenOn}${ANSI.hideCursor}${ANSI.clear}`);
+    this.applyMouse();
     this.output.on('resize', this.handleResize);
   }
 
@@ -64,7 +71,27 @@ export class Screen {
     if (!this.active) return;
     this.active = false;
     this.output.off('resize', this.handleResize);
+    if (this.mouseActive) { this.write(ANSI.mouseOff); this.mouseActive = false; }
     this.write(`${ANSI.reset}${ANSI.showCursor}${ANSI.altScreenOff}`);
+  }
+
+  /**
+   * Bring the terminal's mouse reporting in line with `this.mouse`.
+   * Tracking is left off while the screen is inactive so a crash between
+   * `enter` and `leave` cannot strand the terminal in reporting mode.
+   */
+  applyMouse() {
+    const wanted = this.active && this.mouse !== 'off';
+    if (wanted === this.mouseActive && !wanted) return;
+    if (!wanted) { this.write(ANSI.mouseOff); this.mouseActive = false; return; }
+    this.write(ANSI.mouseOff + ANSI.mouseOn(this.mouse === 'hover'));
+    this.mouseActive = true;
+  }
+
+  setMouse(mode) {
+    if (this.mouse === mode) return;
+    this.mouse = mode;
+    this.applyMouse();
   }
 
   setTitle(text) {

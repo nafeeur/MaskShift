@@ -4,7 +4,9 @@ import { glyphs, panel } from '../box.mjs';
 import { highlight } from '../markdown.mjs';
 import { hstack } from '../layout.mjs';
 import { split } from '../layout.mjs';
+import { LAYER, listZone, viewportZone } from '../regions.mjs';
 import { expandTabs, fit, padStart, truncate } from '../text.mjs';
+import { sidePane } from './catalog.mjs';
 
 const ICONS = {
   directory: { unicode: '▾', ascii: '/' },
@@ -85,16 +87,65 @@ export function render(app, region) {
       + highlight(theme, expandTabs(line), language)
     ));
     app.preview.set(painted);
-    previewBody.push(...app.preview.render(height - 2, previewWidth - 4));
+    previewBody.push(...app.preview.render(height - 1, previewWidth - 2));
   }
 
-  const preview = panel({
-    theme, width: previewWidth, height, title: app.previewPath ? truncate(app.previewPath, 40) : 'SOURCE VIEW', index: '',
-    stamp: app.previewLines.length ? `${app.previewLines.length} lines` : '', focused: app.focus === 'preview',
+  // No frame here: the tree's own right-hand rule already divides the two.
+  const preview = sidePane(app, {
+    width: previewWidth, height,
+    title: app.previewPath ? truncate(app.previewPath, 40) : 'SOURCE VIEW',
+    stamp: app.previewLines.length ? `${app.previewLines.length} lines` : '',
+    focused: app.focus === 'preview',
     body: previewBody,
   });
 
+  registerRegions(app, region, { treeWidth, previewWidth, listHeight });
   return { lines: hstack([{ lines: tree, width: treeWidth }, { lines: preview, width: previewWidth }], height), cursor: null };
+}
+
+function registerRegions(app, region, { treeWidth, previewWidth, listHeight }) {
+  if (!app.regions) return;
+
+  app.regions.add({
+    row: region.row + 1,
+    column: region.column + 2,
+    width: Math.max(0, treeWidth - 4),
+    height: 1,
+    id: 'files:filter',
+    layer: LAYER.body + 1,
+    onPress: (target) => { target.focus = 'file-filter'; },
+  });
+
+  // A directory folds on a click; a file previews on the first click and
+  // opens on the second, matching the catalogue views.
+  listZone(app, {
+    row: region.row + 3,
+    column: region.column + 1,
+    width: Math.max(0, treeWidth - 2),
+    height: listHeight,
+    list: app.fileList,
+    id: 'files:tree',
+    focus: 'files',
+    onSelect: (target, item) => { if (item?.type === 'file') target.schedulePreview(item.path); },
+    onClick: (target, item) => {
+      if (item?.type !== 'directory') return false;
+      // Folding is what a click on a directory means everywhere else.
+      if (target.collapsedDirs.has(item.path)) target.collapsedDirs.delete(item.path);
+      else target.collapsedDirs.add(item.path);
+      return true;
+    },
+    onActivate: (target, item) => { if (item?.type === 'file') void target.openFile(item.path); },
+  });
+
+  viewportZone(app, {
+    row: region.row + 1,
+    column: region.column + treeWidth,
+    width: previewWidth,
+    height: region.height - 1,
+    viewport: app.preview,
+    id: 'files:preview',
+    focus: 'preview',
+  });
 }
 
 export function handle(app, event) {

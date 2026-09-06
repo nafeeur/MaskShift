@@ -1,10 +1,13 @@
 // The right rail: plan of attack, live loadout telemetry, the event bus and
 // a git pulse. Toggle with ctrl+b, cycle with ctrl+r.
 
-import { glyphs, meter, panel, sparkline } from './box.mjs';
+import { glyphs, meter, rule, sparkline } from './box.mjs';
+import { LAYER } from './regions.mjs';
 import { fit, padStart, truncate, visibleWidth, wrap } from './text.mjs';
 
 export const RAIL_TABS = ['plan', 'telemetry', 'events', 'git'];
+
+const RAIL_TITLES = { plan: 'PLAN', telemetry: 'LOADOUT', events: 'EVENTS', git: 'GIT' };
 
 function planLines(app, width) {
   const { theme } = app;
@@ -116,26 +119,100 @@ function gitLines(app, width) {
   return lines.length ? lines : [theme.paint('Working tree clean.', { fg: theme.roles.success })];
 }
 
+/**
+ * The rail is a column, not a card.
+ *
+ * Boxing it put a second vertical rule hard against the main stage's — a
+ * two-column wall down the full height of the screen for no information. A
+ * single divider separates the two just as clearly, gives the rail two more
+ * columns of content, and leaves room to spell the sections out as tabs
+ * instead of hiding them behind ctrl+r.
+ */
 export function render(app, region) {
   const { theme } = app;
   const { width, height } = region;
-  const inner = width - 4;
+  const focused = app.focus === 'rail';
+  // The main stage already draws a vertical rule along this boundary; adding
+  // the rail's own would just be the same wall one column wider. A gutter and
+  // the stage's edge separate them.
+  const inner = Math.max(4, width - 2);
+
   const builders = { plan: planLines, telemetry: telemetryLines, events: eventLines, git: gitLines };
   const body = builders[app.railTab](app, inner);
   app.railView.set(body);
 
-  const titles = { plan: 'PLAN OF ATTACK', telemetry: 'LOADOUT', events: 'EVENT FEED', git: 'GIT PULSE' };
   const stamps = {
     plan: app.plan?.steps?.length ? `${app.plan.steps.length} steps` : '',
-    telemetry: `${app.subagents} subagents`,
-    events: `${app.events.length} events`,
+    telemetry: `${app.subagents} sub`,
+    events: `${app.events.length}`,
     git: app.gitBranch || '',
   };
 
-  return panel({
-    theme, width, height, title: titles[app.railTab], index: '',
-    stamp: stamps[app.railTab], focused: app.focus === 'rail',
-    body: app.railView.render(height - 2, inner),
+  const lines = [
+    tabRow(app, inner),
+    // With no frame of its own, this rule is where the rail shows that it owns
+    // the keyboard.
+    rule(theme, inner, '', {
+      stamp: stamps[app.railTab],
+      colour: focused ? theme.roles.borderActive : theme.roles.border,
+      weight: focused ? 'heavy' : 'light',
+    }),
+    ...app.railView.render(Math.max(0, height - 2), inner),
+  ];
+
+  registerRegions(app, region, inner);
+  return lines.slice(0, height).map((line) => ` ${fit(line, inner)}`);
+}
+
+// Spelling the sections out costs one row and removes a keystroke nobody
+// discovers on their own.
+function tabRow(app, width) {
+  const { theme } = app;
+  let out = '';
+  for (const tab of RAIL_TABS) {
+    const label = RAIL_TITLES[tab];
+    out += tab === app.railTab
+      ? theme.paint(` ${label} `, { fg: theme.palette.ink, bg: theme.palette.crimson, bold: true })
+      : theme.paint(` ${label} `, { fg: app.regions?.hoverId === `rail:${tab}` ? theme.roles.text : theme.roles.muted });
+  }
+  return fit(out, width);
+}
+
+function registerRegions(app, region, inner) {
+  const regions = app.regions;
+  if (!regions) return;
+  let column = region.column + 1;
+  for (const tab of RAIL_TABS) {
+    const span = visibleWidth(RAIL_TITLES[tab]) + 2;
+    regions.add({
+      row: region.row,
+      column,
+      width: span,
+      height: 1,
+      id: `rail:${tab}`,
+      layer: LAYER.rail + 1,
+      onPress: (target) => {
+        target.railTab = tab;
+        target.focus = 'rail';
+        target.railView.toTop();
+        if (tab === 'git') void target.refreshGit();
+      },
+    });
+    column += span;
+  }
+
+  const bodyHeight = Math.max(0, region.height - 2);
+  regions.add({
+    row: region.row + 2,
+    column: region.column,
+    width: region.width,
+    height: bodyHeight,
+    id: 'rail:body',
+    layer: LAYER.rail,
+    onPress: (target) => { target.focus = 'rail'; },
+    onWheel: (target, event) => {
+      target.railView.scroll(event.button === 'wheelup' ? -3 : 3, bodyHeight);
+    },
   });
 }
 
@@ -143,5 +220,5 @@ export function handle(app, event) {
   if (event.name === 'tab') { app.cycleRail(1); return true; }
   if (event.name === 'c' && app.railTab === 'events') { app.events = []; return true; }
   if (event.name === 'r' && app.railTab === 'git') { void app.refreshGit(); return true; }
-  return app.railView.handle(event, app.bodyRegion.height - 2);
+  return app.railView.handle(event, Math.max(1, app.bodyRegion.height - 2));
 }

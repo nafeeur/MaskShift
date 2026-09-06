@@ -9,6 +9,8 @@ import { Screen } from '../src/tui/screen.mjs';
 import { Theme, detectDepth } from '../src/tui/theme.mjs';
 import { fit, sliceAnsi, stripAnsi, truncate, visibleWidth, wrap } from '../src/tui/text.mjs';
 import { Composer, ListView, TextField, Viewport, fuzzy } from '../src/tui/widgets.mjs';
+import { Regions } from '../src/tui/regions.mjs';
+import { resolveMouseMode } from '../src/tui/app.mjs';
 import { createProject, runtimeForTest } from './helpers.mjs';
 
 const ESC = String.fromCharCode(27);
@@ -246,4 +248,184 @@ test('the interface routes keys, slash commands and view switches', async (t) =>
 
   app.toast('unit test', 'success');
   assert.equal(app.toasts.items.length, 1);
+});
+
+test('the decoder turns SGR and legacy mouse reports into positioned events', () => {
+  const only = (input) => decode(input).events;
+
+  const [press] = only(`${ESC}[<0;15;2M`);
+  assert.equal(press.name, 'mouse');
+  assert.equal(press.type, 'press');
+  assert.equal(press.button, 'left');
+  // Reports are 1-based; the renderer addresses cells from zero.
+  assert.equal(press.row, 1);
+  assert.equal(press.column, 14);
+
+  assert.equal(only(`${ESC}[<0;15;2m`)[0].type, 'release');
+  assert.equal(only(`${ESC}[<2;15;2M`)[0].button, 'right');
+  assert.equal(only(`${ESC}[<32;15;2M`)[0].type, 'drag');
+  assert.equal(only(`${ESC}[<35;15;2M`)[0].type, 'move');
+  assert.equal(only(`${ESC}[<64;15;2M`)[0].button, 'wheelup');
+  assert.equal(only(`${ESC}[<65;15;2M`)[0].button, 'wheeldown');
+  assert.equal(only(`${ESC}[<16;15;2M`)[0].ctrl, true);
+  assert.equal(only(`${ESC}[<4;15;2M`)[0].shift, true);
+
+  // Legacy X10: ESC [ M then three bytes biased by 32.
+  const legacy = only(`${ESC}[M${String.fromCharCode(32, 40, 34)}`)[0];
+  assert.equal(legacy.type, 'press');
+  assert.equal(legacy.column, 7);
+  assert.equal(legacy.row, 1);
+
+  // A mouse report must not be mistaken for keystrokes, and must not stall the
+  // buffer the way an unrecognised CSI sequence would.
+  assert.deepEqual(only(`${ESC}[<0;15;2M`).filter((event) => event.name !== 'mouse'), []);
+  assert.equal(decode(`${ESC}[<0;15;2M`).rest, '');
+  assert.equal(decode(`${ESC}[<0;15`).rest, `${ESC}[<0;15`);
+  assert.deepEqual(only(`${ESC}[<0;15;2Mx`).map((event) => event.name), ['mouse', 'x']);
+  assert.equal(only(`${ESC}[A`)[0].name, 'up');
+});
+
+test('hit testing resolves the topmost zone and honours layers', () => {
+  const regions = new Regions();
+  regions.add({ row: 2, column: 2, width: 10, height: 3, id: 'under' });
+  regions.add({ row: 3, column: 3, width: 2, height: 1, id: 'over', layer: 100 });
+
+  assert.equal(regions.hit(2, 2)?.id, 'under');
+  assert.equal(regions.hit(3, 3)?.id, 'over');
+  assert.equal(regions.hit(1, 2), null);
+  assert.equal(regions.hit(2, 12), null);
+  assert.equal(regions.covered(3, 3, 100), true);
+  assert.equal(regions.covered(2, 2, 100), false);
+
+  // A zone is only a candidate if it carries the handler being looked for.
+  regions.add({ row: 8, column: 0, width: 4, height: 1, id: 'wheelable', onWheel: () => {} });
+  assert.equal(regions.hit(8, 1, { need: 'onPress' }), null);
+  assert.equal(regions.hit(8, 1, { need: 'onWheel' })?.id, 'wheelable');
+
+  regions.clear();
+  assert.equal(regions.hit(3, 3), null);
+});
+
+test('the mouse mode resolves from the environment before stored preferences', () => {
+  const previous = process.env.MASKSHIFT_MOUSE;
+  delete process.env.MASKSHIFT_MOUSE;
+  try {
+    assert.equal(resolveMouseMode({}), 'click');
+    assert.equal(resolveMouseMode({ mouse: 'hover' }), 'hover');
+    assert.equal(resolveMouseMode({ mouse: false }), 'off');
+    assert.equal(resolveMouseMode({ mouse: 'nonsense' }), 'click');
+    process.env.MASKSHIFT_MOUSE = 'off';
+    assert.equal(resolveMouseMode({ mouse: 'hover' }), 'off');
+    process.env.MASKSHIFT_MOUSE = 'hover';
+    assert.equal(resolveMouseMode({}), 'hover');
+  } finally {
+    if (previous === undefined) delete process.env.MASKSHIFT_MOUSE;
+    else process.env.MASKSHIFT_MOUSE = previous;
+  }
+});
+
+test('the interface routes clicks, wheels and drags to what it painted', async (t) => {
+  const project = await createProject(t);
+  const runtime = await runtimeForTest(t, project);
+  const app = new MaskShiftTui(runtime, {
+    workspacePath: project, output: new FakeTerminal(132, 38), headless: true, theme,
+  });
+  await app.bootstrap();
+  await app.loadFileTree();
+
+  // Zones describe the frame the user was looking at, so paint before clicking.
+  const at = (row, column, mask = 0, final = 'M') => {
+    app.snapshot();
+    app.onMouse(decode(`${ESC}[<${mask};${column + 1};${row + 1}${final}`).events[0]);
+  };
+
+  // The tab strip: " 01 HEIST " opens at column 1, so 02 FILES starts at 12.
+  app.view = 'chat';
+  at(1, 14);
+  assert.equal(app.view, 'files');
+  at(1, 3);
+  assert.equal(app.view, 'chat');
+
+  // The two panes of the heist view take focus from a click.
+  app.focus = 'composer';
+  at(4, 20);
+  assert.equal(app.focus, 'transcript');
+  at(34, 20);
+  assert.equal(app.focus, 'composer');
+
+  // Rail sections are tabs now, not just a ctrl+r cycle.
+  at(2, 108);
+  assert.equal(app.railTab, 'telemetry');
+  at(2, 100);
+  assert.equal(app.railTab, 'plan');
+
+  // The wheel scrolls the pane under the pointer without moving focus.
+  app.view = 'chat';
+  app.focus = 'composer';
+  app.messages = Array.from({ length: 200 }, (value, index) => ({ role: 'user', content: `line ${index}`, created_at: Date.now() }));
+  app.transcript.toBottom();
+  app.snapshot();
+  const bottom = app.transcript.offset;
+  at(10, 40, 64);
+  assert.ok(app.transcript.offset < bottom, 'wheel should scroll the transcript up');
+  assert.equal(app.focus, 'composer');
+
+  // Dragging the scrollbar track jumps to that position. With the rail shown
+  // the stage is 99 columns wide, so its track sits at column 97.
+  at(3, 97);
+  const top = app.transcript.offset;
+  app.onMouse(decode(`${ESC}[<32;98;30M`).events[0]);
+  assert.ok(app.transcript.offset > top, 'dragging the track should scroll down');
+  app.onMouse(decode(`${ESC}[<0;98;30m`).events[0]);
+  assert.equal(app.dragging, null, 'release should end the drag');
+
+  // A click outside an overlay dismisses it; one inside does not.
+  app.openPalette();
+  app.snapshot();
+  at(18, 66);
+  assert.ok(app.overlay, 'a click on the overlay should not dismiss it');
+  at(0, 0);
+  assert.equal(app.overlay, null);
+
+  // Turning the mouse off makes every report inert.
+  app.screen.setMouse('off');
+  app.view = 'chat';
+  at(1, 14);
+  assert.equal(app.view, 'chat');
+  app.screen.setMouse('click');
+});
+
+test('the heist view keeps the composer inside one unclipped frame', async (t) => {
+  const project = await createProject(t);
+  const runtime = await runtimeForTest(t, project);
+  const app = new MaskShiftTui(runtime, {
+    workspacePath: project, output: new FakeTerminal(120, 32), headless: true, theme,
+  });
+  await app.bootstrap();
+  app.view = 'chat';
+
+  // A composer that grew past the pane used to push its own bottom rule off
+  // the end of the frame.
+  for (const draft of ['', 'one line', Array.from({ length: 40 }, (value, i) => `line ${i}`).join('\n')]) {
+    app.composer.set(draft);
+    app.screen.invalidate();
+    const frame = app.snapshot();
+    const body = frame.slice(2, frame.length - 2).map(stripAnsi);
+    assert.ok(body.at(-1).startsWith('┗'), `frame should close, got "${body.at(-1)}"`);
+    assert.equal(body.filter((line) => line.startsWith('┏')).length, 1, 'exactly one frame opens');
+    for (const line of frame) assert.equal(visibleWidth(line), 120);
+  }
+});
+
+test('markdown tables line their separators up with their columns', () => {
+  const source = '| # | File | Size |\n|---|------|------|\n| 1 | a.png | 436K |\n| 11 | b.png | 216K |\n';
+  const lines = renderMarkdown(theme, source, 60).map(stripAnsi).filter((line) => line.trim());
+  const [header, divider, ...rows] = lines;
+
+  const pipes = (line) => [...line].flatMap((character, index) => (character === '│' ? [index] : []));
+  const crosses = (line) => [...line].flatMap((character, index) => (character === '┼' ? [index] : []));
+
+  assert.deepEqual(crosses(divider), pipes(header), 'crossings must sit under the pipes');
+  for (const row of rows) assert.deepEqual(pipes(row), pipes(header), `"${row}" drifted`);
+  for (const line of lines) assert.ok(visibleWidth(line) <= 60);
 });

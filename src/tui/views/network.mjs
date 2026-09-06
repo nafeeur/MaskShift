@@ -107,7 +107,18 @@ export function render(app, region) {
     stamp: `${connected} connected`,
     detail: detail(app, Math.max(30, Math.floor(region.width * 0.4) - 4)),
     detailTitle: app.mcpList.current?.name ? truncate(app.mcpList.current.name, 30) : 'SERVER',
+    onTab: (target, id) => { target.mcpTab = id; target.mcpList.first(); },
+    onActivate: (target, item) => activate(target, item),
   });
+}
+
+// Enter, and a click on the already-selected row, do the same thing.
+function activate(app, item) {
+  if (item?.kind === 'server') {
+    void (item.status === 'connected' ? app.disconnectMcp(item.name) : app.connectMcp(item.name));
+  } else if (item?.kind === 'registry') {
+    void app.installRegistryServer(item.raw);
+  }
 }
 
 export function handle(app, event) {
@@ -119,12 +130,7 @@ export function handle(app, event) {
   if (app.focus === 'network') {
     const item = app.mcpList.current;
     switch (true) {
-      case event.name === 'enter' && item?.kind === 'server':
-        void (item.status === 'connected' ? app.disconnectMcp(item.name) : app.connectMcp(item.name));
-        return true;
-      case event.name === 'enter' && item?.kind === 'registry':
-        void app.installRegistryServer(item.raw);
-        return true;
+      case event.name === 'enter': activate(app, item); return true;
       case event.name === 'c' && item?.kind === 'server': void app.connectMcp(item.name, true); return true;
       case event.name === 'd' && item?.kind === 'server': void app.disconnectMcp(item.name); return true;
       case event.name === 'a': app.openMcpDialog(); return true;

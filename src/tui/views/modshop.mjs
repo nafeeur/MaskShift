@@ -160,7 +160,16 @@ export function render(app, region) {
     stamp: `${list.length} entries`,
     detail: detail(app, Math.max(30, Math.floor(region.width * 0.4) - 4)),
     detailTitle: app.modList.current?.name ? truncate(app.modList.current.name, 30) : 'DOSSIER',
+    onTab: (target, id) => { target.modTab = id; target.modList.first(); void target.refreshModShop(); },
+    onActivate: (target, item) => activate(target, item),
   });
+}
+
+// Enter, and a click on the already-selected row, do the same thing.
+function activate(app, item) {
+  if (item?.kind === 'automation') void app.runAutomation(item.raw.id);
+  else if (item?.kind === 'plugin') void (item.status === 'active' ? app.deactivatePlugin(item.name) : app.activatePlugin(item.name));
+  else if (item?.kind === 'bridge') app.openBridgeRunner(item.raw);
 }
 
 export function handle(app, event) {
@@ -169,14 +178,10 @@ export function handle(app, event) {
     switch (true) {
       case event.name === 'n': app.openModCreate(); return true;
       case event.name === 'r' && !event.ctrl: void app.refreshModShop({ force: true }); return true;
-      case event.name === 'enter' && item?.kind === 'automation': void app.runAutomation(item.raw.id); return true;
+      case event.name === 'enter': activate(app, item); return true;
       case event.name === 'space' && item?.kind === 'automation': void app.toggleAutomation(item.raw); return true;
       case event.name === 'delete' && item?.kind === 'automation': app.confirmDeleteAutomation(item.raw); return true;
-      case event.name === 'enter' && item?.kind === 'plugin':
-        void (item.status === 'active' ? app.deactivatePlugin(item.name) : app.activatePlugin(item.name));
-        return true;
       case event.name === 'l' && item?.kind === 'plugin': void app.reloadPlugin(item.name); return true;
-      case event.name === 'enter' && item?.kind === 'bridge': app.openBridgeRunner(item.raw); return true;
       case event.name === 'delete' && item?.kind === 'browser': void app.closeBrowser(item.raw.id); return true;
       case event.name === 'delete' && item?.kind === 'process': void app.stopProcess(item.raw.id); return true;
       default: break;

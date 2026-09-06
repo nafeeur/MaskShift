@@ -1,19 +1,42 @@
 // Shared chrome for the catalogue views (arsenal, network, mod shop):
 // a tab row, a filter, a scrolling list and a detail pane.
 
-import { glyphs, panel } from '../box.mjs';
+import { glyphs, panel, rule } from '../box.mjs';
 import { hstack, split } from '../layout.mjs';
-import { fit, wrap } from '../text.mjs';
+import { LAYER, listZone, viewportZone } from '../regions.mjs';
+import { fit, visibleWidth, wrap } from '../text.mjs';
 
-export function tabRow(app, tabs, active, width) {
+/**
+ * The section tabs. `origin` is the screen cell of the row's first column, so
+ * each chip can claim the columns it lands on as a click target.
+ */
+export function tabRow(app, tabs, active, width, { origin = null, onPick = null } = {}) {
   const { theme } = app;
   const mark = glyphs(theme);
-  const parts = tabs.map((tab) => {
-    const label = tab.count === undefined ? tab.label : `${tab.label} ${tab.count}`;
-    return tab.id === active
-      ? theme.paint(` ${label} `, { fg: theme.palette.ink, bg: theme.palette.gold, bold: true })
-      : theme.paint(` ${label} `, { fg: theme.roles.muted });
-  });
+  let column = origin?.column ?? 0;
+  const parts = [];
+
+  for (const [index, tab] of tabs.entries()) {
+    const label = tab.count === undefined ? ` ${tab.label} ` : ` ${tab.label} ${tab.count} `;
+    const hovered = app.regions?.hoverId === `catalog:tab:${tab.id}`;
+    parts.push(tab.id === active
+      ? theme.paint(label, { fg: theme.palette.ink, bg: theme.palette.gold, bold: true })
+      : theme.paint(label, { fg: hovered ? theme.roles.text : theme.roles.muted, bold: hovered }));
+
+    if (origin && onPick) {
+      app.regions?.add({
+        row: origin.row,
+        column,
+        width: visibleWidth(label),
+        height: 1,
+        id: `catalog:tab:${tab.id}`,
+        layer: LAYER.body + 1,
+        onPress: (target) => onPick(target, tab.id),
+      });
+    }
+    column += visibleWidth(label) + (index < tabs.length - 1 ? 1 : 0);
+  }
+
   return fit(parts.join(theme.paint(mark.pipe, { fg: theme.roles.border })), width);
 }
 
@@ -49,6 +72,30 @@ export function detailBlock(app, width, sections) {
   return lines;
 }
 
+/**
+ * A secondary pane that sits beside a framed one.
+ *
+ * It deliberately has no frame of its own: butting two boxes together drew two
+ * vertical rules with nothing between them. The neighbouring frame is the
+ * divider, a title rule opens the pane, and that rule is also where the pane
+ * shows that it holds the keyboard.
+ */
+export function sidePane(app, { width, height, title, stamp, focused, body }) {
+  const { theme } = app;
+  const inner = Math.max(4, width - 2);
+  const lines = [
+    rule(theme, inner, title, {
+      stamp,
+      active: focused,
+      colour: focused ? theme.roles.borderActive : theme.roles.border,
+      weight: focused ? 'heavy' : 'light',
+    }),
+    ...body,
+  ];
+  return lines.slice(0, height).concat(new Array(Math.max(0, height - lines.length)).fill(''))
+    .map((line) => ` ${fit(line, inner)}`);
+}
+
 export function renderCatalog(app, region, spec) {
   const { theme } = app;
   const { width, height } = region;
@@ -57,13 +104,20 @@ export function renderCatalog(app, region, spec) {
     ? split(width, [{ weight: 3, min: 34 }, { weight: 2, min: 34, max: 70 }])
     : [width, 0];
 
+  // Panel frame plus one column of padding on each side.
+  const listInner = listWidth - 4;
   const header = [];
-  if (spec.tabs?.length) header.push(tabRow(app, spec.tabs, spec.activeTab, listWidth - 4));
-  header.push(filterRow(app, spec.filter, app.focus === spec.filterFocus, listWidth - 4, spec.placeholder || 'FILTER'));
+  if (spec.tabs?.length) {
+    header.push(tabRow(app, spec.tabs, spec.activeTab, listInner, {
+      origin: { row: region.row + 1, column: region.column + 2 },
+      onPick: (target, id) => spec.onTab?.(target, id),
+    }));
+  }
+  header.push(filterRow(app, spec.filter, app.focus === spec.filterFocus, listInner, spec.placeholder || 'FILTER'));
   header.push('');
 
   const listHeight = Math.max(1, height - 2 - header.length);
-  const rows = spec.list.render(theme, listWidth - 4, listHeight, spec.row);
+  const rows = spec.list.render(theme, listInner, listHeight, spec.row);
 
   const listPanel = panel({
     theme, width: listWidth, height, title: spec.title, index: spec.index,
@@ -71,17 +125,53 @@ export function renderCatalog(app, region, spec) {
     body: [...header, ...rows],
   });
 
+  const filterRowIndex = region.row + 1 + header.length - 2;
+  app.regions?.add({
+    row: filterRowIndex,
+    column: region.column + 2,
+    width: listInner,
+    height: 1,
+    id: `catalog:filter:${spec.filterFocus}`,
+    layer: LAYER.body + 1,
+    onPress: (target) => { target.focus = spec.filterFocus; },
+  });
+
+  listZone(app, {
+    row: region.row + 1 + header.length,
+    column: region.column + 1,
+    width: Math.max(0, listWidth - 2),
+    height: listHeight,
+    list: spec.list,
+    id: `catalog:list:${spec.listFocus}`,
+    focus: spec.listFocus,
+    onSelect: (target, item, index) => spec.onSelect?.(target, item, index),
+    onActivate: (target, item, index) => spec.onActivate?.(target, item, index),
+  });
+
   if (!hasDetail) return { lines: listPanel, cursor: null };
 
   const detailLines = spec.detail ?? [theme.paint('Nothing selected.', { fg: theme.roles.border, italic: true })];
   app.detail.set(detailLines);
-  const detailPanel = panel({
-    theme, width: detailWidth, height, title: spec.detailTitle || 'DOSSIER', index: '',
-    stamp: spec.detailStamp || '', focused: app.focus === 'detail',
-    body: app.detail.render(height - 2, detailWidth - 4),
+  const detailBody = app.detail.render(height - 1, detailWidth - 2);
+  const detail = sidePane(app, {
+    width: detailWidth, height,
+    title: spec.detailTitle || 'DOSSIER',
+    stamp: spec.detailStamp || '',
+    focused: app.focus === 'detail',
+    body: detailBody,
   });
 
-  return { lines: hstack([{ lines: listPanel, width: listWidth }, { lines: detailPanel, width: detailWidth }], height), cursor: null };
+  viewportZone(app, {
+    row: region.row + 1,
+    column: region.column + listWidth,
+    width: detailWidth,
+    height: height - 1,
+    viewport: app.detail,
+    id: 'catalog:detail',
+    focus: 'detail',
+  });
+
+  return { lines: hstack([{ lines: listPanel, width: listWidth }, { lines: detail, width: detailWidth }], height), cursor: null };
 }
 
 /** Shared key handling for filter fields and list movement. */

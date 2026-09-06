@@ -3,6 +3,7 @@
 
 import { glyphs, panel } from './box.mjs';
 import { centreOffset } from './layout.mjs';
+import { LAYER } from './regions.mjs';
 import { fit, padStart, truncate, visibleWidth, wrap } from './text.mjs';
 import { Composer, ListView, TextField, fuzzy, highlightMatch } from './widgets.mjs';
 
@@ -10,6 +11,9 @@ class Overlay {
   constructor({ title = '', index = '' } = {}) {
     this.title = title;
     this.index = index;
+    // The app dismisses an overlay when a click lands outside it. A dialogue
+    // that must be answered can opt out.
+    this.dismissOnOutsideClick = true;
   }
 
   size(viewport) {
@@ -27,6 +31,50 @@ class Overlay {
       column: offset.column + cursorColumn,
     };
     return { lines, offset, cursor };
+  }
+
+  /**
+   * Claim the overlay's own rectangle so a click inside it never reads as a
+   * click on the view behind. Called by every overlay before it adds the
+   * finer-grained zones on top.
+   */
+  claim(app, offset, columns, rows) {
+    app.regions?.add({
+      row: offset.row, column: offset.column, width: columns, height: rows,
+      id: 'overlay:surface', layer: LAYER.overlay,
+      onPress: () => {},
+    });
+  }
+
+  zone(app, spec) {
+    app.regions?.add({ layer: LAYER.overlay + 1, ...spec });
+  }
+
+  /**
+   * Rows of a ListView inside an overlay: a click selects, and because an
+   * overlay's whole purpose is to pick something, that same click commits.
+   */
+  listZone(app, { offset, columns, top, height, list, onPick, id }) {
+    this.zone(app, {
+      row: offset.row + top,
+      column: offset.column + 1,
+      width: Math.max(0, columns - 2),
+      height,
+      id,
+      onPress: (target, event, region) => {
+        const index = list.offset + (event.row - region.row);
+        if (index < 0 || index >= list.items.length) return;
+        list.selected = index;
+        list.ensureVisible(height);
+        onPick(target, list.items[index]);
+      },
+      onWheel: (target, event) => {
+        const step = event.button === 'wheelup' ? -3 : 3;
+        list.offset = Math.max(0, Math.min(list.offset + step, Math.max(0, list.items.length - height)));
+        list.selected = Math.max(list.offset, Math.min(list.selected, list.offset + height - 1));
+        list.selected = Math.max(0, Math.min(list.selected, Math.max(0, list.items.length - 1)));
+      },
+    });
   }
 }
 
@@ -79,7 +127,16 @@ export class PaletteOverlay extends Overlay {
       theme, width, height: size.rows, title: 'COMMAND PALETTE', index: '⌘',
       stamp: `${rows.length} actions`, focused: true, body,
     });
-    return this.place(app, viewport, lines, 2 + 3 + input.cursorColumn, 1);
+    const placed = this.place(app, viewport, lines, 2 + 3 + input.cursorColumn, 1);
+    this.claim(app, placed.offset, width, lines.length);
+    // Body row 0 is the input and row 1 the divider, so the list starts three
+    // rows below the overlay's own top edge.
+    this.listZone(app, {
+      offset: placed.offset, columns: width, top: 3, height: listHeight, list: this.list,
+      id: 'overlay:palette',
+      onPick: (target, action) => { target.closeOverlay(); if (action) void target.runAction(action.id); },
+    });
+    return placed;
   }
 
   handle(app, event) {
@@ -149,7 +206,14 @@ export class PickerOverlay extends Overlay {
       theme, width, height: size.rows, title: this.title, index: mark.diamond,
       stamp: `${this.list.items.length}`, focused: true, body,
     });
-    return this.place(app, viewport, lines, 2 + 3 + input.cursorColumn, 1);
+    const placed = this.place(app, viewport, lines, 2 + 3 + input.cursorColumn, 1);
+    this.claim(app, placed.offset, width, lines.length);
+    this.listZone(app, {
+      offset: placed.offset, columns: width, top: 3, height: listHeight, list: this.list,
+      id: 'overlay:picker',
+      onPick: (target, item) => { target.closeOverlay(); if (item) void this.onSelect(item); },
+    });
+    return placed;
   }
 
   handle(app, event) {
@@ -215,9 +279,11 @@ export class FormOverlay extends Overlay {
     const width = size.columns;
     const inner = width - 4;
     const body = [];
+    const spans = [];
     let cursor = null;
     for (const [index, field] of this.fields.entries()) {
       const active = index === this.index;
+      spans.push({ index, field, start: body.length });
       body.push(theme.paint(field.label.toUpperCase(), { fg: active ? theme.palette.crimson : theme.roles.muted, bold: active })
         + (field.hint ? theme.paint(`   e.g. ${field.hint}`, { fg: theme.roles.border, italic: true }) : ''));
       if (field.type === 'toggle') {
@@ -241,12 +307,16 @@ export class FormOverlay extends Overlay {
         body.push(theme.paint(active ? ` ${mark.caret} ` : '   ', { fg: theme.palette.crimson }) + rendered.text);
         if (active) cursor = { row: body.length - 1, column: 3 + rendered.cursorColumn };
       }
+      spans[spans.length - 1].end = body.length;
     }
     if (this.note) { body.push(''); for (const piece of wrap(this.note, inner)) body.push(theme.paint(piece, { fg: theme.roles.border, italic: true })); }
     if (this.error) { body.push(''); body.push(theme.paint(truncate(this.error, inner), { fg: theme.roles.danger })); }
     body.push('');
-    body.push(theme.paint(` ${this.submitLabel} `, { fg: theme.palette.ink, bg: theme.palette.crimson, bold: true })
-      + theme.paint('  ctrl+s submits', { fg: theme.roles.border })
+    const submitChip = theme.paint(` ${this.submitLabel} `, { fg: theme.palette.ink, bg: theme.palette.crimson, bold: true });
+    const cancelChip = theme.paint(' CANCEL ', { fg: theme.roles.muted });
+    const submitRow = body.length;
+    body.push(`${submitChip}  ${cancelChip}`
+      + theme.paint('   ctrl+s submits', { fg: theme.roles.border })
       + theme.paint('   tab moves', { fg: theme.roles.border })
       + theme.paint('   esc cancels', { fg: theme.roles.border }));
 
@@ -255,6 +325,49 @@ export class FormOverlay extends Overlay {
       stamp: `${this.fields.length} fields`, focused: true, body,
     });
     const offset = centreOffset(viewport, { columns: width, rows: lines.length });
+
+    this.claim(app, offset, width, lines.length);
+    // A form taller than the viewport has its body clipped by the panel, so
+    // only rows that actually made it onto the screen become click targets.
+    const painted = lines.length - 2;
+    for (const span of spans) {
+      if (span.start >= painted) continue;
+      this.zone(app, {
+        row: offset.row + 1 + span.start,
+        column: offset.column + 1,
+        width: Math.max(0, width - 2),
+        height: Math.max(1, Math.min(span.end ?? span.start + 1, painted) - span.start),
+        id: `overlay:field:${span.field.name}`,
+        // A click focuses the field, and for the two field types with no text
+        // to place a caret in, it also advances the value.
+        onPress: () => {
+          this.index = span.index;
+          if (span.field.type === 'toggle') span.field.toggled = !span.field.toggled;
+          if (span.field.type === 'select') {
+            span.field.optionIndex = (span.field.optionIndex + 1) % span.field.options.length;
+          }
+        },
+      });
+    }
+    if (submitRow < painted) {
+      this.zone(app, {
+        row: offset.row + 1 + submitRow,
+        column: offset.column + 2,
+        width: visibleWidth(submitChip),
+        height: 1,
+        id: 'overlay:submit',
+        onPress: (target) => this.submit(target),
+      });
+      this.zone(app, {
+        row: offset.row + 1 + submitRow,
+        column: offset.column + 2 + visibleWidth(submitChip) + 2,
+        width: visibleWidth(cancelChip),
+        height: 1,
+        id: 'overlay:cancel',
+        onPress: (target) => target.closeOverlay(),
+      });
+    }
+
     return {
       lines, offset,
       cursor: cursor ? { row: offset.row + 1 + cursor.row, column: offset.column + 2 + cursor.column } : null,
@@ -338,6 +451,7 @@ export class ConfirmOverlay extends Overlay {
     const no = this.choice === 1
       ? theme.paint('  NO  ', { fg: theme.palette.ink, bg: theme.palette.gold, bold: true })
       : theme.paint('  NO  ', { fg: theme.roles.muted });
+    const buttonRow = body.length;
     body.push(`${yes}   ${no}`);
     const lines = panel({
       theme, width, height: body.length + 2, title: this.title,
@@ -346,6 +460,20 @@ export class ConfirmOverlay extends Overlay {
       colour: this.danger ? theme.palette.crimson : theme.palette.gold,
     });
     const offset = centreOffset(viewport, { columns: width, rows: lines.length });
+
+    this.claim(app, offset, width, lines.length);
+    this.zone(app, {
+      row: offset.row + 1 + buttonRow, column: offset.column + 2,
+      width: visibleWidth(yes), height: 1, id: 'overlay:yes',
+      onPress: (target) => { target.closeOverlay(); void this.onConfirm(); },
+    });
+    this.zone(app, {
+      row: offset.row + 1 + buttonRow,
+      column: offset.column + 2 + visibleWidth(yes) + 3,
+      width: visibleWidth(no), height: 1, id: 'overlay:no',
+      onPress: (target) => target.closeOverlay(),
+    });
+
     return { lines, offset, cursor: null };
   }
 
@@ -382,6 +510,20 @@ export class TextOverlay extends Overlay {
       body: this.body.slice(this.offset, this.offset + inner),
     });
     const offset = centreOffset(viewport, { columns: width, rows: lines.length });
+
+    this.claim(app, offset, width, lines.length);
+    this.zone(app, {
+      row: offset.row, column: offset.column, width, height: lines.length,
+      id: 'overlay:text',
+      onPress: () => {},
+      onWheel: (target, event) => {
+        this.offset = Math.max(0, Math.min(
+          this.offset + (event.button === 'wheelup' ? -3 : 3),
+          Math.max(0, this.body.length - inner),
+        ));
+      },
+    });
+
     return { lines, offset, cursor: null };
   }
 

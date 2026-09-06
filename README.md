@@ -182,9 +182,11 @@ otherwise.
 `maskshift` opens a full-screen terminal interface built on a bespoke,
 zero-dependency renderer: a diffing frame buffer, an ANSI-aware layout engine,
 and a raw-mode key decoder. The look is one idea carried everywhere — the
-**stencil frame**. Every surface is a notched panel with an inset title tab on
-the top rail and a stamp on the bottom rail, and the panel that owns the keyboard
-is promoted from a hairline to a heavy crimson rule, so focus is never in doubt.
+**stencil frame**. Every surface is a panel with an inset title on the top rail
+and a stamp on the rule that bounds it, and the panel that owns the keyboard is
+promoted from a hairline to a heavy crimson rule, so focus is never in doubt.
+Adjacent panes share a single rule instead of stacking two, so a boundary is
+drawn once and a rule always means something.
 
 Crimson is identity and focus, gold is keys and the operator, bone is text, and
 each capability class keeps a fixed accent — cyanide for tools, violet for
@@ -192,6 +194,12 @@ skills, azure for MCP — so the same colour always means the same category. The
 palette is generated for truecolour, 256-colour and 16-colour terminals from one
 set of hex values, and `NO_COLOR`, `MASKSHIFT_COLOR=off` and `MASKSHIFT_ASCII=1`
 all produce a clean, aligned fallback.
+
+It is fully mouse-driven as well as fully keyboard-driven: view tabs, rail
+tabs, list rows, catalogue filters, scrollbars, hint-rail keys and every
+overlay button respond to a click, and the wheel scrolls whatever is under the
+pointer. Set `MASKSHIFT_MOUSE=off` (or use `f2`) to hand text selection back to
+the terminal.
 
 Six views, switched with `1`–`6`, plus a right rail on `ctrl+b`:
 

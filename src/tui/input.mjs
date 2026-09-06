@@ -1,8 +1,10 @@
-// Raw-mode keyboard decoder.
+// Raw-mode input decoder.
 //
 // Turns the byte soup arriving on stdin into { name, ctrl, alt, shift, ... }
 // events, including bracketed paste so dropping a large prompt into the
-// composer stays a single event instead of a thousand keystrokes.
+// composer stays a single event instead of a thousand keystrokes, and SGR
+// mouse reports so every panel, tab and row can be clicked as well as typed
+// at.
 
 import { EventEmitter } from 'node:events';
 import { ESC } from './theme.mjs';
@@ -29,6 +31,52 @@ function modifiers(code) {
 
 function key(name, extra = {}) {
   return { name, ctrl: false, alt: false, shift: false, sequence: '', ...extra };
+}
+
+const MOUSE_BUTTONS = ['left', 'middle', 'right', 'none'];
+const WHEEL_BUTTONS = ['wheelup', 'wheeldown', 'wheelleft', 'wheelright'];
+
+/**
+ * Turn an xterm button mask plus 1-based cell coordinates into a mouse event.
+ *
+ * The two encodings disagree about button code 3: SGR reports a release
+ * through the `m` terminator and uses code 3 for "no button", which combined
+ * with the motion bit is a bare hover. Legacy X10 has no separate terminator
+ * and spends code 3 on the release itself, so it can never report a hover.
+ */
+function mouse(mask, x, y, released, legacy = false) {
+  const shift = Boolean(mask & 4);
+  const alt = Boolean(mask & 8);
+  const ctrl = Boolean(mask & 16);
+  const motion = Boolean(mask & 32);
+  const wheel = Boolean(mask & 64);
+  const low = mask & 3;
+
+  let button;
+  let type;
+  if (wheel) {
+    button = WHEEL_BUTTONS[low];
+    type = 'wheel';
+  } else {
+    button = MOUSE_BUTTONS[low];
+    if (released) type = 'release';
+    // Motion with no button held is a hover, only sent under ?1003h.
+    else if (motion) type = button === 'none' ? 'move' : 'drag';
+    else if (legacy && low === 3) type = 'release';
+    else type = 'press';
+  }
+
+  return {
+    name: 'mouse',
+    type,
+    button,
+    row: Math.max(0, y - 1),
+    column: Math.max(0, x - 1),
+    ctrl,
+    alt,
+    shift,
+    sequence: '',
+  };
 }
 
 /**
@@ -63,6 +111,29 @@ export function decode(chunk) {
     const next = chunk[index + 1];
 
     if (next === '[' || next === 'O') {
+      // SGR mouse (?1006): ESC [ < mask ; col ; row M|m — the only encoding
+      // that survives a UTF-8 stream and terminals wider than 223 columns.
+      if (chunk[index + 2] === '<') {
+        const sgr = /^\[<(\d+);(\d+);(\d+)([Mm])/.exec(chunk.slice(index + 1));
+        if (!sgr) return { events, rest: chunk.slice(index) };
+        events.push(mouse(Number(sgr[1]), Number(sgr[2]), Number(sgr[3]), sgr[4] === 'm'));
+        index += 1 + sgr[0].length;
+        continue;
+      }
+
+      // Legacy X10 mouse: ESC [ M then three bytes biased by 32. Kept as a
+      // fallback for terminals that ignore ?1006h; it cannot address a cell
+      // past column 223, so coordinates are clamped rather than wrapped.
+      if (chunk[index + 2] === 'M') {
+        if (chunk.length < index + 6) return { events, rest: chunk.slice(index) };
+        const mask = chunk.codePointAt(index + 3) - 32;
+        const x = chunk.codePointAt(index + 4) - 32;
+        const y = chunk.codePointAt(index + 5) - 32;
+        if (mask >= 0 && x >= 0 && y >= 0) events.push(mouse(mask, x, y, false, true));
+        index += 6;
+        continue;
+      }
+
       const match = /^(\[|O)([0-9;]*)([~A-Za-z])/.exec(chunk.slice(index + 1));
       if (!match) return { events, rest: chunk.slice(index) };
 
@@ -119,6 +190,7 @@ export class Keyboard extends EventEmitter {
       const { events, rest } = decode(this.buffer);
       this.buffer = rest;
       for (const event of events) {
+        if (event.name === 'mouse') { this.emit('mouse', event); continue; }
         // A bare ESC that never resolved into a sequence.
         if (event.sequence === ESC && event.name !== 'escape') continue;
         this.emit('key', event);
