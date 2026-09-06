@@ -34,7 +34,7 @@ function printHelp(ui, topic = null) {
     ui.banner(VERSION, { compact: true });
     ui.heading(group.title, topic);
     for (const command of Object.values(group.commands)) {
-      ui.line(ui.theme.paint(`  maskshift ${command.usage}`, { fg: ui.theme.palette.gold, bold: true }));
+      ui.line(ui.theme.paint(`  maskshift ${command.usage}`, { fg: ui.theme.roles.accent, bold: true }));
       ui.line(ui.theme.paint(`      ${command.summary}`, { fg: ui.theme.roles.muted }));
     }
     ui.line();
@@ -42,7 +42,7 @@ function printHelp(ui, topic = null) {
   }
   if (topic && SINGLE[topic]) {
     ui.banner(VERSION, { compact: true });
-    ui.line(ui.theme.paint(`  maskshift ${SINGLE[topic].usage}`, { fg: ui.theme.palette.gold, bold: true }));
+    ui.line(ui.theme.paint(`  maskshift ${SINGLE[topic].usage}`, { fg: ui.theme.roles.accent, bold: true }));
     ui.line(ui.theme.paint(`      ${SINGLE[topic].summary}`, { fg: ui.theme.roles.muted }));
     return;
   }
@@ -133,7 +133,7 @@ async function headlessRun(runtime, ui, args, positional) {
     const payload = event.payload || {};
     switch (event.type) {
       case 'run.started':
-        ui.line(ui.theme.paint(`${ui.marks.diamond} run ${event.runId} on ${payload.model}`, { fg: ui.theme.palette.crimson, bold: true }));
+        ui.line(ui.theme.paint(`${ui.marks.diamond} run ${event.runId} on ${payload.model}`, { fg: ui.theme.roles.primary, bold: true }));
         break;
       case 'run.model-turn':
         ui.line(ui.theme.paint(`${ui.marks.dot} turn ${String(payload.step).padStart(2, '0')} — ${payload.tools?.length ?? 0} tools active`, { fg: ui.theme.roles.border }));

@@ -1,9 +1,13 @@
 // 05 MOD SHOP — automations, plugins, agent bridges, browsers, processes.
 
-import { glyphs } from '../box.mjs';
-import { fit, oneLine, truncate, wrap } from '../text.mjs';
-import { detailBlock, handleCatalog, renderCatalog } from './catalog.mjs';
+import { oneLine, truncate, wrap } from '../text.mjs';
+import { statusGlyph, statusOf } from '../status.mjs';
+import { SPACE } from '../tokens.mjs';
+import { detailBlock, handleCatalog, listRow, renderCatalog } from './catalog.mjs';
 import { fuzzy } from '../widgets.mjs';
+
+const NAME_WIDTH = 30;
+const STATUS_WIDTH = 11;
 
 const TABS = [
   { id: 'automations', label: 'AUTOMATIONS' },
@@ -68,23 +72,20 @@ export function items(app) {
     .sort((a, b) => b.score - a.score);
 }
 
-const STATUS_TONES = {
-  armed: 'success', active: 'success', available: 'success', running: 'success', ok: 'success',
-  paused: 'muted', missing: 'muted', exited: 'muted', headless: 'info', visible: 'warning',
-  failed: 'danger', error: 'danger', inactive: 'muted', loaded: 'info',
-};
-
 function row(app, item, selected, width) {
   const { theme } = app;
-  const mark = glyphs(theme);
-  const tone = theme.role(STATUS_TONES[item.status] || 'muted');
-  const head = theme.paint(` ${item.status === 'running' || item.status === 'active' ? mark.lamp : mark.ring} `, { fg: tone })
-    + theme.paint(fit(truncate(item.name, 30), 31), { fg: theme.palette.gold, bold: true })
-    + theme.paint(fit(String(item.status).toUpperCase(), 12), { fg: tone })
-    + (width - 46 >= 10 ? theme.paint(truncate(item.description || '', width - 46), { fg: theme.roles.muted }) : '');
-  return selected
-    ? theme.paint(mark.spine, { fg: theme.palette.crimson }) + theme.paint(fit(head, width - 1), { bg: theme.palette.raised })
-    : ` ${fit(head, width - 1)}`;
+  const state = statusOf(item.status);
+  const tone = theme.role(state.tone);
+  return listRow(app, {
+    selected, width,
+    marker: statusGlyph(theme, item.status, { animate: false }),
+    markerTone: tone,
+    cells: [
+      { text: truncate(item.name, NAME_WIDTH), width: NAME_WIDTH, tone: theme.roles.text, bold: true },
+      { text: state.label, width: STATUS_WIDTH, tone },
+      { text: item.description || '', tone: theme.roles.muted },
+    ],
+  });
 }
 
 export function detail(app, width) {
@@ -92,7 +93,8 @@ export function detail(app, width) {
   if (!item) return null;
   const { theme } = app;
   const raw = item.raw || {};
-  const sections = [{ heading: item.name }, ...wrap(item.description || '', width)];
+  const text = Math.max(8, width - SPACE.gutter);
+  const sections = [item.description || ''];
   if (item.kind === 'automation') {
     sections.push(
       { field: 'enabled', value: raw.enabled ? 'yes' : 'no', tone: raw.enabled ? theme.roles.success : theme.roles.muted },
@@ -102,7 +104,7 @@ export function detail(app, width) {
       { field: 'last run', value: raw.last_run_at || 'never' },
       { field: 'last status', value: raw.last_status || '—' },
       { heading: 'payload' },
-      { raw: wrap(JSON.stringify(raw.action || {}, null, 2), width).map((line) => theme.paint(line, { fg: theme.roles.dim })) },
+      { raw: wrap(JSON.stringify(raw.action || {}, null, 2), text).map((line) => theme.paint(line, { fg: theme.roles.dim })) },
     );
   } else if (item.kind === 'plugin') {
     sections.push(
@@ -136,7 +138,7 @@ export function detail(app, width) {
       { field: 'cwd', value: raw.cwd || '' },
       { field: 'exit', value: String(raw.exitCode ?? '') },
       { heading: 'stdout' },
-      { raw: wrap(oneLine(raw.stdout || '', 4000), width).slice(0, 40).map((line) => theme.paint(line, { fg: theme.roles.dim })) },
+      { raw: wrap(oneLine(raw.stdout || '', 4000), text).slice(0, 40).map((line) => theme.paint(line, { fg: theme.roles.dim })) },
     );
   }
   return detailBlock(app, width, sections);
@@ -150,14 +152,13 @@ export function render(app, region) {
     browser: app.browsers.length, processes: app.processes.length,
   };
   return renderCatalog(app, region, {
-    title: 'MOD SHOP', index: '05',
     tabs: TABS.map((tab) => ({ ...tab, count: counts[tab.id] })),
     activeTab: app.modTab,
     filter: app.modFilter, filterFocus: 'mod-filter', listFocus: 'modshop',
-    placeholder: 'FILTER EXTENSIONS AND AUTONOMY',
+    placeholder: 'Filter extensions and autonomy',
     list: app.modList,
     row: (item, selected, width) => row(app, item, selected, width),
-    stamp: `${list.length} entries`,
+    stamp: `${list.length} ENTRIES`,
     detail: detail(app, Math.max(30, Math.floor(region.width * 0.4) - 4)),
     detailTitle: app.modList.current?.name ? truncate(app.modList.current.name, 30) : 'DOSSIER',
     onTab: (target, id) => { target.modTab = id; target.modList.first(); void target.refreshModShop(); },

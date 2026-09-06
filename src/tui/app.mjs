@@ -4,7 +4,6 @@
 // keyboard, and paints one frame at a time through the double-buffered screen.
 
 import path from 'node:path';
-import { glyphs } from './box.mjs';
 import { headerBand, hintRail, statusRail, tabStrip } from './chrome.mjs';
 import { Keyboard } from './input.mjs';
 import { hstack, overlay as paintOverlay, split, vstack } from './layout.mjs';
@@ -16,6 +15,7 @@ import { Screen } from './screen.mjs';
 import { Theme } from './theme.mjs';
 import { fit, oneLine, truncate, wrap } from './text.mjs';
 import { Composer, ListView, Spinner, TextField, Toasts, Viewport } from './widgets.mjs';
+import { columns, gutter, key as typeKey, label as sectionLabel } from './type.mjs';
 import { VERSION, runCommand, safeJsonParse } from '../core/utils.mjs';
 import * as chatView from './views/chat.mjs';
 import * as filesView from './views/files.mjs';
@@ -42,9 +42,12 @@ export class MaskShiftTui {
       ...(preferences.colorDepth === null || preferences.colorDepth === undefined ? {} : { depth: Number(preferences.colorDepth) }),
       ...(preferences.unicode === null || preferences.unicode === undefined ? {} : { unicode: Boolean(preferences.unicode) }),
     });
+    // A headless render is a still: every clock-driven part of the interface
+    // freezes together so a captured frame is reproducible byte for byte.
+    if (headless) this.theme.motion.frozen = true;
     this.screen = new Screen({ theme: this.theme, output, mouse: resolveMouseMode(preferences) });
     this.keyboard = new Keyboard({ input });
-    this.spinner = new Spinner();
+    this.spinner = new Spinner('dots');
     this.toasts = new Toasts();
     // Rebuilt every frame; see regions.mjs.
     this.regions = new Regions();
@@ -99,13 +102,13 @@ export class MaskShiftTui {
     this.skills = [];
     this.skillBodies = new Map();
     this.arsenalTab = 'tools';
-    this.arsenalFilter = new TextField({ placeholder: 'SEARCH EVERY CAPABILITY' });
+    this.arsenalFilter = new TextField({ placeholder: 'Search every capability' });
     this.arsenalList = new ListView();
 
     this.mcpServers = [];
     this.mcpTools = new Map();
     this.mcpTab = 'installed';
-    this.mcpFilter = new TextField({ placeholder: 'FILTER SERVERS' });
+    this.mcpFilter = new TextField({ placeholder: 'Filter servers' });
     this.mcpList = new ListView();
     this.registryResults = [];
 
@@ -115,13 +118,13 @@ export class MaskShiftTui {
     this.browsers = [];
     this.processes = [];
     this.modTab = 'automations';
-    this.modFilter = new TextField({ placeholder: 'FILTER' });
+    this.modFilter = new TextField({ placeholder: 'Filter' });
     this.modList = new ListView();
 
     // Files.
     this.fileEntries = [];
     this.fileList = new ListView();
-    this.fileFilter = new TextField({ placeholder: 'FILTER PATHS' });
+    this.fileFilter = new TextField({ placeholder: 'Filter paths' });
     this.collapsedDirs = new Set();
     this.showHidden = false;
     this.previewPath = '';
@@ -131,7 +134,7 @@ export class MaskShiftTui {
 
     // Terminal.
     this.terminalLines = [];
-    this.terminalField = new TextField({ placeholder: 'run any command with your full account permissions' });
+    this.terminalField = new TextField({ placeholder: 'Run any command with your full account permissions…' });
     this.terminalCwd = '~';
     this.terminalBusy = false;
     this.terminalView = new Viewport();
@@ -200,9 +203,10 @@ export class MaskShiftTui {
 
   tick() {
     if (!this.running) return;
-    this.spinner.advance();
     const dirty = this.toasts.prune();
-    if (this.busy || dirty || this.terminalBusy) this.requestRender();
+    // Anything clock-driven has to keep the loop awake for as long as it is
+    // moving, or a toast would sit at half-opacity until the next keystroke.
+    if (this.busy || dirty || this.terminalBusy || this.toasts.animating) this.requestRender();
   }
 
   requestRender() {
@@ -241,21 +245,24 @@ export class MaskShiftTui {
     if (!this.busy && this.pendingCalls.size === 0) return [];
     const entries = [];
     for (const call of this.pendingCalls.values()) {
+      // A call in flight is laid out on the same columns as the completed call
+      // it will become, so a row does not jump sideways when it finishes.
       entries.push({
-        render: (theme, width) => {
-          const mark = glyphs(theme);
-          const head = theme.paint(`  ${this.spinner.frame(theme)} `, { fg: theme.palette.gold })
-            + theme.paint(call.name, { fg: theme.palette.cyanide, bold: true })
-            + theme.paint(`  ${oneLine(JSON.stringify(call.args ?? {}), Math.max(6, width - call.name.length - 8))}`, { fg: theme.roles.border });
-          return [fit(head, width)];
-        },
+        render: (theme, width) => [fit(
+          gutter(theme, this.spinner.frame(theme), { tone: theme.roles.accent })
+          + columns(theme, [
+            { text: call.name, width: 18, tone: theme.roles.tool, bold: true },
+            { text: oneLine(JSON.stringify(call.args ?? {})), tone: theme.roles.muted },
+          ], Math.max(8, width - 2)),
+          width,
+        )],
       });
     }
     if (this.busy && this.pendingCalls.size === 0) {
       entries.push({
         render: (theme, width) => [fit(
-          theme.paint(`  ${this.spinner.frame(theme)} `, { fg: theme.palette.crimson })
-          + theme.paint(this.thinkingLabel || 'THINKING', { fg: theme.roles.muted, italic: true }),
+          gutter(theme, this.spinner.frame(theme), { tone: theme.roles.primary })
+          + theme.paint(this.thinkingLabel || 'Thinking…', { fg: theme.roles.muted, italic: true }),
           width,
         )],
       });
@@ -263,10 +270,11 @@ export class MaskShiftTui {
     return entries;
   }
 
+  // Chrome is upper case; anything the operator is being spoken to in is not.
   composerPlaceholder() {
     return this.busy
-      ? 'RUN IN FLIGHT — ESC RETREATS, OR QUEUE THE NEXT ORDER'
-      : 'TELL MASKSHIFT WHAT SUCCESS LOOKS LIKE…';
+      ? 'Run in flight — esc cancels, or queue the next order…'
+      : 'Describe what success looks like…';
   }
 
   currentHints() {
@@ -276,11 +284,13 @@ export class MaskShiftTui {
     return module?.hints ? module.hints(this) : [];
   }
 
+  // Seconds are noise in a transcript: they change every row and none of them
+  // is ever the thing being read.
   stamp(value) {
     if (!value) return '';
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return '';
-    return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`;
+    return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
   }
 
   summarizeEvent(event) {
@@ -1054,18 +1064,26 @@ export class MaskShiftTui {
     if (!value) return;
     this.terminalField.remember(value);
     this.terminalField.clear();
-    this.pushTerminal(this.theme.paint(`❯ ${value}`, { fg: this.theme.palette.crimson, bold: true }));
+    const theme = this.theme;
+    // The echoed command wears the prompt marker in the gutter and its output
+    // sits in the blank one below it, so a command and everything it printed
+    // share the left edge the live prompt is already on.
+    this.pushTerminal(gutter(theme, '❯', { tone: theme.roles.primary })
+      + theme.paint(value, { fg: theme.roles.text, bold: true }));
     this.terminalBusy = true;
     this.requestRender();
     try {
       const result = await this.runtime.toolRegistry.execute('shell_exec', {
         command: value, cwd: '.', timeoutMs: this.runtime.config.get().commandTimeoutMs,
       }, this.toolContext());
-      for (const line of String(result.stdout || '').split('\n')) if (line) this.pushTerminal(this.theme.paint(line, { fg: this.theme.roles.text }));
-      for (const line of String(result.stderr || '').split('\n')) if (line) this.pushTerminal(this.theme.paint(line, { fg: this.theme.roles.danger }));
-      this.pushTerminal(this.theme.paint(`exit ${result.code}`, { fg: result.code === 0 ? this.theme.roles.success : this.theme.roles.danger }));
+      for (const line of String(result.stdout || '').split('\n')) if (line) this.pushTerminal(gutter(theme) + theme.paint(line, { fg: theme.roles.text }));
+      for (const line of String(result.stderr || '').split('\n')) if (line) this.pushTerminal(gutter(theme) + theme.paint(line, { fg: theme.roles.danger }));
+      this.pushTerminal(gutter(theme, result.code === 0 ? '✓' : '✕', {
+        tone: result.code === 0 ? theme.roles.success : theme.roles.danger,
+      }) + theme.paint(`exit ${result.code}`, { fg: theme.roles.muted }));
     } catch (error) {
-      this.pushTerminal(this.theme.paint(error.message, { fg: this.theme.roles.danger }));
+      this.pushTerminal(gutter(theme, '✕', { tone: theme.roles.danger })
+        + theme.paint(error.message, { fg: theme.roles.danger }));
     }
     this.terminalBusy = false;
     this.terminalView.toBottom();
@@ -1170,9 +1188,8 @@ export class MaskShiftTui {
     ];
     const lines = rows.map(([key, description]) => {
       if (!key && !description) return '';
-      if (!description) return theme.paint(key, { fg: theme.palette.crimson, bold: true });
-      return theme.paint(fit(key, 20), { fg: theme.palette.gold, bold: true })
-        + theme.paint(description, { fg: theme.roles.muted });
+      if (!description) return sectionLabel(theme, key);
+      return gutter(theme) + typeKey(theme, fit(key, 18)) + theme.paint(description, { fg: theme.roles.muted });
     });
     this.overlay = new TextOverlay({ title: 'KEY REFERENCE', lines, stamp: 'esc closes' });
   }
@@ -1181,11 +1198,11 @@ export class MaskShiftTui {
     const sessions = this.runtime.store.listSessions({ limit: 200 });
     this.overlay = new PickerOverlay({
       title: 'HEIST ARCHIVE',
-      placeholder: 'FILTER HEISTS…',
+      placeholder: 'Filter heists…',
       items: sessions.map((session) => ({
         id: session.id, label: session.title || 'Untitled',
         detail: `${session.model_id || ''} · ${this.stamp(session.updated_at)}`,
-        tone: session.id === this.sessionId ? this.theme.palette.crimson : undefined,
+        tone: session.id === this.sessionId ? this.theme.roles.primary : undefined,
       })),
       onSelect: (item) => this.loadSession(item.id),
     });
@@ -1463,18 +1480,18 @@ export class MaskShiftTui {
       const report = await this.runtime.workspaceManager.inspect(this.workspaceId);
       const theme = this.theme;
       const lines = [
-        theme.paint(report.workspace.path, { fg: theme.palette.gold, bold: true }),
+        theme.paint(report.workspace.path, { fg: theme.roles.accent, bold: true }),
         '',
         theme.paint(`Files: ${report.files.count}${report.files.truncated ? '+' : ''}`, { fg: theme.roles.text }),
         theme.paint(`Git: ${report.git ? report.git.root : 'not a repository'}`, { fg: theme.roles.text }),
         theme.paint(`Project files: ${report.projectFiles.join(', ') || 'none'}`, { fg: theme.roles.text }),
         theme.paint(`Context files: ${report.contextFiles.map((file) => file.path).join(', ') || 'none'}`, { fg: theme.roles.text }),
         '',
-        theme.paint('LANGUAGES', { fg: theme.palette.crimson, bold: true }),
-        ...report.languages.map(([extension, count]) => theme.paint(`  ${fit(extension, 12)}${count}`, { fg: theme.roles.muted })),
+        sectionLabel(theme, 'Languages'),
+        ...report.languages.map(([extension, count]) => gutter(theme) + theme.paint(`${fit(extension, 12)}${count}`, { fg: theme.roles.muted })),
         '',
-        theme.paint('GIT STATUS', { fg: theme.palette.crimson, bold: true }),
-        ...String(report.git?.status || '').split('\n').map((line) => theme.paint(`  ${line}`, { fg: theme.roles.muted })),
+        sectionLabel(theme, 'Git status'),
+        ...String(report.git?.status || '').split('\n').map((line) => gutter(theme) + theme.paint(line, { fg: theme.roles.muted })),
       ];
       this.overlay = new TextOverlay({ title: 'TARGET INTEL', lines });
     } catch (error) {
@@ -1533,17 +1550,19 @@ export class MaskShiftTui {
     this.providers = providers;
     const config = this.runtime.config.get();
     const lines = [
-      theme.paint(`MaskShift ${this.version}  ·  node ${process.version}  ·  ${process.platform}/${process.arch}`, { fg: theme.palette.gold, bold: true }),
+      theme.paint(`MaskShift ${this.version}  ·  node ${process.version}  ·  ${process.platform}/${process.arch}`, { fg: theme.roles.accent, bold: true }),
       '',
       theme.paint(`Home       ${config.home}`, { fg: theme.roles.text }),
       theme.paint(`Database   ${config.dataFile}`, { fg: theme.roles.text }),
       theme.paint(`Mode       ${config.permissionMode}`, { fg: theme.roles.text }),
       theme.paint(`Tools ${this.counts.tools}  Skills ${this.counts.skills}  MCP ${this.counts.mcp}`, { fg: theme.roles.text }),
       '',
-      theme.paint('PROVIDERS', { fg: theme.palette.crimson, bold: true }),
-      ...providers.map((provider) => theme.paint(
-        `  ${provider.status === 'online' ? '✓' : '·'} ${fit(provider.id, 14)}${provider.status}${provider.error ? ` — ${provider.error}` : ''}`,
-        { fg: provider.status === 'online' ? theme.roles.success : theme.roles.muted },
+      sectionLabel(theme, 'Providers'),
+      ...providers.map((provider) => gutter(theme, provider.status === 'online' ? '✓' : '·', {
+        tone: provider.status === 'online' ? theme.roles.success : theme.roles.muted,
+      }) + theme.paint(
+        `${fit(provider.id, 14)}${provider.status}${provider.error ? ` — ${provider.error}` : ''}`,
+        { fg: provider.status === 'online' ? theme.roles.text : theme.roles.muted },
       )),
     ];
     this.overlay = new TextOverlay({ title: 'DOCTOR', lines });

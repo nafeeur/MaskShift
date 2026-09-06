@@ -1,76 +1,99 @@
-// The right rail: plan of attack, live loadout telemetry, the event bus and
-// a git pulse. Toggle with ctrl+b, cycle with ctrl+r.
+// The right rail: the plan of attack, live loadout telemetry, the event bus
+// and a git pulse. Toggle with ctrl+b, cycle with ctrl+r.
+//
+// The rail is a column, not a card. Boxing it put a second vertical rule hard
+// against the main stage's — a two-column wall down the full height of the
+// screen for no information.
+//
+// It spends exactly one row on chrome, which is what the stage spends on its
+// top rail, so the first line of a plan sits on the same screen row as the
+// first line of the transcript beside it. It used to spend two, and every row
+// in the rail was one out of step with the pane it was reporting on.
 
-import { glyphs, meter, rule, sparkline } from './box.mjs';
+import { glyphs, meter, sparkline } from './box.mjs';
 import { LAYER } from './regions.mjs';
+import { statusMark, statusOf } from './status.mjs';
 import { fit, padStart, truncate, visibleWidth, wrap } from './text.mjs';
+import { SPACE } from './tokens.mjs';
+import { columns, gutter, label as typeLabel, spread } from './type.mjs';
 
 export const RAIL_TABS = ['plan', 'telemetry', 'events', 'git'];
 
 const RAIL_TITLES = { plan: 'PLAN', telemetry: 'LOADOUT', events: 'EVENTS', git: 'GIT' };
 
+/** A rail section heading. Quieter than a pane title, louder than a value. */
+function heading(theme, text, width, stamp = '') {
+  return spread(typeLabel(theme, text, { tone: theme.roles.label }),
+    stamp ? theme.paint(stamp, { fg: theme.roles.faint }) : '', width);
+}
+
 function planLines(app, width) {
   const { theme } = app;
-  const mark = glyphs(theme);
   const plan = app.plan;
+  const text = Math.max(6, width - SPACE.gutter);
   if (!plan?.steps?.length) {
-    return [theme.paint('No plan yet. Multi-stage runs publish one here.', { fg: theme.roles.border, italic: true })];
+    return [gutter(theme) + theme.paint('No plan yet. Multi-stage runs publish one here.', { fg: theme.roles.muted, italic: true })];
   }
   const lines = [];
   if (plan.summary) {
-    for (const piece of wrap(plan.summary, width)) lines.push(theme.paint(piece, { fg: theme.roles.dim, italic: true }));
+    for (const piece of wrap(plan.summary, text)) lines.push(gutter(theme) + theme.paint(piece, { fg: theme.roles.dim }));
     lines.push('');
   }
-  const done = plan.steps.filter((step) => step.status === 'done' || step.status === 'completed').length;
-  lines.push(meter(theme, done, plan.steps.length, width - 8)
-    + theme.paint(` ${done}/${plan.steps.length}`, { fg: theme.roles.muted }));
+
+  const done = plan.steps.filter((step) => statusOf(step.status).kind === 'done').length;
+  lines.push(gutter(theme)
+    + meter(theme, done, plan.steps.length, Math.max(4, text - 8), { colour: theme.roles.success })
+    + theme.paint(padStart(`${done}/${plan.steps.length}`, 8), { fg: theme.roles.muted }));
   lines.push('');
-  for (const [index, step] of plan.steps.entries()) {
-    const state = String(step.status || 'pending');
-    const icon = ['done', 'completed'].includes(state) ? mark.check
-      : state === 'active' || state === 'in_progress' ? mark.caret
-        : state === 'blocked' || state === 'failed' ? mark.cross : mark.dot;
-    const tone = ['done', 'completed'].includes(state) ? theme.roles.success
-      : state === 'active' || state === 'in_progress' ? theme.palette.gold
-        : state === 'blocked' || state === 'failed' ? theme.roles.danger : theme.roles.border;
-    const head = theme.paint(`${icon} `, { fg: tone }) + theme.paint(padStart(String(index + 1), 2), { fg: theme.roles.border }) + ' ';
-    const body = wrap(step.title || step.text || '', Math.max(6, width - visibleWidth(head)));
-    lines.push(`${head}${theme.paint(body[0] ?? '', { fg: tone === theme.roles.border ? theme.roles.muted : theme.roles.text })}`);
-    for (const piece of body.slice(1)) lines.push(`${' '.repeat(visibleWidth(head))}${theme.paint(piece, { fg: theme.roles.muted })}`);
+
+  // The mark carries the state and the gutter carries the mark, so a step's
+  // text starts on the same column whether it is done, running or waiting.
+  for (const step of plan.steps) {
+    const state = statusOf(step.status || 'pending');
+    const tone = theme.role(state.tone);
+    const body = wrap(step.title || step.text || '', text);
+    lines.push(gutter(theme, statusMark(theme, step.status || 'pending', { animate: true }), { tone })
+      + theme.paint(body[0] ?? '', { fg: state.kind === 'pending' ? theme.roles.muted : theme.roles.text }));
+    for (const piece of body.slice(1)) lines.push(gutter(theme) + theme.paint(piece, { fg: theme.roles.muted }));
   }
   return lines;
 }
 
 function telemetryLines(app, width) {
   const { theme } = app;
-  const mark = glyphs(theme);
   const snapshot = app.capabilitySnapshot;
+  const text = Math.max(6, width - SPACE.gutter);
   const lines = [];
   const gauges = [
-    ['TOOLS', snapshot?.tools?.length ?? 0, app.counts.tools, theme.palette.cyanide],
-    ['SKILLS', snapshot?.skills?.length ?? 0, app.counts.skills, theme.palette.violet],
-    ['MCP', snapshot?.mcpServers?.length ?? 0, Math.max(1, app.counts.mcp), theme.palette.azure],
-    ['SUBAGENTS', app.subagents, Math.max(1, app.runtime.config.get().maxParallelSubagents), theme.palette.gold],
+    ['TOOLS', snapshot?.tools?.length ?? 0, app.counts.tools, theme.roles.tool],
+    ['SKILLS', snapshot?.skills?.length ?? 0, app.counts.skills, theme.roles.skill],
+    ['MCP', snapshot?.mcpServers?.length ?? 0, Math.max(1, app.counts.mcp), theme.roles.mcp],
+    ['SUBAGENTS', app.subagents, Math.max(1, app.runtime.config.get().maxParallelSubagents), theme.roles.accent],
   ];
-  for (const [label, value, total, colour] of gauges) {
-    lines.push(theme.paint(fit(label, 11), { fg: theme.roles.muted })
-      + theme.paint(padStart(String(value), 4), { fg: colour, bold: true })
-      + theme.paint(` / ${total}`, { fg: theme.roles.border }));
-    lines.push(`${' '.repeat(11)}${meter(theme, value, total, Math.max(4, width - 12), { colour })}`);
+  for (const [name, value, total, colour] of gauges) {
+    lines.push(gutter(theme) + spread(
+      typeLabel(theme, name, { tone: theme.roles.muted }),
+      theme.paint(String(value), { fg: colour, bold: true }) + theme.paint(` / ${total}`, { fg: theme.roles.faint }),
+      text,
+    ));
+    lines.push(gutter(theme) + meter(theme, value, total, text, { colour }));
+    lines.push('');
   }
+
+  lines.push(heading(theme, 'Token flow', width));
+  lines.push(gutter(theme) + sparkline(theme, app.tokenHistory, text, theme.roles.accent));
   lines.push('');
-  lines.push(theme.paint(`${mark.spine} TOKEN FLOW`, { fg: theme.palette.crimson, bold: true }));
-  lines.push(sparkline(theme, app.tokenHistory, width - 2, theme.palette.gold));
-  lines.push('');
-  lines.push(theme.paint(`${mark.spine} ACTIVE LOADOUT`, { fg: theme.palette.crimson, bold: true }));
+
   const active = [
-    ...(snapshot?.tools || []).map((name) => [name, theme.palette.cyanide]),
-    ...(snapshot?.skills || []).map((name) => [name, theme.palette.violet]),
-    ...(snapshot?.mcpServers || []).map((name) => [`mcp:${name}`, theme.palette.azure]),
+    ...(snapshot?.tools || []).map((name) => [name, theme.roles.tool]),
+    ...(snapshot?.skills || []).map((name) => [name, theme.roles.skill]),
+    ...(snapshot?.mcpServers || []).map((name) => [`mcp:${name}`, theme.roles.mcp]),
   ];
-  if (!active.length) lines.push(theme.paint('Nothing summoned yet.', { fg: theme.roles.border, italic: true }));
+  lines.push(heading(theme, 'Active loadout', width, active.length ? String(active.length) : ''));
+  if (!active.length) lines.push(gutter(theme) + theme.paint('Nothing summoned yet.', { fg: theme.roles.muted, italic: true }));
   for (const [name, colour] of active.slice(0, 200)) {
-    lines.push(theme.paint(`${mark.dot} `, { fg: theme.roles.border }) + theme.paint(truncate(name, width - 2), { fg: colour }));
+    lines.push(gutter(theme, glyphs(theme).dot, { tone: theme.roles.faint })
+      + theme.paint(truncate(name, text), { fg: colour }));
   }
   return lines;
 }
@@ -84,18 +107,21 @@ const EVENT_TONES = {
 
 function eventLines(app, width) {
   const { theme } = app;
-  const mark = glyphs(theme);
-  if (!app.events.length) return [theme.paint('Bus is quiet.', { fg: theme.roles.border, italic: true })];
+  const text = Math.max(6, width - SPACE.gutter);
+  if (!app.events.length) return [gutter(theme) + theme.paint('Bus is quiet.', { fg: theme.roles.muted, italic: true })];
   const lines = [];
   for (const event of app.events) {
     const tone = theme.role(EVENT_TONES[event.type] || 'muted');
-    const time = theme.paint(app.stamp(event.timestamp), { fg: theme.roles.border });
-    const type = theme.paint(truncate(event.type.replace(/^run\./, ''), 18), { fg: tone, bold: true });
-    lines.push(fit(`${time} ${type}`, width));
+    // Time and type on fixed columns; the summary wraps into the gutter, so a
+    // long event never breaks the timeline running down the left.
+    lines.push(gutter(theme) + columns(theme, [
+      { text: app.stamp(event.timestamp), width: 5, tone: theme.roles.faint },
+      { text: event.type.replace(/^run\./, '').toUpperCase(), tone, bold: true },
+    ], text));
     const summary = app.summarizeEvent(event);
     if (summary) {
-      for (const piece of wrap(summary, width - 2).slice(0, 3)) {
-        lines.push(theme.paint(`  ${piece}`, { fg: theme.roles.muted }));
+      for (const piece of wrap(summary, text).slice(0, 3)) {
+        lines.push(gutter(theme) + theme.paint(piece, { fg: theme.roles.muted }));
       }
     }
   }
@@ -104,37 +130,31 @@ function eventLines(app, width) {
 
 function gitLines(app, width) {
   const { theme } = app;
-  if (!app.gitStatus) return [theme.paint('No workspace signal.', { fg: theme.roles.border, italic: true })];
+  const text = Math.max(6, width - SPACE.gutter);
+  if (!app.gitStatus) return [gutter(theme) + theme.paint('No workspace signal.', { fg: theme.roles.muted, italic: true })];
   const lines = [];
   for (const raw of app.gitStatus.split('\n')) {
     if (!raw.trim()) continue;
-    const status = raw.slice(0, 2);
-    const tone = raw.startsWith('##') ? theme.palette.gold
-      : status.includes('?') ? theme.roles.border
-        : status.includes('M') ? theme.palette.azure
-          : status.includes('A') ? theme.roles.success
-            : status.includes('D') ? theme.roles.danger : theme.roles.text;
-    lines.push(theme.paint(truncate(raw, width), { fg: tone }));
+    const code = raw.slice(0, 2);
+    const branch = raw.startsWith('##');
+    const tone = branch ? theme.roles.accent
+      : code.includes('?') ? theme.roles.muted
+        : code.includes('M') ? theme.roles.info
+          : code.includes('A') ? theme.roles.success
+            : code.includes('D') ? theme.roles.danger : theme.roles.text;
+    // The porcelain code lives in the gutter like every other row marker; the
+    // path beside it then starts where all the other text in the rail starts.
+    lines.push(branch
+      ? gutter(theme) + theme.paint(truncate(raw.replace(/^##\s*/, ''), text), { fg: tone, bold: true })
+      : gutter(theme, code.trim() || glyphs(theme).dot, { tone })
+        + theme.paint(truncate(raw.slice(3), text), { fg: theme.roles.text }));
   }
-  return lines.length ? lines : [theme.paint('Working tree clean.', { fg: theme.roles.success })];
+  return lines.length ? lines : [gutter(theme, glyphs(theme).check, { tone: theme.roles.success })
+    + theme.paint('Working tree clean.', { fg: theme.roles.dim })];
 }
 
-/**
- * The rail is a column, not a card.
- *
- * Boxing it put a second vertical rule hard against the main stage's — a
- * two-column wall down the full height of the screen for no information. A
- * single divider separates the two just as clearly, gives the rail two more
- * columns of content, and leaves room to spell the sections out as tabs
- * instead of hiding them behind ctrl+r.
- */
 export function render(app, region) {
-  const { theme } = app;
   const { width, height } = region;
-  const focused = app.focus === 'rail';
-  // The main stage already draws a vertical rule along this boundary; adding
-  // the rail's own would just be the same wall one column wider. A gutter and
-  // the stage's edge separate them.
   const inner = Math.max(4, width - 2);
 
   const builders = { plan: planLines, telemetry: telemetryLines, events: eventLines, git: gitLines };
@@ -142,48 +162,52 @@ export function render(app, region) {
   app.railView.set(body);
 
   const stamps = {
-    plan: app.plan?.steps?.length ? `${app.plan.steps.length} steps` : '',
-    telemetry: `${app.subagents} sub`,
-    events: `${app.events.length}`,
-    git: app.gitBranch || '',
+    plan: app.plan?.steps?.length ? `${app.plan.steps.length} STEPS` : '',
+    telemetry: `${app.subagents} SUB`,
+    events: String(app.events.length),
+    git: (app.gitBranch || '').toUpperCase(),
   };
 
   const lines = [
-    tabRow(app, inner),
-    // With no frame of its own, this rule is where the rail shows that it owns
-    // the keyboard.
-    rule(theme, inner, '', {
-      stamp: stamps[app.railTab],
-      colour: focused ? theme.roles.borderActive : theme.roles.border,
-      weight: focused ? 'heavy' : 'light',
-    }),
-    ...app.railView.render(Math.max(0, height - 2), inner),
+    sectionRow(app, inner, stamps[app.railTab]),
+    ...app.railView.render(Math.max(0, height - 1), inner),
   ];
 
   registerRegions(app, region, inner);
   return lines.slice(0, height).map((line) => ` ${fit(line, inner)}`);
 }
 
-// Spelling the sections out costs one row and removes a keystroke nobody
-// discovers on their own.
-function tabRow(app, width) {
+/**
+ * The section switcher.
+ *
+ * Spelling the sections out removes a keystroke nobody discovers on their own,
+ * and it fits on one row because the active section is marked by weight rather
+ * than by a filled chip — the chip belongs to the view tabs, and having two
+ * chips lit in two different strips made neither of them mean anything.
+ */
+function sectionRow(app, width, stamp) {
   const { theme } = app;
   let out = '';
-  for (const tab of RAIL_TABS) {
-    const label = RAIL_TITLES[tab];
-    out += tab === app.railTab
-      ? theme.paint(` ${label} `, { fg: theme.palette.ink, bg: theme.palette.crimson, bold: true })
-      : theme.paint(` ${label} `, { fg: app.regions?.hoverId === `rail:${tab}` ? theme.roles.text : theme.roles.muted });
+  for (const [index, tab] of RAIL_TABS.entries()) {
+    if (index > 0) out += theme.paint(` ${glyphs(theme).dot} `, { fg: theme.roles.border });
+    const active = tab === app.railTab;
+    const hovered = app.regions?.hoverId === `rail:${tab}`;
+    out += theme.paint(RAIL_TITLES[tab], {
+      fg: active ? theme.roles.heading : (hovered ? theme.roles.text : theme.roles.muted),
+      bold: active,
+      underline: active,
+    });
   }
-  return fit(out, width);
+  return spread(out, stamp ? theme.paint(stamp, { fg: theme.roles.faint }) : '', width);
 }
 
 function registerRegions(app, region, inner) {
   const regions = app.regions;
   if (!regions) return;
   let column = region.column + 1;
-  for (const tab of RAIL_TABS) {
-    const span = visibleWidth(RAIL_TITLES[tab]) + 2;
+  for (const [index, tab] of RAIL_TABS.entries()) {
+    if (index > 0) column += 3;
+    const span = visibleWidth(RAIL_TITLES[tab]);
     regions.add({
       row: region.row,
       column,
@@ -201,9 +225,9 @@ function registerRegions(app, region, inner) {
     column += span;
   }
 
-  const bodyHeight = Math.max(0, region.height - 2);
+  const bodyHeight = Math.max(0, region.height - 1);
   regions.add({
-    row: region.row + 2,
+    row: region.row + 1,
     column: region.column,
     width: region.width,
     height: bodyHeight,
@@ -220,5 +244,5 @@ export function handle(app, event) {
   if (event.name === 'tab') { app.cycleRail(1); return true; }
   if (event.name === 'c' && app.railTab === 'events') { app.events = []; return true; }
   if (event.name === 'r' && app.railTab === 'git') { void app.refreshGit(); return true; }
-  return app.railView.handle(event, Math.max(1, app.bodyRegion.height - 2));
+  return app.railView.handle(event, Math.max(1, app.bodyRegion.height - 1));
 }

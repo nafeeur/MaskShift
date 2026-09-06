@@ -119,8 +119,14 @@ The renderer is written from scratch against Node's built-ins:
   frame and rewrites only the rows that changed.
 - `input.mjs` — a raw-mode decoder for control keys, CSI sequences, modifiers and
   bracketed paste.
-- `box.mjs` / `layout.mjs` — the stencil panel language and the column/row
-  composition helpers.
+- `tokens.mjs` — the design system: the palette, the spacing scale, the
+  breakpoints and the documented rules about when each token may be used.
+- `type.mjs` / `status.mjs` / `motion.mjs` — the type ramp and the gutter
+  primitive that keeps every pane on one grid, the single status vocabulary
+  every subsystem's state resolves through, and the wall clock every animation
+  is driven from.
+- `box.mjs` / `layout.mjs` — the panel language and the column/row composition
+  helpers.
 - `widgets.mjs`, `overlays.mjs`, `views/` — editors, lists, viewports, the command
   palette, forms, and the six views.
 

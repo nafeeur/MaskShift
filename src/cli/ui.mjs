@@ -35,8 +35,10 @@ export class Ui {
     if (this.json) return;
     const { theme } = this;
     if (compact) {
-      this.write(theme.paint(' MASK', { fg: theme.palette.ink, bg: theme.palette.crimson, bold: true })
-        + theme.paint('SHIFT ', { fg: theme.palette.ink, bg: theme.palette.gold, bold: true })
+      // The wordmark, drawn as text rather than as a fill — the same mark the
+      // full-screen interface puts in its identity band.
+      this.write(theme.paint('MASK', { fg: theme.roles.primary, bold: true })
+        + theme.paint('SHIFT', { fg: theme.roles.text, bold: true })
         + theme.paint(`  ${SUBTITLE}  ${this.marks.dot}  v${version}`, { fg: theme.roles.muted }));
       return;
     }
@@ -50,14 +52,17 @@ export class Ui {
     const { theme } = this;
     const label = `${index ? `${index} ` : ''}${text.toUpperCase()}`;
     this.write('');
-    this.write(theme.paint(` ${label} `, { fg: theme.palette.ink, bg: theme.palette.crimson, bold: true })
-      + theme.paint(repeat(theme.unicode ? '━' : '=', Math.max(0, this.width - visibleWidth(label) - 2)), { fg: theme.palette.blood }));
+    // A heading is a name on a rule, not a block of colour. Filled chips are
+    // for the one selected thing in a strip of peers, and a command's output
+    // has no such strip.
+    this.write(theme.paint(`${label} `, { fg: theme.roles.heading, bold: true })
+      + theme.paint(repeat(theme.unicode ? '━' : '=', Math.max(0, this.width - visibleWidth(label) - 1)), { fg: theme.roles.borderStrong }));
   }
 
   section(text) {
     if (this.json) return;
     this.write('');
-    this.write(this.theme.paint(`${this.marks.spine} ${text.toUpperCase()}`, { fg: this.theme.palette.crimson, bold: true }));
+    this.write(this.theme.paint(text.toUpperCase(), { fg: this.theme.roles.label, bold: true }));
   }
 
   line(text = '') { if (!this.json) this.write(text); }
@@ -105,7 +110,7 @@ export class Ui {
     }
     this.write(columns.map((column, index) => theme.paint(
       fit(String(column.label || column.key).toUpperCase(), sizes[index], { align: column.align || 'left' }),
-      { fg: theme.palette.crimson, bold: true },
+      { fg: theme.roles.label, bold: true },
     )).join('  '));
     this.write(theme.paint(sizes.map((size) => repeat(theme.unicode ? '─' : '-', size)).join('  '), { fg: theme.roles.border }));
     for (const row of rows) {
@@ -119,7 +124,7 @@ export class Ui {
 
   bullet(text, tone) {
     if (this.json) return;
-    this.write(this.theme.paint(`  ${this.marks.diamond} `, { fg: tone || this.theme.palette.crimson })
+    this.write(this.theme.paint(`  ${this.marks.bullet} `, { fg: tone || this.theme.roles.muted })
       + this.theme.paint(text, { fg: this.theme.roles.text }));
   }
 
@@ -153,11 +158,11 @@ export class Ui {
     if (this.json) return;
     const width = Math.max(labelWidth, visibleWidth(name) + 2);
     if (width + 20 > this.width) {
-      this.write(this.theme.paint(`  ${name}`, { fg: this.theme.palette.gold, bold: true }));
+      this.write(this.theme.paint(`  ${name}`, { fg: this.theme.roles.accent, bold: true }));
       if (description) this.write(this.theme.paint(`  ${' '.repeat(4)}${description}`, { fg: this.theme.roles.muted }));
       return;
     }
-    this.write(this.theme.paint(`  ${fit(name, width)}`, { fg: this.theme.palette.gold, bold: true })
+    this.write(this.theme.paint(`  ${fit(name, width)}`, { fg: this.theme.roles.accent, bold: true })
       + this.theme.paint(truncate(description, this.width - width - 3), { fg: this.theme.roles.muted }));
   }
 }

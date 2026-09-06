@@ -1,10 +1,24 @@
-// 01 HEIST — the transcript and composer.
+// 01 HEIST — the transcript and the composer.
+//
+// The transcript is the densest surface in the product, and it was the one
+// that read worst: a user turn's text began two columns right of the model's,
+// the model's prose began one column left of its own name, and tool results
+// began two columns right of both. Four left edges in one pane.
+//
+// Every row here is now built the same way — `SPACE.gutter` columns of marker
+// followed by text — so a speaker rail, a status tick, a bullet and a
+// paragraph all put their first character on the same column. The gutter also
+// carries the only per-turn ornament: a rail in the speaker's colour, full
+// strength on the row that names them and softened down the body.
 
-import { glyphs, panel, rule } from '../box.mjs';
+import { frameColour, glyphs, panel, rule } from '../box.mjs';
 import { heroBlock, maskArt } from '../brand.mjs';
 import { renderMarkdown } from '../markdown.mjs';
+import { spin } from '../motion.mjs';
 import { LAYER, Regions } from '../regions.mjs';
 import { center, fit, oneLine, truncate, visibleWidth, wrap } from '../text.mjs';
+import { SPACE } from '../tokens.mjs';
+import { columns, gutter, key as typeKey, spread } from '../type.mjs';
 
 const STARTERS = [
   ['CASE THE REPO', 'Map this repository, identify architectural risks, and propose the highest-impact improvements.'],
@@ -12,30 +26,59 @@ const STARTERS = [
   ['REVIEW THE TAKE', 'Review the current Git changes, repair defects, add missing tests, and run the relevant verification suite.'],
 ];
 
-// A speaker is announced by a solid chip and a right-aligned stamp. An earlier
-// revision ran a dashed rule between the two; at 130 columns that is seventy
-// characters of noise per turn, so the space is simply left empty.
-function speakerRule(theme, label, colour, width, meta = '') {
-  const head = theme.paint(` ${label} `, { fg: theme.palette.ink, bg: colour, bold: true });
-  const tail = meta ? theme.paint(truncate(meta, Math.max(0, width - visibleWidth(head) - 2)), { fg: theme.roles.border }) : '';
-  const gap = Math.max(1, width - visibleWidth(head) - visibleWidth(tail));
-  return `${head}${' '.repeat(gap)}${tail}`;
+const TOOL_NAME_WIDTH = 18;
+
+/**
+ * The speaker rail.
+ *
+ * `lead` is the row that names the speaker and takes the colour at full
+ * strength; every other row of the turn gets the same rail softened toward the
+ * panel, which groups the turn without fencing it in. The assistant's rail is
+ * softened much further than the operator's: the model's output is the page,
+ * the operator's input is the thing quoted onto it.
+ */
+function rail(theme, colour, { lead = false, weight = 0.35 } = {}) {
+  const mark = glyphs(theme);
+  return lead
+    ? gutter(theme, mark.spine, { tone: colour })
+    : gutter(theme, mark.bar, { tone: theme.soften(colour, weight) });
 }
 
-function toolLine(theme, message, width, expanded) {
+/** `SPEAKER · qualifier` on the left, a timestamp on the right. */
+function speakerRow(theme, name, colour, width, { qualifier = '', stamp = '' } = {}) {
+  const mark = glyphs(theme);
+  const head = theme.paint(name, { fg: colour, bold: true })
+    + (qualifier
+      ? theme.paint(` ${mark.dot} ${truncate(qualifier, Math.max(0, width - name.length - 12))}`, { fg: theme.roles.muted })
+      : '');
+  const tail = stamp ? theme.paint(stamp, { fg: theme.roles.faint }) : '';
+  return spread(head, tail, width);
+}
+
+/**
+ * A tool call: its outcome in the gutter, its name in a fixed column, its
+ * result filling the rest. Fixed columns are what let a run of six calls read
+ * as a table instead of as six unrelated sentences.
+ */
+function toolLines(app, message, width, expanded) {
+  const { theme } = app;
   const mark = glyphs(theme);
   const name = message.meta?.toolName || 'tool';
   const failed = Boolean(message.meta?.isError);
-  const tone = failed ? theme.roles.danger : theme.roles.tool;
-  const icon = failed ? mark.cross : mark.check;
-  const head = theme.paint(`  ${icon} `, { fg: tone })
-    + theme.paint(name, { fg: tone, bold: true })
-    + theme.paint(`  ${oneLine(message.content, Math.max(10, width - visibleWidth(name) - 8))}`, { fg: theme.roles.muted });
-  if (!expanded) return [fit(head, width)];
-  const lines = [fit(head, width)];
-  for (const raw of String(message.content || '').split('\n').slice(0, 60)) {
-    for (const piece of wrap(raw, width - 6)) {
-      lines.push(theme.paint('    ' + mark.pipe + ' ', { fg: theme.roles.border }) + theme.paint(piece, { fg: theme.roles.dim }));
+  const tone = failed ? theme.roles.danger : theme.roles.success;
+  const text = String(message.content || '');
+
+  const head = gutter(theme, failed ? mark.cross : mark.check, { tone })
+    + columns(theme, [
+      { text: name, width: Math.min(TOOL_NAME_WIDTH, Math.max(8, width - 12)), tone: theme.roles.tool, bold: true },
+      { text: oneLine(text, Math.max(6, width - TOOL_NAME_WIDTH - SPACE.columnGap)), tone: failed ? theme.roles.danger : theme.roles.dim },
+    ], width);
+
+  const lines = [fit(head, width + SPACE.gutter)];
+  if (!expanded) return lines;
+  for (const raw of text.split('\n').slice(0, 60)) {
+    for (const piece of wrap(raw, Math.max(8, width - 2))) {
+      lines.push(gutter(theme) + theme.paint(`${mark.bar} `, { fg: theme.roles.border }) + theme.paint(piece, { fg: theme.roles.muted }));
     }
   }
   return lines;
@@ -43,67 +86,105 @@ function toolLine(theme, message, width, expanded) {
 
 export function transcriptLines(app, width) {
   const { theme } = app;
-  const mark = glyphs(theme);
+  const text = Math.max(8, width - SPACE.gutter);
   const lines = [];
+  let previousKind = null;
+
   // One blank line *before* each block rather than after, so the transcript
-  // never ends on trailing whitespace and every gap is the same height.
-  const openBlock = () => { if (lines.length) lines.push(''); };
+  // never ends on trailing whitespace and every gap is the same height. Two
+  // adjacent tool calls are a single block: they belong to one another, and
+  // padding between them turned a six-step run into a page of whitespace.
+  const openBlock = (kind) => {
+    if (lines.length && !(kind === 'tool' && previousKind === 'tool')) lines.push('');
+    previousKind = kind;
+  };
 
   for (const message of app.messages) {
     if (message.role === 'user') {
-      openBlock();
-      lines.push(speakerRule(theme, 'OPERATOR', theme.palette.gold, width, app.stamp(message.created_at)));
-      for (const piece of wrap(String(message.content || ''), width - 2)) {
-        lines.push(theme.paint(`${mark.spine} `, { fg: theme.palette.gold }) + theme.paint(piece, { fg: theme.roles.text }));
+      openBlock('user');
+      const colour = theme.roles.user;
+      lines.push(rail(theme, colour, { lead: true })
+        + speakerRow(theme, 'OPERATOR', colour, text, { stamp: app.stamp(message.created_at) }));
+      for (const piece of wrap(String(message.content || ''), text)) {
+        lines.push(rail(theme, colour) + theme.paint(piece, { fg: theme.roles.text }));
       }
       continue;
     }
+
     if (message.role === 'assistant') {
       if (!String(message.content || '').trim()) continue;
-      openBlock();
-      lines.push(speakerRule(theme, 'MASKSHIFT', theme.palette.crimson, width, message.meta?.modelRef || ''));
-      lines.push(...renderMarkdown(theme, message.content, width));
+      openBlock('assistant');
+      const colour = theme.roles.primary;
+      lines.push(rail(theme, colour, { lead: true })
+        + speakerRow(theme, 'MASKSHIFT', colour, text, {
+          qualifier: message.meta?.modelRef || '',
+          stamp: app.stamp(message.created_at),
+        }));
+      for (const piece of renderMarkdown(theme, message.content, text)) {
+        lines.push(rail(theme, colour, { weight: 0.14 }) + piece);
+      }
       continue;
     }
+
     if (message.role === 'tool') {
-      openBlock();
-      lines.push(...toolLine(theme, message, width, app.expandTools));
+      openBlock('tool');
+      lines.push(...toolLines(app, message, text, app.expandTools));
       continue;
     }
   }
+
   for (const entry of app.liveTrail) {
     if (lines.length) lines.push('');
-    lines.push(...entry.render(theme, width, app));
+    previousKind = 'live';
+    lines.push(...entry.render(theme, text, app));
   }
   return lines;
 }
 
+/**
+ * The idle screen.
+ *
+ * It is the first thing anyone sees, so it does exactly three things: say what
+ * this is, say what it can reach, and offer three ways in. The starters are
+ * laid out on fixed columns so the key, the name and the description form
+ * three straight edges rather than three ragged ones.
+ */
 function emptyState(app, width, height) {
   const { theme } = app;
+  const mark = glyphs(theme);
   const lines = [];
   const hero = heroBlock(theme, width);
   const art = maskArt(theme);
   const artBlock = art.map((line) => center(line, width));
-  // The starter block is five rows: a caption, a gap, and one row per starter.
-  const chrome = STARTERS.length + 2;
+  const chrome = STARTERS.length + 3;
   const block = height > hero.length + art.length + chrome + 4 ? [...artBlock, '', ...hero] : hero;
   const pad = Math.max(0, Math.floor((height - block.length - chrome) / 2));
   for (let index = 0; index < pad; index += 1) lines.push('');
   lines.push(...block);
   lines.push('');
-  lines.push(center(theme.paint(`TOTAL ARSENAL ACCESS  ${glyphs(theme).dot}  SUMMONED ONLY WHEN NEEDED`, { fg: theme.roles.muted }), width));
+  lines.push(center(theme.paint(
+    `${app.counts.tools} TOOLS  ${mark.dot}  ${app.counts.skills} SKILLS  ${mark.dot}  ${app.counts.mcp} MCP SERVERS  ${mark.dot}  SUMMONED ONLY WHEN NEEDED`,
+    { fg: theme.roles.muted },
+  ), width));
   lines.push('');
 
   // Remembered so the click zones land on the same rows the keys do.
   app.starterRows = [];
   const labelWidth = Math.max(...STARTERS.map(([label]) => visibleWidth(label)));
+  // One centred block, sized once: the key, the name and the description then
+  // form three straight edges under a centred wordmark instead of a short
+  // ragged column adrift in the middle of the pane.
+  const strip = Math.min(Math.max(52, width - 8), 96);
+  const indent = Math.max(0, Math.floor((width - strip) / 2));
+  const keyWidth = 2;
   for (const [index, [label, prompt]] of STARTERS.entries()) {
-    const key = theme.paint(` F${index + 1} `, { fg: theme.palette.ink, bg: theme.palette.crimson, bold: true });
-    const name = theme.paint(fit(label, labelWidth), { fg: theme.palette.gold, bold: true });
-    const room = Math.max(10, width - labelWidth - 12);
-    const body = `${key} ${name}  ${theme.paint(truncate(prompt, room), { fg: theme.roles.border })}`;
+    const body = typeKey(theme, `F${index + 1}`)
+      + '  ' + columns(theme, [
+        { text: label, width: labelWidth, tone: theme.roles.text, bold: true },
+        { text: prompt, tone: theme.roles.muted },
+      ], Math.max(10, strip - keyWidth - 2));
     app.starterRows.push(lines.length);
-    lines.push(fit(`  ${body}`, width));
+    lines.push(fit(`${' '.repeat(indent)}${body}`, width));
   }
   return lines;
 }
@@ -141,23 +222,26 @@ export function render(app, region) {
   const bar = app.transcript.scrollbar(theme, transcriptHeight);
   const transcriptRows = visible.map((line, index) => `${fit(line, textWidth + 1)}${bar[index] ?? ' '}`);
 
+  // The rail reports where you are when you have scrolled away from the live
+  // edge, and how much there is when you have not.
   const scrolled = !app.transcript.stick && body.length > transcriptHeight;
   const note = scrolled
-    ? `${Math.round((app.transcript.offset / Math.max(1, body.length - transcriptHeight)) * 100)}% ${mark.arrowUp}`
-    : `${app.messages.length} msg`;
+    ? `${mark.arrowUp} ${Math.round((app.transcript.offset / Math.max(1, body.length - transcriptHeight)) * 100)}%`
+    : `${app.messages.length} MESSAGES`;
 
   // The seam labels the composer and carries its keys, so the pane that owns
   // the keyboard is named on the rule that bounds it.
   const composerFocused = app.focus === 'composer';
   const paneFocused = composerFocused || app.focus === 'transcript';
-  const seamLabel = app.busy ? `${app.spinner.frame(theme)} EXECUTING` : 'COMPOSER';
+  const seamLabel = app.busy ? `${spin(theme, 'dots')} EXECUTING` : 'COMPOSER';
   const seam = rule(theme, width - 2, seamLabel, {
     active: composerFocused,
     // The seam is part of the frame, so it carries the frame's weight.
     weight: paneFocused ? 'heavy' : 'light',
-    colour: paneFocused ? theme.roles.borderActive : theme.roles.border,
+    colour: frameColour(theme, paneFocused),
+    busy: app.busy,
     stamp: composerFocused
-      ? (app.busy ? `esc retreats ${mark.dot} ↵ queues` : `↵ execute ${mark.dot} ^J newline`)
+      ? (app.busy ? `esc cancels ${mark.dot} ↵ queues` : `↵ execute ${mark.dot} ^J newline`)
       : 'tab or click to type',
   });
 
@@ -165,13 +249,15 @@ export function render(app, region) {
   const composerBody = [];
   for (let index = 0; index < composerRows; index += 1) {
     const row = layout.rows[index];
-    const gutter = index === 0
-      ? theme.paint(`${mark.caret} `, { fg: app.busy ? theme.roles.border : theme.palette.crimson })
-      : '  ';
+    // The caret lives in the same gutter every other row in the pane uses, so
+    // a draft lines up with the transcript above it.
+    const marker = index === 0
+      ? gutter(theme, mark.caret, { tone: app.busy ? theme.roles.muted : theme.roles.primary })
+      : gutter(theme);
     const text = index === 0 && !app.composer.value
-      ? theme.paint(truncate(app.composerPlaceholder(), composerWidth), { fg: theme.roles.border, italic: true })
+      ? theme.paint(truncate(app.composerPlaceholder(), composerWidth), { fg: theme.roles.muted, italic: true })
       : theme.paint(row ?? '', { fg: theme.roles.text });
-    composerBody.push(fit(`${gutter}${text}`, inner));
+    composerBody.push(fit(`${marker}${text}`, inner));
   }
 
   // The old footer row carried an always-empty character meter. The same
@@ -183,8 +269,12 @@ export function render(app, region) {
   if (drafted > 1000) stampParts.push(`${Math.round((drafted / 4000) * 100)}% of budget`);
   if (!app.autoLoad) stampParts.push('MANUAL LOAD');
 
+  // The tab strip already says which view this is; repeating "01 HEIST" on the
+  // rail directly beneath it stacked two identical chips one row apart. The
+  // rail now carries the one thing the tab cannot: what this session is about.
   const lines = panel({
-    theme, width, height, title: 'HEIST', index: '01', note,
+    theme, width, height, title: app.sessionTitle || 'NEW SESSION', note,
+    busy: app.busy && paneFocused,
     stamp: stampParts.join(` ${mark.dot} `),
     body: [...transcriptRows, seam, ...composerBody],
     seamRows: [transcriptHeight],

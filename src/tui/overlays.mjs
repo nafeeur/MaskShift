@@ -4,13 +4,14 @@
 import { glyphs, panel } from './box.mjs';
 import { centreOffset } from './layout.mjs';
 import { LAYER } from './regions.mjs';
-import { fit, padStart, truncate, visibleWidth, wrap } from './text.mjs';
+import { fit, repeat, truncate, visibleWidth, wrap } from './text.mjs';
+import { SPACE } from './tokens.mjs';
+import { chip, columns, gutter, key as typeKey } from './type.mjs';
 import { Composer, ListView, TextField, fuzzy, highlightMatch } from './widgets.mjs';
 
 class Overlay {
-  constructor({ title = '', index = '' } = {}) {
+  constructor({ title = '' } = {}) {
     this.title = title;
-    this.index = index;
     // The app dismisses an overlay when a click lands outside it. A dialogue
     // that must be answered can opt out.
     this.dismissOnOutsideClick = true;
@@ -83,7 +84,7 @@ export class PaletteOverlay extends Overlay {
   constructor(actions) {
     super({ title: 'COMMAND PALETTE' });
     this.actions = actions;
-    this.field = new TextField({ placeholder: 'RUN A COMMAND…' });
+    this.field = new TextField({ placeholder: 'Run a command…' });
     this.list = new ListView();
     this.list.setItems(this.matches(), { keepSelection: false });
   }
@@ -112,20 +113,26 @@ export class PaletteOverlay extends Overlay {
     const input = this.field.render(theme, width - 8, { focused: true });
 
     const body = [
-      theme.paint(` ${mark.caret} `, { fg: theme.palette.crimson, bold: true }) + input.text,
-      theme.paint(''.padEnd(width - 4, theme.unicode ? '╌' : '-'), { fg: theme.roles.border }),
+      gutter(theme, mark.caret, { tone: theme.roles.primary }) + input.text,
+      theme.paint(repeat(mark.tick, width - 4), { fg: theme.roles.border }),
+      // Group, action and shortcut on fixed columns: the palette is scanned
+      // vertically, and three ragged edges made that impossible.
       ...this.list.render(theme, width - 4, listHeight, (item, selected, itemWidth) => {
-        const label = highlightMatch(theme, truncate(item.label, 40), item.positions, theme.palette.gold);
-        const group = theme.paint(fit(item.group.toUpperCase(), 12), { fg: theme.roles.border });
-        const key = item.key ? theme.paint(padStart(item.key, 10), { fg: theme.palette.gold }) : ' '.repeat(10);
-        const line = `${theme.paint(selected ? mark.caret : ' ', { fg: theme.palette.crimson })} ${group}${fit(label, itemWidth - 24)}${key}`;
-        return selected ? theme.paint(fit(line, itemWidth), { bg: theme.palette.raised }) : fit(line, itemWidth);
+        const line = gutter(theme, selected ? mark.caret : '', { tone: theme.roles.primary })
+          + columns(theme, [
+            { text: item.group.toUpperCase(), width: 12, tone: theme.roles.faint },
+            { text: highlightMatch(theme, truncate(item.label, 44), item.positions, theme.roles.accent, theme.roles.text) },
+            { text: item.key || '', width: 10, align: 'right', tone: theme.roles.accent },
+          ], Math.max(0, itemWidth - SPACE.gutter));
+        return selected
+          ? theme.paint(fit(line, itemWidth), { bg: theme.roles.surfaceRaised })
+          : fit(line, itemWidth);
       }),
     ];
 
     const lines = panel({
-      theme, width, height: size.rows, title: 'COMMAND PALETTE', index: '⌘',
-      stamp: `${rows.length} actions`, focused: true, body,
+      theme, width, height: size.rows, title: 'COMMAND PALETTE',
+      stamp: `${rows.length} ACTIONS`, focused: true, body,
     });
     const placed = this.place(app, viewport, lines, 2 + 3 + input.cursorColumn, 1);
     this.claim(app, placed.offset, width, lines.length);
@@ -156,7 +163,7 @@ export class PaletteOverlay extends Overlay {
 
 /** A generic single-choice picker (sessions, models, workspaces, providers). */
 export class PickerOverlay extends Overlay {
-  constructor({ title, items, onSelect, placeholder = 'FILTER…', renderRow = null, footer = '' }) {
+  constructor({ title, items, onSelect, placeholder = 'Filter…', renderRow = null, footer = '' }) {
     super({ title });
     this.items = items;
     this.onSelect = onSelect;
@@ -188,22 +195,25 @@ export class PickerOverlay extends Overlay {
     const listHeight = Math.max(3, size.rows - (this.footer ? 6 : 5));
     const input = this.field.render(theme, width - 8, { focused: true });
     const body = [
-      theme.paint(` ${mark.caret} `, { fg: theme.palette.crimson, bold: true }) + input.text,
-      theme.paint(''.padEnd(width - 4, theme.unicode ? '╌' : '-'), { fg: theme.roles.border }),
+      gutter(theme, mark.caret, { tone: theme.roles.primary }) + input.text,
+      theme.paint(repeat(mark.tick, width - 4), { fg: theme.roles.border }),
       ...this.list.render(theme, width - 4, listHeight, (item, selected, itemWidth) => {
         if (this.renderRow) return this.renderRow(app, item, selected, itemWidth);
-        const label = theme.paint(fit(truncate(item.label, Math.floor(itemWidth * 0.5)), Math.floor(itemWidth * 0.5)), {
-          fg: item.tone || theme.palette.gold, bold: true,
-        });
-        const detail = theme.paint(truncate(item.detail || '', itemWidth - Math.floor(itemWidth * 0.5) - 3), { fg: theme.roles.muted });
-        const line = `${theme.paint(selected ? mark.caret : ' ', { fg: theme.palette.crimson })} ${label}${detail}`;
-        return selected ? theme.paint(fit(line, itemWidth), { bg: theme.palette.raised }) : fit(line, itemWidth);
+        const half = Math.floor(itemWidth * 0.5);
+        const line = gutter(theme, selected ? mark.caret : '', { tone: theme.roles.primary })
+          + columns(theme, [
+            { text: truncate(item.label, half), width: half, tone: item.tone || theme.roles.text, bold: true },
+            { text: item.detail || '', tone: theme.roles.muted },
+          ], Math.max(0, itemWidth - SPACE.gutter));
+        return selected
+          ? theme.paint(fit(line, itemWidth), { bg: theme.roles.surfaceRaised })
+          : fit(line, itemWidth);
       }),
     ];
-    if (this.footer) body.push('', theme.paint(truncate(this.footer, width - 4), { fg: theme.roles.border, italic: true }));
+    if (this.footer) body.push('', gutter(theme) + theme.paint(truncate(this.footer, width - 6), { fg: theme.roles.muted, italic: true }));
 
     const lines = panel({
-      theme, width, height: size.rows, title: this.title, index: mark.diamond,
+      theme, width, height: size.rows, title: this.title,
       stamp: `${this.list.items.length}`, focused: true, body,
     });
     const placed = this.place(app, viewport, lines, 2 + 3 + input.cursorColumn, 1);
@@ -284,45 +294,48 @@ export class FormOverlay extends Overlay {
     for (const [index, field] of this.fields.entries()) {
       const active = index === this.index;
       spans.push({ index, field, start: body.length });
-      body.push(theme.paint(field.label.toUpperCase(), { fg: active ? theme.palette.crimson : theme.roles.muted, bold: active })
-        + (field.hint ? theme.paint(`   e.g. ${field.hint}`, { fg: theme.roles.border, italic: true }) : ''));
+      body.push(theme.paint(field.label.toUpperCase(), { fg: active ? theme.roles.borderActive : theme.roles.muted, bold: active })
+        + (field.hint ? theme.paint(`   e.g. ${field.hint}`, { fg: theme.roles.faint, italic: true }) : ''));
       if (field.type === 'toggle') {
         const box = field.toggled ? `[${mark.check}]` : '[ ]';
-        body.push(theme.paint(` ${box} ${field.toggled ? 'ON' : 'OFF'}`, { fg: field.toggled ? theme.roles.success : theme.roles.border }));
+        body.push(gutter(theme) + theme.paint(`${box} ${field.toggled ? 'ON' : 'OFF'}`, { fg: field.toggled ? theme.roles.success : theme.roles.muted }));
       } else if (field.type === 'select') {
         const option = field.options[field.optionIndex];
-        body.push(theme.paint(` ${mark.arrowRight} `, { fg: theme.roles.border })
-          + theme.paint(option?.label ?? '', { fg: theme.palette.gold, bold: true })
-          + theme.paint(`   ${field.optionIndex + 1}/${field.options.length}  ←/→`, { fg: theme.roles.border }));
+        body.push(gutter(theme, mark.arrowRight, { tone: theme.roles.muted })
+          + theme.paint(option?.label ?? '', { fg: theme.roles.accent, bold: true })
+          + theme.paint(`   ${field.optionIndex + 1}/${field.options.length}  ←/→`, { fg: theme.roles.faint }));
       } else if (field.type === 'textarea') {
         const layout = field.editor.layout(inner - 3, field.rows);
         for (let line = 0; line < field.rows; line += 1) {
           const text = layout.rows[line] ?? '';
-          body.push(theme.paint(active && line === layout.caret.row ? ` ${mark.caret} ` : '   ', { fg: theme.palette.crimson })
+          body.push(theme.paint(active && line === layout.caret.row ? ` ${mark.caret} ` : '   ', { fg: theme.roles.primary })
             + theme.paint(fit(text, inner - 3), { fg: active ? theme.roles.text : theme.roles.muted }));
         }
         if (active) cursor = { row: body.length - field.rows + layout.caret.row, column: 3 + layout.caret.column };
       } else {
         const rendered = field.editor.render(theme, inner - 3, { focused: active });
-        body.push(theme.paint(active ? ` ${mark.caret} ` : '   ', { fg: theme.palette.crimson }) + rendered.text);
+        body.push(theme.paint(active ? ` ${mark.caret} ` : '   ', { fg: theme.roles.primary }) + rendered.text);
         if (active) cursor = { row: body.length - 1, column: 3 + rendered.cursorColumn };
       }
       spans[spans.length - 1].end = body.length;
     }
-    if (this.note) { body.push(''); for (const piece of wrap(this.note, inner)) body.push(theme.paint(piece, { fg: theme.roles.border, italic: true })); }
+    if (this.note) { body.push(''); for (const piece of wrap(this.note, inner)) body.push(theme.paint(piece, { fg: theme.roles.muted, italic: true })); }
     if (this.error) { body.push(''); body.push(theme.paint(truncate(this.error, inner), { fg: theme.roles.danger })); }
     body.push('');
-    const submitChip = theme.paint(` ${this.submitLabel} `, { fg: theme.palette.ink, bg: theme.palette.crimson, bold: true });
+    // A modal's primary action is the one other place a filled chip is
+    // correct: there is no tab strip on screen to confuse it with, and a
+    // dialogue has to say plainly what pressing return will do.
+    const submitChip = chip(theme, this.submitLabel);
     const cancelChip = theme.paint(' CANCEL ', { fg: theme.roles.muted });
     const submitRow = body.length;
-    body.push(`${submitChip}  ${cancelChip}`
-      + theme.paint('   ctrl+s submits', { fg: theme.roles.border })
-      + theme.paint('   tab moves', { fg: theme.roles.border })
-      + theme.paint('   esc cancels', { fg: theme.roles.border }));
+    body.push(`${submitChip}  ${cancelChip}   `
+      + [['^S', 'submit'], ['tab', 'move'], ['esc', 'cancel']]
+        .map(([k, l]) => typeKey(theme, k) + theme.paint(` ${l}`, { fg: theme.roles.muted }))
+        .join(theme.paint(` ${mark.dot} `, { fg: theme.roles.border })));
 
     const lines = panel({
-      theme, width, height: Math.min(viewport.rows - 2, body.length + 2), title: this.title, index: mark.mask,
-      stamp: `${this.fields.length} fields`, focused: true, body,
+      theme, width, height: Math.min(viewport.rows - 2, body.length + 2), title: this.title,
+      stamp: `${this.fields.length} FIELDS`, focused: true, body,
     });
     const offset = centreOffset(viewport, { columns: width, rows: lines.length });
 
@@ -445,19 +458,21 @@ export class ConfirmOverlay extends Overlay {
     const width = Math.min(viewport.columns - 6, 66);
     const body = wrap(this.message, width - 4).map((line) => theme.paint(line, { fg: theme.roles.text }));
     body.push('');
+    // The destructive answer is never the quiet one: a confirmation that puts
+    // YES in the same neutral as NO is a confirmation nobody reads.
     const yes = this.choice === 0
-      ? theme.paint('  YES  ', { fg: theme.palette.ink, bg: this.danger ? theme.palette.crimson : theme.palette.toxic, bold: true })
+      ? chip(theme, ' YES ', { tone: this.danger ? theme.roles.danger : theme.roles.success })
       : theme.paint('  YES  ', { fg: theme.roles.muted });
     const no = this.choice === 1
-      ? theme.paint('  NO  ', { fg: theme.palette.ink, bg: theme.palette.gold, bold: true })
+      ? chip(theme, ' NO ', { tone: theme.roles.accent })
       : theme.paint('  NO  ', { fg: theme.roles.muted });
     const buttonRow = body.length;
     body.push(`${yes}   ${no}`);
     const lines = panel({
       theme, width, height: body.length + 2, title: this.title,
-      index: this.danger ? mark.warn : mark.diamond,
+      note: this.danger ? `${mark.warn} DESTRUCTIVE` : '',
       stamp: '←/→ then ↵', focused: true, body,
-      colour: this.danger ? theme.palette.crimson : theme.palette.gold,
+      colour: this.danger ? theme.roles.danger : theme.roles.accent,
     });
     const offset = centreOffset(viewport, { columns: width, rows: lines.length });
 
@@ -505,8 +520,8 @@ export class TextOverlay extends Overlay {
     const inner = height - 2;
     this.offset = Math.max(0, Math.min(this.offset, Math.max(0, this.body.length - inner)));
     const lines = panel({
-      theme, width, height, title: this.title, index: glyphs(theme).mask,
-      stamp: this.stamp || `${this.body.length} lines`, focused: true,
+      theme, width, height, title: this.title,
+      stamp: this.stamp || `${this.body.length} LINES`, focused: true,
       body: this.body.slice(this.offset, this.offset + inner),
     });
     const offset = centreOffset(viewport, { columns: width, rows: lines.length });

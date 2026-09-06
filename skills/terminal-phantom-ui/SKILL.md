@@ -1,6 +1,6 @@
 ---
 name: terminal-phantom-ui
-description: Build MaskShift terminal interfaces in the Phantom Protocol design language — stencil frames with notched title tabs, a crimson-and-bone palette that degrades to 16 colours, and the ANSI width discipline that keeps a TUI aligned.
+description: Build MaskShift terminal interfaces in the Phantom Protocol design language — tokens over hex values, one marker gutter per pane, one filled chip per screen, and the ANSI width discipline that keeps a TUI aligned.
 ---
 
 # MaskShift Phantom Protocol (terminal)
@@ -13,33 +13,74 @@ the language together, and everything below serves them:
 2. **Every row is exactly the terminal width.** A single miscounted column
    shears the entire frame. Alignment is correctness, not polish.
 
-## Palette
+## Tokens, not colours
 
-- Crimson `#ff2d55` is identity and focus. Gold `#ffb648` is keys, the operator
-  and anything the user typed. Bone `#ece7dd` is body text; ash and smoke are
-  the two muted greys — don't invent a third.
-- Capability classes keep fixed accents so the same colour always means the
-  same category, everywhere: cyanide for tools, violet for skills, azure for
-  MCP, gold for automations. If you add a category, give it a token; if you add
-  a token, wire it to a category.
+- Import meaning from `tokens.mjs`; never a hex value, and never `theme.palette.*`
+  in a view. A view says `theme.roles.danger`, not "the red one". When one token
+  moves, the whole interface moves with it.
+- **Crimson is identity and focus only** — the wordmark, the active view tab,
+  the pane holding the keyboard. It is never a data value and never a severity.
+  Failure has its own red (`roles.danger`) precisely so a red pane cannot read
+  as a focused one.
+- **Gold is the operator** — their turn, their keys, their pending input.
+- Capability classes keep fixed accents so the same colour always means the same
+  category, everywhere: cyanide for tools, violet for skills, azure for MCP. If
+  you add a category, give it a token; if you add a token, wire it to a category.
+- Everything else is the neutral ramp. Hierarchy is carried by weight and case,
+  not by inventing a hue. If you reach for a new colour, you probably want
+  `heading` / `text` / `label` / `dim` / `muted` instead.
 - Define colours once as hex and let the theme degrade them. `Theme.fg`/`bg`
   emit truecolor, 256-colour or 16-colour sequences from the same value.
   **Never hardcode an SGR number**: the 16-colour path has to clamp each channel
   to a single bit, and hand-written codes bypass that.
-- `NO_COLOR`, `FORCE_COLOR`, `MASKSHIFT_COLOR=off|basic|full` and a
-  non-TTY stdout all have to produce clean, still-aligned monochrome. Colour is
-  never load-bearing on its own — pair it with a glyph or a label.
+- `NO_COLOR`, `FORCE_COLOR`, `MASKSHIFT_COLOR=off|basic|full` and a non-TTY
+  stdout all have to produce clean, still-aligned monochrome. Colour is never
+  load-bearing on its own — pair it with a glyph or a label. Two states that
+  differ only in hue are two states nobody can tell apart.
 
-## Geometry: the stencil frame
+## The grid
 
-- Every surface is a panel with a notched title tab inset into the top rail
-  (`┏━┫ 03 ARSENAL ┣━━━┓`) and an optional stamp on the bottom rail — a count, a
-  path, a status. One tab, one stamp; don't add a third decoration.
-- Focus is shown by weight, not by colour alone: the focused panel is promoted
-  from a light hairline frame to a heavy crimson one. Exactly one panel is
-  focused at a time, and the hint bar always names what that panel's keys do.
-- Selection inside a list is a crimson spine (`▌`) plus a raised background, so
-  it survives a monochrome terminal.
+- **Every content row is `SPACE.gutter` columns of marker, then text.** Build
+  rows with `gutter()` / `row()` from `type.mjs`, even when there is no marker
+  to put there. This is the whole reason a speaker rail, a status tick, a
+  bullet, a tree glyph and a plain paragraph share one left edge; hand-rolling
+  an indent is how a pane ends up with four of them.
+- Lay tabular rows out with `columns()`, not with bare `fit` calls and magic
+  numbers. Two lists that each invent their own column widths will never line
+  up with each other.
+- Selection inside a list is a spine (`▌`) in the gutter plus a raised
+  background, so it survives a monochrome terminal.
+
+## One label, one chip
+
+- **A name appears once per screen.** The tab strip names the view; a panel's
+  top rail then carries what the tab cannot — the session title, the shell's
+  directory, a section switcher. Printing the view's name on the panel under
+  its own tab is the single most repetitive thing a layout can do.
+- **Exactly one filled chip per screen**: the active view tab. Everything else
+  is text on the surface it belongs to. A modal's primary action is the only
+  exception, and only because there is no tab strip on screen to confuse it
+  with. Section switchers inside a pane are marked by weight and an underline.
+- Focus is the frame, and the frame alone: a light hairline when idle, a heavy
+  frame in a *dark* red when focused. Mixing a border with full crimson traces a
+  bright rectangle around whatever the operator is already looking at.
+- **Chrome is upper case; content keeps the case its author wrote.** Never
+  upper-case a model's headings or a user's prose.
+
+## Status and motion
+
+- Every subsystem state — runs, plan steps, servers, processes, tool results —
+  resolves through `statusOf()` in `status.mjs`. Seven kinds, each fixing a tone
+  and a glyph. Do not write another `STATUS_TONES` map in a view; add to the
+  vocabulary instead.
+- Animation is a function of the wall clock in `motion.mjs`, never of a frame
+  counter, so the interface looks the same at 8fps over SSH and freezes whole
+  for a headless capture. Two spinners driven by their own counters drift apart
+  on screen.
+- Nothing animates for decoration. Each animation answers a question: is this
+  alive (a breathing lamp), is it working or stuck (a sweep along the focused
+  rail), did I miss that (a toast fading), which step is in flight (an inline
+  spinner).
 - `MASKSHIFT_ASCII=1` and a non-UTF-8 locale swap every box-drawing glyph for
   ASCII. Any new glyph needs an entry in both `MARKS.unicode` and `MARKS.ascii`.
 
@@ -100,3 +141,12 @@ This is where TUIs actually break.
   width and the frame's height — the terminal equivalent of checking for
   horizontal overflow. Reading the layout code is not verification; every
   alignment bug is invisible in source and obvious in a rendered frame.
+- Assert the design rules, not just the geometry. `tests/tui.test.mjs` checks
+  that every transcript row clears the gutter before its text starts, and that
+  a view's name appears on exactly one row of its own screen — both are bugs
+  that survive any width assertion and that no one notices while writing the
+  code that causes them.
+- Look at the output. `npm run capture` renders real frames to SVG through the
+  same renderer; a palette that reads fine as a list of hex values can still put
+  the loudest thing on screen around the thing the operator is already looking
+  at.
