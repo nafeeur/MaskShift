@@ -3,10 +3,24 @@
   "version": "1.0.0",
   "description": "A maximalist, model-agnostic coding harness for the terminal, with lazy skills, tools, MCP and multi-agent orchestration.",
   "type": "module",
-  "private": true,
   "bin": {
-    "maskshift": "./bin/maskshift.mjs"
+    "maskshift": "bin/maskshift.mjs"
   },
+  "files": [
+    "bin",
+    "src",
+    "skills",
+    "maskshift.config.example.json"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nafeeur/MaskShift.git"
+  },
+  "homepage": "https://github.com/nafeeur/MaskShift#readme",
+  "bugs": {
+    "url": "https://github.com/nafeeur/MaskShift/issues"
+  },
+  "author": "Nafeeur Rahman",
   "engines": {
     "node": ">=22.0.0"
   },
