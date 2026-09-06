@@ -112,11 +112,36 @@ usable at 80×24.
 | **05 MOD SHOP** | Automations, plugins, agent bridges, browsers and processes — each with create, arm/pause, reload and delete. |
 | **06 TERMINAL** | The host shell, running with your full account permissions. |
 
+![01 HEIST](screenshots/heist.svg)
+
+![02 FILES](screenshots/files.svg)
+
+![03 ARSENAL](screenshots/arsenal.svg)
+
+![04 NETWORK](screenshots/network.svg)
+
+![05 MOD SHOP](screenshots/modshop.svg)
+
+`ctrl+k` opens a fuzzy command palette over every action MaskShift can perform, so nothing is
+buried behind a key you have to memorise:
+
+![Command palette](screenshots/palette.svg)
+
+`f2` tunes the core engine — default model, permission mode, agent turn and subagent limits,
+indexing and checkpoint behaviour — without editing `config.json` by hand:
+
+![Settings](screenshots/settings.svg)
+
 The right rail carries four sections, spelled out across a single header row so
 its first line of content sits on the same screen row as the first line of the
 pane it is reporting on: **plan** (live multi-stage plan with progress),
 **loadout** (which tools, skills and MCP servers the current run has actually
 summoned, plus token flow), **events** (the raw runtime bus) and **git**.
+
+![Live loadout telemetry](screenshots/loadout.svg)
+
+Every screenshot on this page is rendered by `npm run capture` through the same code path the
+terminal uses, so none of them can drift from the product.
 
 ## The mouse
 

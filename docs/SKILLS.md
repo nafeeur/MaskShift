@@ -2,6 +2,27 @@
 
 MaskShift ships with **44 skills**. Descriptions are indexed at startup; full skill bodies are loaded only after activation.
 
+## Where skills come from
+
+A skill is a directory containing a `SKILL.md` with YAML front matter and operational
+instructions. MaskShift scans, in order:
+
+```text
+<MaskShift>/skills
+~/.maskshift/skills
+<workspace>/.maskshift/skills
+<workspace>/.agents/skills
+<workspace>/.claude/skills
+~/.codex/skills
+~/.claude/skills
+~/.copilot/skills
+```
+
+Skills written for Claude, Codex and Copilot therefore load without conversion. The agent can
+also create and improve skills itself through the `skill_*` native tools.
+
+## Bundled
+
 | Skill | Description | Source |
 |---|---|---|
 | `architecture` | Design system architecture with explicit requirements, boundaries, data flows, tradeoffs, failure modes, and evolution paths. | `skills/architecture` |

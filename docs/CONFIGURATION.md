@@ -84,12 +84,49 @@ GITHUB_TOKEN
 
 Provider entries are merged by `id` with built-in defaults.
 
-`toolProtocol` selects how tools reach the model: `auto` (default) prefers the provider's
-native tool API and falls back to the in-prompt text protocol the first time an endpoint
-rejects a tool schema or a model replies with a text call; `native` always uses the tool API;
-`text` always uses the text protocol and never sends a `tools` field. Set `text` for a local
-model known to lack tool support, to skip the one probing request `auto` spends discovering
-that. See [Models without native tool calling](../README.md#models-without-native-tool-calling).
+### Models without native tool calling
+
+Every MaskShift capability is reached through a tool call, so a model that cannot emit one
+would otherwise be limited to conversation. Models that lack a native tool API are driven with
+a text protocol instead: the active tools and their schemas are rendered into the system
+prompt, and the model calls them by writing a block in its reply.
+
+```text
+<tool_call>
+{"name": "fs_read", "arguments": {"path": "src/index.js"}}
+</tool_call>
+```
+
+Replies are parsed back into ordinary tool calls, so the whole harness — lazy capability
+activation, skills, MCP servers, subagents, plan tracking, checkpoints — behaves identically
+either way. The reader accepts the variants small models tend to emit (single quotes, unquoted
+keys, trailing commas, Python literals, fenced blocks, arguments as a JSON string), and a call
+it cannot parse is sent back for correction rather than ending the run.
+
+Each provider takes an optional `toolProtocol`:
+
+| Value | Behaviour |
+| --- | --- |
+| `auto` (default) | Use the native tool API, and fall back to the text protocol the first time the endpoint rejects a tool schema or the model answers with a text call instead. |
+| `native` | Always use the provider's tool API. |
+| `text` | Always use the text protocol, and never send a `tools` field. |
+
+`auto` needs no configuration: the downgrade is remembered per model, so it costs at most one
+request. Set `text` explicitly to skip even that probe.
+
+```json
+{
+  "providers": [
+    { "id": "ollama", "type": "ollama", "toolProtocol": "text" }
+  ]
+}
+```
+
+Native tool calling remains preferable where a model supports it properly — it is more
+token-efficient and less error-prone — so leave `auto` alone unless a model is known to need
+otherwise.
+
+### Provider entries
 
 ```json
 {
@@ -156,6 +193,17 @@ Keys may be `"<providerId>:<model>"` or a bare model id. Verify current rates ag
 
 ## MCP definitions
 
+MaskShift maintains one combined catalog from the bundled curated starters, this file,
+workspace `.mcp.json` and `.vscode/mcp.json`, the Claude/Codex/Copilot/Cursor/OpenCode/Windsurf
+MCP configuration files, the live official MCP Registry, and any servers registered by plugins.
+
+Servers are **lazy** by default. MaskShift searches the catalog, connects the relevant server
+when a task requires it, reads its tool schema, qualifies every tool as `mcp__server__tool`,
+and injects only those activated tools into the current run — so the whole catalog stays
+available without consuming the context window before work begins. Credential-gated servers
+still need their real API key or OAuth setup; MaskShift can discover, install, import and
+connect them, but it cannot fabricate credentials.
+
 ```json
 {
   "mcpServers": {
@@ -202,6 +250,58 @@ Environment placeholders are expanded at connection time. `${workspace}` in stdi
 ```
 
 Use `agent_bridge_discover` and `agent_bridge_help` to inspect the effective command template before delegation.
+
+## Automations
+
+Schedules accept an ISO timestamp, an interval such as `every 15m`, or a five-field cron
+expression. One-shot ISO automations disarm after they complete. An automation runs one of
+three kinds of work: an autonomous MaskShift agent run, a direct native-tool call, or an
+unrestricted host shell command. Runs and failures are persisted in SQLite and streamed into
+the interface event feed.
+
+```json
+{
+  "automations": {
+    "enabled": true,
+    "pollIntervalMs": 30000,
+    "maxPerTick": 4
+  }
+}
+```
+
+Create and manage them from the Mod Shop (`5`), the `maskshift automation` subcommands, or the
+`automation_*` tools.
+
+## Browser profiles
+
+MaskShift discovers Chromium, Chrome or Edge and launches persistent CDP profiles. Use visible
+mode for an initial interactive login, then reuse the same named profile in headless runs.
+
+```json
+{
+  "browser": {
+    "profileRoot": "~/.maskshift/browser/profiles",
+    "headless": true
+  }
+}
+```
+
+## Data locations
+
+Default home is `~/.maskshift`, overridable with `MASKSHIFT_HOME`.
+
+```text
+config.json                 persistent configuration
+maskshift.sqlite            sessions, runs, messages, memory, indexes, automations
+logs/maskshift.log          daemon log
+logs/audit.jsonl            tool and execution audit trail
+artifacts/                  generated browser and run artifacts
+browser/profiles/           persistent Chromium profiles
+checkpoints/                non-Git checkpoint data
+plugins/                    installed capability packs
+skills/                     user-created skills
+worktrees/                  isolated agent worktrees
+```
 
 ## Hooks
 

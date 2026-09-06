@@ -162,6 +162,21 @@ A plugin exports `activate(api)` and may:
 
 Plugins run in the daemon process with the same authority as MaskShift. Activation and deactivation update the live tool registry without restarting the server.
 
+Install through the Mod Shop (`5`), the `maskshift plugins` subcommands, or the tool directly:
+
+```text
+plugin_install source=/absolute/path/to/plugin kind=local
+plugin_install source=https://github.com/example/maskshift-plugin.git kind=git
+plugin_install source=@scope/maskshift-plugin kind=auto
+```
+
+A complete worked example is in [`examples/plugins/telemetry-pack`](../examples/plugins/telemetry-pack).
+
+MaskShift also detects compatible local coding CLIs — Claude Code, Codex, OpenCode, GitHub
+Copilot CLI, Nous Hermes, Aider, plus any custom `agentBridges` entry — and can delegate scoped
+work to them while retaining the parent run, telemetry and repository context. These CLIs are
+not vendored; a bridge activates when the executable is on `PATH`.
+
 ## Recovery model
 
 Recovery is layered:
