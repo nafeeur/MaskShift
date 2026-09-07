@@ -59,10 +59,25 @@ async function setup(t, overrides = {}) {
   return { project, runtime, workspace, context, call, optional };
 }
 
+// A scenario that throws part-way never reaches the tools listed after the failing line, so
+// the coverage gate would blame those tools for an assertion that failed somewhere else.
+// Record the real failure and let the gate report that instead.
+const scenarioFailures = [];
+function scenario(suite, name, body) {
+  return suite.test(name, async (t) => {
+    try {
+      await body(t);
+    } catch (error) {
+      scenarioFailures.push({ name, message: error.message });
+      throw error;
+    }
+  });
+}
+
 // Sequential scenarios keep PATH/fetch fixtures local to this test process.
 // No live cloud account, container, remote machine, or paid model is used.
 test('all native tools have executable verification', { timeout: 180_000 }, async (suite) => {
-  await suite.test('filesystem writes, reads, patches, moves and deletes', async (t) => {
+  await scenario(suite, 'filesystem writes, reads, patches, moves and deletes', async (t) => {
     const { call, optional, project } = await setup(t);
     await call('fs_mkdir', { path: 'nested' }, r => assert.equal(r.created, true));
     await call('fs_write', { path: 'nested/a.txt', content: 'alpha\nbeta\n' }, r => assert.equal(r.size, 11));
@@ -79,7 +94,7 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
     await assert.rejects(fsp.access(path.join(project, 'nested/b.txt')), { code: 'ENOENT' });
   });
 
-  await suite.test('shell commands and background process lifecycle', async (t) => {
+  await scenario(suite, 'shell commands and background process lifecycle', async (t) => {
     const { call, optional, project } = await setup(t);
     await call('shell_exec', { command: 'printf hello' }, r => { assert.equal(r.code, 0); assert.equal(r.stdout, 'hello'); });
     await call('shell_exec_parallel', { commands: ['printf one', { command: 'printf two' }] }, r => assert.deepEqual(r.map(x => [x.code, x.stdout]), [[0, 'one'], [0, 'two']]));
@@ -95,7 +110,7 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
     await call('command_lookup', { commands: ['node', 'maskshift_nonexistent_command_123'] }, r => { assert.ok(r.node); assert.equal(r.maskshift_nonexistent_command_123, null); });
   });
 
-  await suite.test('search, project context and indexing', async (t) => {
+  await scenario(suite, 'search, project context and indexing', async (t) => {
     const { call, optional, project } = await setup(t);
     await fsp.writeFile(path.join(project, 'imports.js'), "import fs from 'node:fs';\n");
     await optional('search_text', ['rg'], { query: 'velocity', glob: '*.js' }, r => assert.ok(r.matches.some(m => m.text.includes('function velocity'))));
@@ -114,7 +129,7 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
     await call('usage_report', {}, r => assert.equal(r.runsConsidered, 0));
   });
 
-  await suite.test('Git branch, commit, checkpoint and worktree lifecycle', async (t) => {
+  await scenario(suite, 'Git branch, commit, checkpoint and worktree lifecycle', async (t) => {
     const { call, optional, project } = await setup(t);
     await call('git_status', {}, r => assert.match(r.status, /^## /));
     await call('git_log', {}, r => assert.equal(r.log[0].subject, 'initial'));
@@ -134,7 +149,7 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
     assert.match(await fsp.readFile(path.join(worktree.path, 'index.js'), 'utf8'), /verification/);
   });
 
-  await suite.test('memory, skills and lazy capability state', async (t) => {
+  await scenario(suite, 'memory, skills and lazy capability state', async (t) => {
     const { call, runtime } = await setup(t);
     const memory = await call('memory_save', { title: 'fixture-memory', content: 'Remember the velocity formula' });
     await call('memory_search', { query: 'velocity' }, r => assert.ok(r.some(m => m.id === memory.id)));
@@ -157,7 +172,7 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
     await call('plan_get', {}, r => assert.equal(r.steps[0].status, 'completed'));
   });
 
-  await suite.test('SQLite, archives, runtime cells and environment', async (t) => {
+  await scenario(suite, 'SQLite, archives, runtime cells and environment', async (t) => {
     const { call, optional, project } = await setup(t);
     await call('sqlite_query', { database: 'data.sqlite', sql: 'CREATE TABLE items (id INTEGER, name TEXT)' });
     await call('sqlite_query', { database: 'data.sqlite', sql: 'INSERT INTO items VALUES (?, ?)', parameters: [7, "it's a test"] }, r => assert.equal(r.changes, 1));
@@ -172,13 +187,19 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
     await call('environment_set', { values: { MASKSHIFT_TEST_MARKER: 'fixture' } });
     try { await call('environment_list', { filter: '^MASKSHIFT_TEST_MARKER$', includeValues: true }, r => assert.deepEqual(r, { MASKSHIFT_TEST_MARKER: 'fixture' })); }
     finally { await call('environment_set', { values: { MASKSHIFT_TEST_MARKER: null } }); }
-    await optional('port_inspect', ['ss', 'lsof', 'netstat'], { port: 1 }, r => assert.equal(r.code, 0));
+    // Port 1 is expected to be unused: ss/lsof/netstat all exit non-zero on "no match",
+    // so assert the adapter reported which inspector ran, not a zero exit code.
+    await optional('port_inspect', ['ss', 'lsof', 'netstat'], { port: 1 }, r => {
+      assert.ok(['ss', 'lsof', 'netstat'].includes(r.inspector));
+      assert.equal(typeof r.stdout, 'string');
+      assert.equal(r.matched, false);
+    });
     const source = path.join(project, 'index.js');
     const transferred = await optional('rsync_transfer', ['rsync'], { source, destination: path.join(project, 'copy.js') }, r => assert.equal(r.code, 0));
     if (transferred) assert.equal(await fsp.readFile(path.join(project, 'copy.js'), 'utf8'), await fsp.readFile(source, 'utf8'));
   });
 
-  await suite.test('PDF extraction and notebook edits', async (t) => {
+  await scenario(suite, 'PDF extraction and notebook edits', async (t) => {
     const { call, optional, project } = await setup(t);
     // Minimal real PDF fixture; pdftotext is the only required PDF dependency.
     const stream = 'BT /F1 18 Tf 30 100 Td (MASKSHIFT_PDF_OK) Tj ET';
@@ -195,7 +216,7 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
     await call('notebook_read', { path: 'fixture.ipynb' }, r => assert.equal(r.cells[0].source, '2+2'));
   });
 
-  await suite.test('image OCR and description fallback', async (t) => {
+  await scenario(suite, 'image OCR and description fallback', async (t) => {
     const { call, project } = await setup(t);
     await fsp.writeFile(path.join(project, 'fixture.png'), makeFixturePng());
     // No tesseract/vision model guaranteed on this host, so this exercises the graceful-degradation
@@ -208,7 +229,7 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
     });
   });
 
-  await suite.test('automation and plugin lifecycle in disposable home', async (t) => {
+  await scenario(suite, 'automation and plugin lifecycle in disposable home', async (t) => {
     const { call, project, runtime } = await setup(t);
     const automation = await call('automation_create', { name: 'verify', schedule: 'every 1h', enabled: false, action: { type: 'shell', command: 'printf AUTOMATION_OK > automated.txt' } });
     const automationId = automation.id;
@@ -237,7 +258,7 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
     assert.equal(await runtime.toolRegistry.execute('installed_fixture_ping', {}), 'pong');
   });
 
-  await suite.test('HTTP fetch, download, search and registry fixtures', async (t) => {
+  await scenario(suite, 'HTTP fetch, download, search and registry fixtures', async (t) => {
     const { call, optional, project } = await setup(t);
     const server = await jsonServer(t, (req, res) => {
       if (req.url === '/file') { res.writeHead(200, { 'Content-Type': 'text/plain' }); return res.end('DOWNLOAD_OK'); }
@@ -258,7 +279,7 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
     await call('mcp_registry_install', { registryName: 'io.fixture/test-server' }, r => assert.match(JSON.stringify(r), /test-server/), 'HTTP response fixture');
   });
 
-  await suite.test('MCP tools over a real stdio fixture server', async (t) => {
+  await scenario(suite, 'MCP tools over a real stdio fixture server', async (t) => {
     const { call, context } = await setup(t);
     await call('mcp_add', { name: 'verification', definition: { transport: 'stdio', command: process.execPath, args: [path.join(here, 'fixtures-mcp-server.mjs'), 'modern'], enabled: true, lazy: true } });
     await call('mcp_list', {}, r => assert.ok(r.some(s => s.name === 'verification')));
@@ -272,7 +293,7 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
     assert.equal(context.capabilityState.mcpServers.has('verification'), false);
   });
 
-  await suite.test('LSP tools over framed stdio with edits applied to files', async (t) => {
+  await scenario(suite, 'LSP tools over framed stdio with edits applied to files', async (t) => {
     const { call, runtime, project } = await setup(t);
     await call('lsp_discover', {}, r => assert.ok(r.some(s => s.id === 'typescript')));
     runtime.lspManager.availability = [{ id: 'fixture', languages: ['javascript'], available: true, selected: { executable: process.execPath, args: [path.join(here, 'fixtures-lsp-server.mjs')] } }];
@@ -291,7 +312,7 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
     assert.equal(runtime.lspManager.list().length, 0);
   });
 
-  await suite.test('agent tools with a deterministic local model endpoint', async (t) => {
+  await scenario(suite, 'agent tools with a deterministic local model endpoint', async (t) => {
     const server = await jsonServer(t, (req, res) => respondJson(res, 200, { id: 'fixture', output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'FIXTURE_AGENT_OK' }] }] }));
     const { call, runtime, workspace, context } = await setup(t, { defaultModel: 'fixture:local', providers: [{ id: 'fixture', type: 'openai-responses', baseUrl: server.url, apiKeyEnv: null, enabled: true, models: [{ id: 'local' }], timeoutMs: 5000 }] });
     context.runId = null; // Manual CLI tools have no parent run.
@@ -303,7 +324,7 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
     assert.equal((await runtime.engine.waitForRun(run.id)).status, 'cancelled');
   });
 
-  await suite.test('external agent bridges execute a local echo CLI', async (t) => {
+  await scenario(suite, 'external agent bridges execute a local echo CLI', async (t) => {
     const { call } = await setup(t, { agentBridges: { claude: { enabled: false }, codex: { enabled: false }, opencode: { enabled: false }, copilot: { enabled: false }, hermes: { enabled: false }, aider: { enabled: false }, fixture: { command: 'node', args: ['-e', 'console.log(process.argv[1])', '{prompt}'] } } });
     await call('agent_bridge_discover', {}, r => assert.ok(r.some(b => b.name === 'fixture' && b.available)), 'local CLI fixture');
     await call('agent_bridge_help', { bridge: 'fixture' }, r => { assert.equal(r.code, 0); assert.match(r.stdout, /Usage/); }, 'local CLI fixture');
@@ -311,7 +332,7 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
     await call('external_agent_run', { command: 'node', args: ['-e', 'console.log(process.argv[1])', '{prompt}'], prompt: 'CUSTOM_OK' }, r => { assert.equal(r.code, 0); assert.equal(r.stdout.trim(), 'CUSTOM_OK'); }, 'local CLI fixture');
   });
 
-  await suite.test('container, SSH, database CLI and service command adapters', async (t) => {
+  await scenario(suite, 'container, SSH, database CLI and service command adapters', async (t) => {
     const { call, optional, project } = await setup(t);
     const bin = path.join(project, 'fixture-bin'); await fsp.mkdir(bin);
     const source = `#!${process.execPath}\nimport path from 'node:path';\nconst argv = process.argv.slice(2);\nif (path.basename(process.argv[1]) === 'docker' && argv[0] === 'ps') console.log(JSON.stringify({ID:'fixture-container', Names:'fixture'}));\nelse console.log(JSON.stringify({command:path.basename(process.argv[1]),argv}));\n`;
@@ -335,7 +356,7 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
     await fixtureCall('system_service', { service: 'fixture.service', action: 'status', user: true }, r => assert.deepEqual(JSON.parse(r.stdout).argv, ['--user', 'status', 'fixture.service']));
   });
 
-  await suite.test('browser tool delegation contracts', async (t) => {
+  await scenario(suite, 'browser tool delegation contracts', async (t) => {
     const { call, runtime, workspace } = await setup(t);
     await call('browser_discover', {}, r => assert.equal(typeof r, 'object'));
     const cases = [
@@ -368,6 +389,11 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
 
   await suite.test('coverage gate: every native tool has assertions or an explicit dependency skip', () => {
     const missing = inventory.filter(tool => !coverage.has(tool.name)).map(tool => tool.name);
+    if (scenarioFailures.length) {
+      assert.fail(`Coverage is unverifiable: ${scenarioFailures.length} scenario(s) aborted before finishing.\n`
+        + scenarioFailures.map(failure => `  - ${failure.name}: ${failure.message}`).join('\n')
+        + (missing.length ? `\nTools never reached: ${missing.join(', ')}` : ''));
+    }
     assert.deepEqual(missing, [], `Tools without successful assertions: ${missing.join(', ')}`);
   });
   if (process.env.MASKSHIFT_TOOL_REPORT) {

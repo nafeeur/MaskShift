@@ -255,7 +255,20 @@ export function registerPlatformTools(registry, { config }) {
     name: 'port_inspect', title: 'Inspect network ports', description: 'Inspect listening sockets and processes using ss, netstat, or lsof.',
     category: 'system', readOnly: true,
     inputSchema: { type: 'object', properties: { port: { type: 'integer', minimum: 1, maximum: 65535 }, protocol: { type: 'string', enum: ['tcp', 'udp', 'all'], default: 'all' } } },
-    execute: async (args) => { const ss = await commandExists('ss'); const lsof = await commandExists('lsof'); const command = ss ? `${shellQuote(ss)} -lntup ${args.port ? `'( sport = :${Number(args.port)} )'` : ''}` : lsof ? `${shellQuote(lsof)} -nP -i${args.protocol === 'tcp' ? 'TCP' : args.protocol === 'udp' ? 'UDP' : ''}${args.port ? `:${Number(args.port)}` : ''}` : 'netstat -anp'; return runCommand(command, { timeoutMs: 20_000, maxOutputChars: 80_000 }); },
+    // ss, lsof and netstat all exit non-zero when a filter simply matches nothing, so the
+    // exit code reports "no sockets", not failure. Only a missing inspector is an error.
+    execute: async (args) => {
+      const [ss, lsof, netstat] = await Promise.all([commandExists('ss'), commandExists('lsof'), commandExists('netstat')]);
+      const inspector = ss ? 'ss' : lsof ? 'lsof' : netstat ? 'netstat' : null;
+      if (!inspector) throw new Error('No socket inspector is installed. Install one of: ss (iproute2), lsof, netstat (net-tools).');
+      const command = inspector === 'ss'
+        ? `${shellQuote(ss)} -lntup ${args.port ? `'( sport = :${Number(args.port)} )'` : ''}`
+        : inspector === 'lsof'
+          ? `${shellQuote(lsof)} -nP -i${args.protocol === 'tcp' ? 'TCP' : args.protocol === 'udp' ? 'UDP' : ''}${args.port ? `:${Number(args.port)}` : ''}`
+          : `${shellQuote(netstat)} -anp`;
+      const result = await runCommand(command, { timeoutMs: 20_000, maxOutputChars: 80_000 });
+      return { ...result, inspector, matched: result.code === 0 && Boolean(result.stdout.trim()) };
+    },
   });
 
   registry.register({
