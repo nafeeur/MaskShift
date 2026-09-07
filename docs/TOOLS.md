@@ -1,6 +1,6 @@
 # Native Tool Inventory
 
-Generated from the MaskShift 1.0.0 runtime. **149 native tools** are available before plugins or MCP servers add more capabilities.
+Generated from the MaskShift 1.0.1 runtime. **149 native tools** are available before plugins or MCP servers add more capabilities.
 
 Only activated descriptors enter a model request; this document is the complete local catalog.
 

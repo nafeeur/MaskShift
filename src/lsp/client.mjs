@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
-import { id, truncate } from '../core/utils.mjs';
+import { id, truncate, VERSION } from '../core/utils.mjs';
 
 function languageId(file) {
   const ext = path.extname(file).toLowerCase();
@@ -59,7 +59,7 @@ export class LanguageServerClient {
     });
     const initialized = await this.request('initialize', {
       processId: process.pid,
-      clientInfo: { name: 'MaskShift', version: '1.0.0' },
+      clientInfo: { name: 'MaskShift', version: VERSION },
       locale: 'en',
       rootPath: this.root,
       rootUri: pathToFileURL(this.root).href,

@@ -135,9 +135,11 @@ export class RepositoryIndexer {
     return chunks;
   }
 
-  async index(workspaceId, { force = false } = {}) {
+  // Every pass is a full rescan, so there is nothing for a `force` option to force. It used to
+  // be accepted here and dropped on the floor by #runIndex, which declares no second parameter.
+  async index(workspaceId) {
     if (this.running.has(workspaceId)) return this.running.get(workspaceId);
-    const task = this.#runIndex(workspaceId, { force }).finally(() => this.running.delete(workspaceId));
+    const task = this.#runIndex(workspaceId).finally(() => this.running.delete(workspaceId));
     this.running.set(workspaceId, task);
     return task;
   }

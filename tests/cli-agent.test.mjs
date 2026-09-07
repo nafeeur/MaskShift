@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
+import { createRequire } from 'node:module';
 import { main } from '../src/cli/main.mjs';
 import { createProject, jsonServer, readJsonBody, respondJson, runtimeForTest, waitFor } from './helpers.mjs';
 
@@ -157,7 +158,8 @@ test('the CLI exposes the full capability surface without a browser', async (t) 
   assert.equal(configured.maxAgentSteps, 42);
 
   const doctorReport = JSON.parse((await cli(['doctor', ...base])).output);
-  assert.equal(doctorReport.version, '1.0.0');
+  // Assert against the manifest, not a literal: the two drifted once already.
+  assert.equal(doctorReport.version, createRequire(import.meta.url)('../package.json').version);
   assert.ok(doctorReport.tools >= 140);
   assert.ok(doctorReport.commands.node);
 });
@@ -183,7 +185,7 @@ test('workspace search reads back what the indexer wrote', async (t) => {
   const project = await createProject(t);
   const runtime = await runtimeForTest(t, project);
   const workspace = await runtime.workspaceManager.open(project);
-  await runtime.indexer.index(workspace.id, { force: true });
+  await runtime.indexer.index(workspace.id);
   const hits = await waitFor(async () => {
     const found = await runtime.indexer.search(workspace.id, 'velocity distance time', 5);
     return found.length ? found : null;

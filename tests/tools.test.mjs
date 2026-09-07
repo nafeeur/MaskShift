@@ -120,7 +120,7 @@ test('repository indexing blends embedding-based semantic search with lexical se
   });
   const workspace = await runtime.workspaceManager.open(project);
 
-  const index = await runtime.indexer.index(workspace.id, { force: true });
+  const index = await runtime.indexer.index(workspace.id);
   assert.ok(index.embeddedChunks >= 1);
   assert.ok(embedCalls.length >= 1);
 
@@ -133,7 +133,7 @@ test('repository indexing blends embedding-based semantic search with lexical se
 
   // Reindexing without content changes must not re-embed unchanged chunks (content-hash reuse).
   const callsBeforeReindex = embedCalls.length;
-  await runtime.indexer.index(workspace.id, { force: true });
+  await runtime.indexer.index(workspace.id);
   const statsAfter = runtime.indexer.stats(workspace.id);
   assert.equal(statsAfter.embeddedChunks, stats.embeddedChunks);
   assert.equal(embedCalls.length, callsBeforeReindex, 'no new embedding requests for unchanged content');

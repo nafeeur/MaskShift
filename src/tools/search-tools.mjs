@@ -103,10 +103,10 @@ export function registerSearchTools(registry, { indexer, workspaceManager, confi
     description: 'Build or refresh MaskShift’s local SQLite FTS code index for structure-aware context retrieval.',
     category: 'search', risk: 'local-index',
     keywords: ['index', 'rag', 'codebase context', 'fts'],
-    inputSchema: { type: 'object', properties: { force: { type: 'boolean', default: true } } },
+    inputSchema: { type: 'object', properties: {} },
     execute: async (args, context) => {
       if (!context.workspaceId) throw new Error('Repository indexing requires a workspace');
-      return indexer.index(context.workspaceId, { force: args.force !== false });
+      return indexer.index(context.workspaceId);
     },
   });
 

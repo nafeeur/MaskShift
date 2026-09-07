@@ -57,7 +57,7 @@ const workspaceCommands = {
       await runtime.skillManager.setWorkspace(workspace.path);
       runtime.pluginManager.workspacePath = workspace.path;
       await runtime.pluginManager.scan({ activate: true });
-      if (args.index !== false && args['no-index'] !== true) await runtime.indexer.index(workspace.id, { force: true });
+      if (args.index !== false && args['no-index'] !== true) await runtime.indexer.index(workspace.id);
       if (ui.emit(workspace)) return;
       ui.ok(`Target locked: ${workspace.name}`);
       ui.fields([['id', workspace.id], ['path', workspace.path], ['git', workspace.meta?.gitRoot || 'not a repository']]);
@@ -141,11 +141,11 @@ const workspaceCommands = {
     },
   },
   index: {
-    usage: 'workspace index [--force]',
+    usage: 'workspace index',
     summary: 'Build or rebuild the local context index',
     async run(context) {
       const workspace = await resolveWorkspace(context);
-      const stats = await context.runtime.indexer.index(workspace.id, { force: context.args.force !== false });
+      const stats = await context.runtime.indexer.index(workspace.id);
       if (context.ui.emit(stats)) return;
       context.ui.ok('Index rebuilt');
       context.ui.fields(Object.entries(stats).map(([key, value]) => [key, typeof value === 'object' ? JSON.stringify(value) : value]));

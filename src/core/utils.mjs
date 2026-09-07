@@ -1,11 +1,14 @@
 import crypto from 'node:crypto';
+import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 
-export const VERSION = '1.0.0';
+// Read from package.json rather than restated here: the two drifted (1.0.0 vs 1.0.1) and
+// every banner and `--version` printed the stale one.
+export const VERSION = createRequire(import.meta.url)('../../package.json').version;
 
 export function id(prefix = 'id') {
   return `${prefix}_${Date.now().toString(36)}_${crypto.randomBytes(6).toString('hex')}`;

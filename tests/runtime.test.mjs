@@ -27,7 +27,7 @@ test('runtime exposes maximal lazy capabilities and executes host tools', async 
   assert.equal(shell.code, 0);
   assert.equal(shell.stdout, 'HOST_EXEC_OK');
 
-  const index = await runtime.indexer.index(workspace.id, { force: true });
+  const index = await runtime.indexer.index(workspace.id);
   assert.ok(index.indexedFiles >= 3);
   assert.ok((await runtime.indexer.search(workspace.id, 'velocity distance time')).some((hit) => hit.path === 'index.js'));
 });

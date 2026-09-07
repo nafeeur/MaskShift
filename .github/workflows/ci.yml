@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A queued run on the same ref is superseded by a newer push.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # 22 is the floor declared in engines; 24 is the current line.
+        node: ['22', '24']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      # MaskShift has no runtime dependency tree, so there is nothing to install.
+      # Assert that stays true rather than trusting it.
+      - name: Assert zero runtime dependencies
+        run: node scripts/assert-no-dependencies.mjs
+
+      - name: Syntax check
+        run: npm run check
+
+      - name: Unit and integration tests
+        run: npm test
+
+      - name: End-to-end smoke test
+        run: npm run smoke
+
+  docs:
+    name: docs are in sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # docs/ is generated from the runtime. Regenerating it here proves the committed
+      # copy matches the code, and that generation stays hermetic: the runner has no
+      # ~/.claude or ~/.codex skills, so a generator that scanned them would produce a
+      # different file here than on a developer machine, and this step would fail.
+      - name: Regenerate documentation
+        run: npm run docs
+
+      - name: Fail if the committed docs differ
+        run: |
+          if ! git diff --exit-code --stat -- docs/; then
+            echo "::error::docs/ is stale. Run 'npm run docs' and commit the result."
+            exit 1
+          fi

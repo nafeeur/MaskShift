@@ -3,13 +3,31 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRuntime } from '../src/runtime.mjs';
+import { VERSION } from '../src/core/utils.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const bundledSkillsDir = path.join(root, 'skills');
 const home = await fsp.mkdtemp(path.join(os.tmpdir(), 'maskshift-docs-'));
-const runtime = await createRuntime({ workspacePath: root, configOverrides: { home, autoIndex: false } });
+// skillsDirs defaults include ~/.claude/skills and ~/.codex/skills, so a plain runtime here
+// documents whatever the person running this happens to have installed — and writes their
+// home directory into the published table. Scan the bundled directory and nothing else.
+const runtime = await createRuntime({
+  workspacePath: root,
+  configOverrides: { home, autoIndex: false, skillsDirs: [bundledSkillsDir] },
+});
 
 function cell(value) {
   return String(value ?? '').replaceAll('|', '\\|').replaceAll('\n', ' ');
+}
+
+// Nothing outside the repository may reach the generated docs.
+function repoRelative(value, label) {
+  if (!value) return value;
+  const relative = path.relative(root, value);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    throw new Error(`Refusing to document a path outside the repository (${label}): ${value}`);
+  }
+  return relative.replaceAll(path.sep, '/');
 }
 
 try {
@@ -22,7 +40,7 @@ try {
   }
   const toolLines = [
     '# Native Tool Inventory', '',
-    `Generated from the MaskShift 1.0.0 runtime. **${tools.length} native tools** are available before plugins or MCP servers add more capabilities.`, '',
+    `Generated from the MaskShift ${VERSION} runtime. **${tools.length} native tools** are available before plugins or MCP servers add more capabilities.`, '',
     'Only activated descriptors enter a model request; this document is the complete local catalog.', '',
   ];
   for (const [category, values] of [...grouped].sort(([a], [b]) => a.localeCompare(b))) {
@@ -34,14 +52,17 @@ try {
   }
   await fsp.writeFile(path.join(root, 'docs', 'TOOLS.md'), `${toolLines.join('\n')}\n`);
 
-  const skills = runtime.skillManager.list();
+  // Belt and braces: the config override above should make this a no-op, but a skill picked
+  // up from anywhere else must never be published as one MaskShift ships.
+  const skills = runtime.skillManager.list()
+    .filter((skill) => !skill.path || !path.relative(bundledSkillsDir, skill.path).startsWith('..'));
   const skillLines = [
     '# Bundled Skills', '',
     `MaskShift ships with **${skills.length} skills**. Descriptions are indexed at startup; full skill bodies are loaded only after activation.`, '',
     '| Skill | Description | Source |', '|---|---|---|',
   ];
   for (const skill of skills.sort((a, b) => a.name.localeCompare(b.name))) {
-    const relative = skill.path ? path.relative(root, skill.path).replaceAll(path.sep, '/') : skill.source;
+    const relative = skill.path ? repoRelative(skill.path, skill.name) : skill.source;
     skillLines.push(`| \`${cell(skill.name)}\` | ${cell(skill.description)} | \`${cell(relative)}\` |`);
   }
   skillLines.push('', 'Workspace and user skill directories can extend this catalog without modifying the core distribution.', '');
@@ -62,13 +83,15 @@ try {
   };
   const portableSkills = skills.map((skill) => ({
     ...skill,
-    path: skill.path ? path.relative(root, skill.path).replaceAll(path.sep, '/') : skill.source,
-    file: skill.file ? path.relative(root, skill.file).replaceAll(path.sep, '/') : undefined,
+    path: skill.path ? repoRelative(skill.path, skill.name) : skill.source,
+    file: skill.file ? repoRelative(skill.file, skill.name) : undefined,
   }));
   const mcpServers = portable(runtime.mcpManager.listServers());
   const manifest = {
-    generatedAt: new Date().toISOString(),
-    version: '1.0.0',
+    // No generation timestamp: the manifest is checked into the repository and CI verifies it
+    // matches the code by regenerating and diffing. A field that changes on every run makes
+    // that check impossible, and says nothing the commit history does not already record.
+    version: VERSION,
     nativeToolCount: tools.length,
     bundledSkillCount: skills.length,
     curatedMcpCount: mcpServers.length,
