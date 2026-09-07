@@ -81,7 +81,10 @@ try {
     if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, portable(child)]));
     return portablePath(value);
   };
-  const portableSkills = skills.map((skill) => ({
+  // updatedAt is the SKILL.md mtime, which is checkout time on a fresh clone — it says
+  // nothing about the skill and makes the manifest differ on every machine. Dropped here
+  // for the same reason generatedAt is: this file is committed and diffed by CI.
+  const portableSkills = skills.map(({ updatedAt, ...skill }) => ({
     ...skill,
     path: skill.path ? repoRelative(skill.path, skill.name) : skill.source,
     file: skill.file ? repoRelative(skill.file, skill.name) : undefined,

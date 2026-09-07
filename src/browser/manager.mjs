@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import net from 'node:net';
 import os from 'node:os';
@@ -11,6 +12,33 @@ const BROWSER_COMMANDS = process.platform === 'darwin'
   : process.platform === 'win32'
     ? ['chrome.exe', 'msedge.exe', 'chromium.exe']
     : ['chromium', 'chromium-browser', 'google-chrome', 'google-chrome-stable', 'microsoft-edge'];
+
+// Chromium's sandbox needs unprivileged user namespaces. Root cannot use it at all, and a
+// distro can withhold it from everyone — Ubuntu 23.10+ restricts it through AppArmor, which
+// is what a default GitHub Actions runner does. Inferring this from the uid alone (the
+// previous rule) gets the non-root-but-restricted case wrong, and Chromium's answer there is
+// to abort with "No usable sandbox!" rather than to degrade.
+export function sandboxUnavailable({
+  platform = process.platform,
+  uid = typeof process.getuid === 'function' ? process.getuid() : null,
+  readFile = (file) => fs.readFileSync(file, 'utf8'),
+} = {}) {
+  if (platform !== 'linux') return false;
+  if (uid === null || uid === 0) return true;
+  const restrictions = [
+    // 1 means AppArmor blocks unprivileged userns for unconfined programs.
+    ['/proc/sys/kernel/apparmor_restrict_unprivileged_userns', (value) => value === '1'],
+    // 0 means the kernel disallows them outright.
+    ['/proc/sys/kernel/unprivileged_userns_clone', (value) => value === '0'],
+    ['/proc/sys/user/max_user_namespaces', (value) => value === '0'],
+  ];
+  for (const [file, blocked] of restrictions) {
+    try {
+      if (blocked(String(readFile(file)).trim())) return true;
+    } catch { /* an absent knob means the restriction is not in force */ }
+  }
+  return false;
+}
 
 async function freePort() {
   return new Promise((resolve, reject) => {
@@ -100,6 +128,15 @@ export class BrowserManager {
     const base = this.config.get().browser?.profilesDir || path.join(this.config.get().home, 'browser', 'profiles');
     const userDataDir = absolutePath(path.join(base, profileName));
     await ensureDir(userDataDir);
+    // Dropping Chromium's sandbox is a real reduction in isolation, so say so rather than
+    // letting it happen quietly. The alternative on a restricted host is not a safer
+    // browser, it is Chromium refusing to start at all.
+    const noSandbox = sandboxUnavailable();
+    if (noSandbox) {
+      this.logger?.warn('Launching Chromium without its sandbox: this host does not permit unprivileged user namespaces', {
+        platform: process.platform, uid: typeof process.getuid === 'function' ? process.getuid() : null,
+      });
+    }
     const args = [
       `--remote-debugging-port=${port}`,
       '--remote-debugging-address=127.0.0.1',
@@ -108,7 +145,7 @@ export class BrowserManager {
       '--disable-component-update', '--disable-sync', '--disable-features=Translate,OptimizationHints',
       '--window-size=1440,1000',
       ...(headless ? ['--headless=new', '--hide-scrollbars'] : []),
-      ...(process.platform === 'linux' && (typeof process.getuid !== 'function' || process.getuid() === 0) ? ['--no-sandbox'] : []),
+      ...(noSandbox ? ['--no-sandbox'] : []),
       ...(this.config.get().browser?.args || []), ...(extraArgs || []), url || 'about:blank',
     ];
     const child = spawn(this.executable, args, { stdio: ['ignore', 'ignore', 'pipe'], detached: process.platform !== 'win32' });

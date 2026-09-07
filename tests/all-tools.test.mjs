@@ -187,11 +187,13 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
     await call('environment_set', { values: { MASKSHIFT_TEST_MARKER: 'fixture' } });
     try { await call('environment_list', { filter: '^MASKSHIFT_TEST_MARKER$', includeValues: true }, r => assert.deepEqual(r, { MASKSHIFT_TEST_MARKER: 'fixture' })); }
     finally { await call('environment_set', { values: { MASKSHIFT_TEST_MARKER: null } }); }
-    // Port 1 is expected to be unused: ss/lsof/netstat all exit non-zero on "no match",
-    // so assert the adapter reported which inspector ran, not a zero exit code.
+    // Port 1 is unused everywhere. The exit code cannot be asserted — lsof exits 1 on no
+    // match while ss exits 0 — and neither can raw stdout, because ss and netstat print
+    // their headers regardless. Only the parsed result is stable across all three.
     await optional('port_inspect', ['ss', 'lsof', 'netstat'], { port: 1 }, r => {
       assert.ok(['ss', 'lsof', 'netstat'].includes(r.inspector));
       assert.equal(typeof r.stdout, 'string');
+      assert.equal(r.rows, 0);
       assert.equal(r.matched, false);
     });
     const source = path.join(project, 'index.js');

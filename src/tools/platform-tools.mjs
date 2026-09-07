@@ -267,7 +267,12 @@ export function registerPlatformTools(registry, { config }) {
           ? `${shellQuote(lsof)} -nP -i${args.protocol === 'tcp' ? 'TCP' : args.protocol === 'udp' ? 'UDP' : ''}${args.port ? `:${Number(args.port)}` : ''}`
           : `${shellQuote(netstat)} -anp`;
       const result = await runCommand(command, { timeoutMs: 20_000, maxOutputChars: 80_000 });
-      return { ...result, inspector, matched: result.code === 0 && Boolean(result.stdout.trim()) };
+      // ss and netstat print their column headers whether or not the filter matched, so
+      // "stdout is non-empty" does not mean "found something". Count rows past the header
+      // instead. lsof prints nothing at all on no match, so the same arithmetic holds.
+      const headerRows = { ss: 1, lsof: 1, netstat: 2 }[inspector];
+      const rows = result.stdout.split('\n').filter((line) => line.trim());
+      return { ...result, inspector, rows: Math.max(0, rows.length - headerRows), matched: rows.length > headerRows };
     },
   });
 
