@@ -153,6 +153,14 @@ export function defaultConfig() {
       '.github/copilot-instructions.md',
       '.cursorrules',
     ],
+    // Stream model output token by token. Per-provider `streaming: false` overrides this.
+    streaming: true,
+    // Transient-failure policy for model requests. Per-provider `retry` overrides this.
+    providerRetry: {
+      attempts: 3,
+      baseMs: 500,
+      maxMs: 30_000,
+    },
     providers: envProviderDefaults(),
     mcpServers: {},
     hooks: {},
@@ -187,6 +195,7 @@ function mergeConfig(base, override) {
   merged.automations = { ...base.automations, ...(override?.automations || {}) };
   merged.browser = { ...base.browser, ...(override?.browser || {}) };
   merged.indexing = { ...base.indexing, ...(override?.indexing || {}) };
+  merged.providerRetry = { ...base.providerRetry, ...(override?.providerRetry || {}) };
   merged.memory = { ...base.memory, ...(override?.memory || {}) };
   merged.pricing = {
     ...base.pricing, ...(override?.pricing || {}),

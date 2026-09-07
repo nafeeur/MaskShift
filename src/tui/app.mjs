@@ -26,6 +26,9 @@ import * as terminalView from './views/terminal.mjs';
 
 const VIEWS = [chatView, filesView, arsenalView, networkView, modshopView, terminalView];
 const EVENT_LIMIT = 400;
+// How much of an in-flight answer stays on screen. The full turn lands in the transcript the
+// moment it completes, so the live view only has to show the leading edge of the writing.
+const STREAM_PREVIEW_LINES = 12;
 const TERMINAL_LIMIT = 2000;
 
 export class MaskShiftTui {
@@ -76,6 +79,7 @@ export class MaskShiftTui {
     this.activeCapabilities = new Set();
     this.subagents = 0;
     this.pendingCalls = new Map();
+    this.streamingText = '';
     this.tokenHistory = [];
     this.totals = { input: 0, output: 0, cost: 0 };
     this.startedAt = null;
@@ -259,12 +263,22 @@ export class MaskShiftTui {
       });
     }
     if (this.busy && this.pendingCalls.size === 0) {
+      // Tokens arriving now: show the answer being written rather than a spinner label. The
+      // 120ms ticker already repaints while busy, so deltas only have to accumulate.
+      const streamed = this.streamingText.trim();
       entries.push({
-        render: (theme, width) => [fit(
-          gutter(theme, this.spinner.frame(theme), { tone: theme.roles.primary })
-          + theme.paint(this.thinkingLabel || 'Thinking…', { fg: theme.roles.muted, italic: true }),
-          width,
-        )],
+        render: (theme, width) => (streamed
+          ? [
+            fit(gutter(theme, this.spinner.frame(theme), { tone: theme.roles.primary })
+              + theme.paint('MASKSHIFT', { fg: theme.roles.primary, bold: true }), width),
+            ...wrap(streamed, Math.max(8, width - 2)).slice(-STREAM_PREVIEW_LINES)
+              .map((piece) => fit(`  ${theme.paint(piece, { fg: theme.roles.text })}`, width)),
+          ]
+          : [fit(
+            gutter(theme, this.spinner.frame(theme), { tone: theme.roles.primary })
+            + theme.paint(this.thinkingLabel || 'Thinking…', { fg: theme.roles.muted, italic: true }),
+            width,
+          )]),
       });
     }
     return entries;
@@ -645,9 +659,14 @@ export class MaskShiftTui {
         this.startedAt = Date.now();
         this.step = 0;
         this.pendingCalls.clear();
+        this.streamingText = '';
         this.thinkingLabel = 'STUDYING THE TARGET';
         break;
+      case 'run.assistant-delta':
+        this.streamingText += payload.text || '';
+        break;
       case 'run.model-turn':
+        this.streamingText = '';
         this.step = payload.step || this.step + 1;
         this.thinkingLabel = `TURN ${String(this.step).padStart(2, '0')} — ${payload.tools?.length ?? 0} TOOLS ACTIVE`;
         this.activeCapabilities = new Set(payload.tools || []);
@@ -659,6 +678,7 @@ export class MaskShiftTui {
           this.tokenHistory.push((payload.usage.outputTokens || payload.usage.output_tokens || 0));
           if (this.tokenHistory.length > 120) this.tokenHistory.shift();
         }
+        this.streamingText = '';
         for (const call of payload.toolCalls || []) this.pendingCalls.set(call.id, { name: call.name, args: call.args });
         this.messages = this.runtime.store.listMessages(this.sessionId, 1000);
         this.thinkingLabel = payload.toolCalls?.length ? 'EXECUTING TOOLS' : 'WRITING';
@@ -677,6 +697,7 @@ export class MaskShiftTui {
       case 'run.cancelled':
       case 'run.max-steps': {
         this.pendingCalls.clear();
+        this.streamingText = '';
         this.messages = this.runtime.store.listMessages(this.sessionId, 1000);
         const run = this.runId ? this.runtime.store.getRun(this.runId) : null;
         this.activeRun = null;
@@ -1249,7 +1270,7 @@ export class MaskShiftTui {
         this.newSession({ silent: true });
         await this.loadFileTree({ force: true });
         await this.refreshGit();
-        if (values.index) void this.runtime.indexer.index(workspace.id, { force: true }).catch(() => {});
+        if (values.index) void this.runtime.indexer.index(workspace.id).catch(() => {});
         this.toast(`Target locked: ${workspace.name}`, 'success');
       },
     });
@@ -1467,7 +1488,7 @@ export class MaskShiftTui {
     if (!this.workspaceId) return;
     this.toast('Indexing the target…', 'info');
     try {
-      const stats = await this.runtime.indexer.index(this.workspaceId, { force: true });
+      const stats = await this.runtime.indexer.index(this.workspaceId);
       this.toast(`Indexed ${stats.files ?? stats.chunks ?? 0} entries`, 'success');
     } catch (error) {
       this.toast(error.message, 'error');

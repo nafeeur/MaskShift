@@ -14,7 +14,7 @@
   <img alt="Node 22+" src="https://img.shields.io/badge/node-%E2%89%A522-3ecf8e?style=flat-square">
   <img alt="Runtime dependencies: none" src="https://img.shields.io/badge/runtime%20deps-0-4aa8ff?style=flat-square">
   <img alt="149 tools" src="https://img.shields.io/badge/tools-149-2bd9c0?style=flat-square">
-  <img alt="44 skills" src="https://img.shields.io/badge/skills-44-a78bfa?style=flat-square">
+  <img alt="36 skills" src="https://img.shields.io/badge/skills-36-a78bfa?style=flat-square">
   <img alt="GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-e5384f?style=flat-square">
 </p>
 
@@ -42,8 +42,9 @@ runtime dependency tree, no HTTP server, no browser, no listening socket.
 | | |
 |---|---|
 | **149 native tools** | Filesystem, shell and process control, search and indexing, Git worktrees and checkpoints, LSP, browsers over CDP, containers and Kubernetes, SSH and rsync, databases, runtimes, images, PDF and Jupyter, web retrieval, plugins, automations, memory and orchestration. → [tool inventory](docs/TOOLS.md) |
-| **44 bundled skills** | Loaded lazily by description, alongside skills imported from Claude, Codex, Copilot and workspace skill directories. → [skills](docs/SKILLS.md) |
+| **36 bundled skills** | Loaded lazily by description, alongside skills imported from Claude, Codex, Copilot and workspace skill directories. → [skills](docs/SKILLS.md) |
 | **Lazy MCP fabric** | stdio and Streamable HTTP, stateless and legacy initialization, resources, prompts, qualified tools, imported configs, and the live official MCP Registry. Servers connect on demand, so the catalog never floods the context window. → [MCP config](docs/CONFIGURATION.md#mcp-definitions) |
+| **Streaming and resilient** | Turns arrive token by token over SSE or NDJSON from every provider type, and a transient 429, 5xx or dropped connection is retried with jittered backoff instead of ending the run. → [streaming](docs/CONFIGURATION.md#streaming), [retries](docs/CONFIGURATION.md#retries) |
 | **Any model** | Ollama, OpenAI Responses, OpenAI-compatible servers, Anthropic, Gemini, OpenRouter, LM Studio and vLLM — with a text protocol that gives models *without* a native tool API the full tool surface. → [providers](docs/CONFIGURATION.md#providers) |
 | **Autonomous repo context** | Project instructions, manifests, repository tree, indexed code chunks (lexical plus optional semantic retrieval), stored memory, recent history and Git state. → [architecture](docs/ARCHITECTURE.md) |
 | **Parallel agents** | Independent sessions and optional isolated Git worktrees for delegated work. |

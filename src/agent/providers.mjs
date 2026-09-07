@@ -31,27 +31,412 @@ function combineSignals(signal, timeoutMs) {
   };
 }
 
-async function fetchJson(url, options, { signal, timeoutMs = 180_000 } = {}) {
-  const combined = combineSignals(signal, timeoutMs);
-  let response;
-  try {
-    response = await fetch(url, { ...options, signal: combined.signal });
-  } catch (error) {
-    combined.cleanup();
-    throw new Error(`Model request failed: ${error.message}`);
+// Statuses worth a second attempt. 4xx that mean "your request is wrong" (400, 401, 403,
+// 404, 422) are excluded deliberately: retrying them burns time and never succeeds, and the
+// tool-protocol downgrade in #complete depends on a 400 surfacing immediately.
+const RETRY_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
+const DEFAULT_RETRY = { attempts: 3, baseMs: 500, maxMs: 30_000 };
+
+function retryAfterMs(response) {
+  const header = response?.headers?.get?.('retry-after');
+  if (!header) return null;
+  const seconds = Number(header);
+  if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
+  const date = Date.parse(header);
+  return Number.isFinite(date) ? Math.max(0, date - Date.now()) : null;
+}
+
+// Full jitter over the top half of the window: enough spread to break up a thundering herd
+// without ever collapsing the wait to nearly zero.
+function backoffMs(attempt, settings, suggestedMs) {
+  if (Number.isFinite(suggestedMs)) return Math.min(suggestedMs, settings.maxMs);
+  const ceiling = Math.min(settings.maxMs, settings.baseMs * 2 ** (attempt - 1));
+  return Math.round(ceiling * (0.5 + Math.random() / 2));
+}
+
+// Not unref'd: a run waiting out a backoff is real work, and the process must not exit under it.
+function sleep(ms, signal) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) { reject(signal.reason || new Error('Aborted')); return; }
+    const onAbort = () => { clearTimeout(timer); reject(signal.reason || new Error('Aborted')); };
+    const timer = setTimeout(() => { signal?.removeEventListener('abort', onAbort); resolve(); }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+async function fetchJson(url, options, { signal, timeoutMs = 180_000, retry = null, onRetry = null } = {}) {
+  const settings = { ...DEFAULT_RETRY, ...(retry || {}) };
+  // Callers opt in. Probes (model listings, health checks) keep single-shot behaviour.
+  const attempts = retry ? Math.max(1, Number(settings.attempts) || 1) : 1;
+
+  for (let attempt = 1; ; attempt += 1) {
+    const combined = combineSignals(signal, timeoutMs);
+    let response = null;
+    let text = '';
+    let transportError = null;
+    try {
+      response = await fetch(url, { ...options, signal: combined.signal });
+      text = await response.text();
+    } catch (error) {
+      transportError = error;
+    } finally {
+      combined.cleanup();
+    }
+
+    // The run was cancelled. Surface that, never retry into it.
+    if (signal?.aborted) throw signal.reason instanceof Error ? signal.reason : new Error('Model request aborted');
+
+    if (transportError) {
+      const error = new Error(`Model request failed: ${transportError.message}`);
+      if (attempt >= attempts) throw error;
+      const waitMs = backoffMs(attempt, settings, null);
+      onRetry?.({ attempt, attempts, waitMs, reason: error.message, status: null });
+      await sleep(waitMs, signal);
+      continue;
+    }
+
+    const data = safeJsonParse(text, null);
+    if (!response.ok) {
+      const message = data?.error?.message || data?.message || truncate(text, 4000) || `HTTP ${response.status}`;
+      const error = new Error(`${response.status} ${response.statusText}: ${message}`);
+      error.status = response.status;
+      error.data = data;
+      if (attempt >= attempts || !RETRY_STATUS.has(response.status)) throw error;
+      const waitMs = backoffMs(attempt, settings, retryAfterMs(response));
+      onRetry?.({ attempt, attempts, waitMs, reason: truncate(error.message, 300), status: response.status });
+      await sleep(waitMs, signal);
+      continue;
+    }
+    if (!data) throw new Error(`Provider returned invalid JSON: ${truncate(text, 2000)}`);
+    return data;
   }
-  combined.cleanup();
-  const text = await response.text();
-  const data = safeJsonParse(text, null);
-  if (!response.ok) {
-    const message = data?.error?.message || data?.message || truncate(text, 4000) || `HTTP ${response.status}`;
-    const error = new Error(`${response.status} ${response.statusText}: ${message}`);
-    error.status = response.status;
-    error.data = data;
-    throw error;
+}
+
+// ------------------------------------------------------------------- streaming
+//
+// Providers stream over SSE (OpenAI, Anthropic, Gemini) or newline-delimited JSON (Ollama).
+// Both framings are a few lines over the fetch body, so streaming costs no dependency.
+
+async function* decodedChunks(body, touch) {
+  const decoder = new TextDecoder();
+  for await (const chunk of body) {
+    touch?.();
+    const text = decoder.decode(chunk, { stream: true });
+    if (text) yield text;
   }
-  if (!data) throw new Error(`Provider returned invalid JSON: ${truncate(text, 2000)}`);
-  return data;
+  const tail = decoder.decode();
+  if (tail) yield tail;
+}
+
+async function* sseData(body, touch) {
+  let buffer = '';
+  for await (const text of decodedChunks(body, touch)) {
+    buffer += text.replaceAll('\r\n', '\n');
+    let index;
+    while ((index = buffer.indexOf('\n\n')) >= 0) {
+      const frame = buffer.slice(0, index);
+      buffer = buffer.slice(index + 2);
+      // Per the SSE spec a frame may carry several data: lines; providers send one JSON
+      // object, but joining keeps a pretty-printed payload intact.
+      const data = frame.split('\n').filter((line) => line.startsWith('data:'))
+        .map((line) => line.slice(5).trim()).join('\n');
+      if (data && data !== '[DONE]') yield data;
+    }
+  }
+}
+
+async function* ndjsonData(body, touch) {
+  let buffer = '';
+  for await (const text of decodedChunks(body, touch)) {
+    buffer += text.replaceAll('\r\n', '\n');
+    let index;
+    while ((index = buffer.indexOf('\n')) >= 0) {
+      const line = buffer.slice(0, index).trim();
+      buffer = buffer.slice(index + 1);
+      if (line) yield line;
+    }
+  }
+  if (buffer.trim()) yield buffer.trim();
+}
+
+// Open a streaming request. Unlike fetchJson the timeout is an *idle* watchdog reset on every
+// chunk, not a total budget: a long generation is normal, a silent socket is not. Retrying is
+// only sound before the first token has been handed to the caller, so this retries while
+// establishing the response and hands the body over untouched once headers are good.
+async function openStream(url, options, { signal, timeoutMs = 300_000, retry = null, onRetry = null } = {}) {
+  const settings = { ...DEFAULT_RETRY, ...(retry || {}) };
+  const attempts = retry ? Math.max(1, Number(settings.attempts) || 1) : 1;
+
+  for (let attempt = 1; ; attempt += 1) {
+    const controller = new AbortController();
+    const forward = () => controller.abort(signal.reason || new Error('Aborted'));
+    signal?.addEventListener('abort', forward, { once: true });
+    let timer = null;
+    const touch = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => controller.abort(new Error(`Provider stream stalled for ${timeoutMs} ms`)), timeoutMs);
+      timer.unref();
+    };
+    const release = () => { clearTimeout(timer); signal?.removeEventListener('abort', forward); };
+    touch();
+
+    let response = null;
+    let transportError = null;
+    try {
+      response = await fetch(url, { ...options, signal: controller.signal });
+    } catch (error) { transportError = error; }
+
+    if (signal?.aborted) {
+      release();
+      throw signal.reason instanceof Error ? signal.reason : new Error('Model request aborted');
+    }
+    if (!transportError && response.ok && response.body) {
+      // Not every endpoint honours `stream: true` — proxies and older local servers answer
+      // with one plain JSON body. Reading that as a stream finds zero frames and silently
+      // yields an empty turn, so detect it and hand the body back for the unary parser.
+      const contentType = response.headers.get('content-type') || '';
+      if (!/event-stream|ndjson|jsonl/i.test(contentType)) {
+        const text = await response.text().catch(() => '');
+        release();
+        const data = safeJsonParse(text, null);
+        if (!data) throw new Error(`Provider ignored the streaming request and returned a non-JSON body: ${truncate(text, 2000)}`);
+        return { unary: data, release: () => {} };
+      }
+      return { response, touch, release };
+    }
+
+    let error;
+    if (transportError) {
+      error = new Error(`Model request failed: ${transportError.message}`);
+    } else if (!response.body) {
+      release();
+      throw new Error(`Provider returned an empty stream (HTTP ${response.status})`);
+    } else {
+      const text = await response.text().catch(() => '');
+      const data = safeJsonParse(text, null);
+      const message = data?.error?.message || data?.message || truncate(text, 4000) || `HTTP ${response.status}`;
+      error = new Error(`${response.status} ${response.statusText}: ${message}`);
+      error.status = response.status;
+      error.data = data;
+    }
+    const suggested = transportError ? null : retryAfterMs(response);
+    release();
+
+    const retryable = transportError ? true : RETRY_STATUS.has(error.status);
+    if (attempt >= attempts || !retryable) throw error;
+    const waitMs = backoffMs(attempt, settings, suggested);
+    onRetry?.({ attempt, attempts, waitMs, reason: truncate(error.message, 300), status: error.status ?? null });
+    await sleep(waitMs, signal);
+  }
+}
+
+// Tool calls arrive as fragments keyed by index; concatenate then parse once at the end.
+function assembleStreamedCalls(fragments) {
+  return [...fragments.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([, call], position) => normalizeToolCall({ id: call.id, name: call.name, arguments: call.args || '{}' }, position))
+    .filter((call) => call.name);
+}
+
+// Unary response parsers. Shared by the non-streaming path and by the streaming path when an
+// endpoint ignores `stream: true`, so one provider quirk is only ever described in one place.
+function parseOpenAiBody(data) {
+  const choice = data.choices?.[0] || {};
+  const message = choice.message || {};
+  return {
+    content: typeof message.content === 'string' ? message.content : (message.content || []).map((item) => item.text || '').join(''),
+    toolCalls: (message.tool_calls || []).map(normalizeToolCall).filter((call) => call.name),
+    finishReason: choice.finish_reason || null,
+    usage: data.usage || null,
+  };
+}
+
+function parseResponsesBody(data) {
+  const output = data.output || [];
+  const content = output.filter((item) => item.type === 'message')
+    .flatMap((item) => item.content || [])
+    .filter((item) => item.type === 'output_text' || typeof item.text === 'string')
+    .map((item) => item.text || '').join('\n');
+  return {
+    content: content || data.output_text || '',
+    toolCalls: output.filter((item) => item.type === 'function_call').map((item, index) => normalizeToolCall({
+      id: item.call_id || item.id, name: item.name, arguments: item.arguments,
+    }, index)).filter((call) => call.name),
+    finishReason: data.status || null,
+    usage: data.usage || null,
+    responseId: data.id || null,
+  };
+}
+
+function parseOllamaBody(data) {
+  const message = data.message || {};
+  return {
+    content: message.content || '',
+    toolCalls: (message.tool_calls || []).map(normalizeToolCall).filter((call) => call.name),
+    finishReason: data.done_reason || (data.done ? 'stop' : null),
+    usage: {
+      input_tokens: data.prompt_eval_count,
+      output_tokens: data.eval_count,
+      total_duration_ns: data.total_duration,
+    },
+  };
+}
+
+function parseAnthropicBody(data) {
+  const blocks = data.content || [];
+  return {
+    content: blocks.filter((block) => block.type === 'text').map((block) => block.text).join('\n'),
+    toolCalls: blocks.filter((block) => block.type === 'tool_use').map((block, index) => normalizeToolCall(block, index)),
+    finishReason: data.stop_reason || null,
+    usage: data.usage || null,
+  };
+}
+
+function parseGeminiBody(data) {
+  const candidate = data.candidates?.[0] || {};
+  const parts = candidate.content?.parts || [];
+  return {
+    content: parts.filter((part) => typeof part.text === 'string').map((part) => part.text).join('\n'),
+    toolCalls: parts.filter((part) => part.functionCall).map((part, index) => normalizeToolCall(part, index)),
+    finishReason: candidate.finishReason || null,
+    usage: data.usageMetadata || null,
+  };
+}
+
+async function readOpenAiStream(response, touch, onDelta) {
+  let content = '';
+  let finishReason = null;
+  let usage = null;
+  const fragments = new Map();
+  for await (const data of sseData(response.body, touch)) {
+    const chunk = safeJsonParse(data, null);
+    if (!chunk) continue;
+    if (chunk.usage) usage = chunk.usage;
+    const choice = chunk.choices?.[0];
+    if (!choice) continue;
+    if (choice.finish_reason) finishReason = choice.finish_reason;
+    const delta = choice.delta || {};
+    const text = typeof delta.content === 'string' ? delta.content : (delta.content || []).map((part) => part.text || '').join('');
+    if (text) { content += text; onDelta?.(text); }
+    for (const call of delta.tool_calls || []) {
+      const index = call.index ?? fragments.size;
+      const entry = fragments.get(index) || { id: call.id, name: '', args: '' };
+      if (call.id) entry.id = call.id;
+      if (call.function?.name) entry.name += call.function.name;
+      if (call.function?.arguments) entry.args += call.function.arguments;
+      fragments.set(index, entry);
+    }
+  }
+  return { content, toolCalls: assembleStreamedCalls(fragments), finishReason, usage };
+}
+
+async function readResponsesStream(response, touch, onDelta) {
+  let content = '';
+  let finishReason = null;
+  let usage = null;
+  let responseId = null;
+  const fragments = new Map();
+  for await (const data of sseData(response.body, touch)) {
+    const event = safeJsonParse(data, null);
+    if (!event) continue;
+    const index = event.output_index ?? fragments.size;
+    switch (event.type) {
+      case 'response.output_text.delta':
+        if (event.delta) { content += event.delta; onDelta?.(event.delta); }
+        break;
+      case 'response.output_item.added':
+        if (event.item?.type === 'function_call') {
+          fragments.set(index, { id: event.item.call_id || event.item.id, name: event.item.name || '', args: '' });
+        }
+        break;
+      case 'response.function_call_arguments.delta': {
+        const entry = fragments.get(index) || { id: event.item_id, name: '', args: '' };
+        entry.args += event.delta || '';
+        fragments.set(index, entry);
+        break;
+      }
+      case 'response.completed':
+      case 'response.incomplete':
+      case 'response.failed':
+        responseId = event.response?.id || responseId;
+        usage = event.response?.usage || usage;
+        finishReason = event.response?.status || finishReason;
+        break;
+      default: break;
+    }
+  }
+  return { content, toolCalls: assembleStreamedCalls(fragments), finishReason, usage, responseId };
+}
+
+async function readAnthropicStream(response, touch, onDelta) {
+  let content = '';
+  let finishReason = null;
+  const usage = {};
+  const fragments = new Map();
+  for await (const data of sseData(response.body, touch)) {
+    const event = safeJsonParse(data, null);
+    if (!event) continue;
+    if (event.type === 'message_start') Object.assign(usage, event.message?.usage || {});
+    else if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
+      fragments.set(event.index, { id: event.content_block.id, name: event.content_block.name || '', args: '' });
+    } else if (event.type === 'content_block_delta') {
+      if (event.delta?.type === 'text_delta' && event.delta.text) {
+        content += event.delta.text;
+        onDelta?.(event.delta.text);
+      } else if (event.delta?.type === 'input_json_delta') {
+        const entry = fragments.get(event.index);
+        if (entry) entry.args += event.delta.partial_json || '';
+      }
+    } else if (event.type === 'message_delta') {
+      finishReason = event.delta?.stop_reason || finishReason;
+      Object.assign(usage, event.usage || {});
+    } else if (event.type === 'error') {
+      throw new Error(event.error?.message || 'Anthropic stream error');
+    }
+  }
+  return { content, toolCalls: assembleStreamedCalls(fragments), finishReason, usage };
+}
+
+async function readOllamaStream(response, touch, onDelta) {
+  let content = '';
+  let finishReason = null;
+  let usage = null;
+  const toolCalls = [];
+  for await (const line of ndjsonData(response.body, touch)) {
+    const chunk = safeJsonParse(line, null);
+    if (!chunk) continue;
+    if (chunk.error) throw new Error(String(chunk.error));
+    const text = chunk.message?.content || '';
+    if (text) { content += text; onDelta?.(text); }
+    for (const call of chunk.message?.tool_calls || []) {
+      toolCalls.push(normalizeToolCall(call, toolCalls.length));
+    }
+    if (chunk.done) {
+      finishReason = chunk.done_reason || 'stop';
+      usage = { input_tokens: chunk.prompt_eval_count, output_tokens: chunk.eval_count, total_duration_ns: chunk.total_duration };
+    }
+  }
+  return { content, toolCalls: toolCalls.filter((call) => call.name), finishReason, usage };
+}
+
+async function readGeminiStream(response, touch, onDelta) {
+  let content = '';
+  let finishReason = null;
+  let usage = null;
+  const toolCalls = [];
+  for await (const data of sseData(response.body, touch)) {
+    const chunk = safeJsonParse(data, null);
+    if (!chunk) continue;
+    if (chunk.usageMetadata) usage = chunk.usageMetadata;
+    const candidate = chunk.candidates?.[0];
+    if (!candidate) continue;
+    if (candidate.finishReason) finishReason = candidate.finishReason;
+    for (const part of candidate.content?.parts || []) {
+      if (typeof part.text === 'string' && part.text) { content += part.text; onDelta?.(part.text); }
+      if (part.functionCall) toolCalls.push(normalizeToolCall(part, toolCalls.length));
+    }
+  }
+  return { content, toolCalls: toolCalls.filter((call) => call.name), finishReason, usage };
 }
 
 function normalizeToolCall(call, index = 0) {
@@ -196,6 +581,27 @@ export class ProviderManager {
     return provider.apiKey || (provider.apiKeyEnv ? process.env[provider.apiKeyEnv] : undefined);
   }
 
+  // Streaming is on unless the config or the individual provider opts out.
+  streamingEnabled(provider) {
+    if (provider.streaming === false) return false;
+    return this.config.get().streaming !== false;
+  }
+
+  // Shared request options for every completion call: per-attempt timeout, retry policy, and
+  // an event so a retried run is visible rather than looking like a stall.
+  requestOptions(provider, { signal, timeoutMs }) {
+    const settings = { ...DEFAULT_RETRY, ...(this.config.get().providerRetry || {}), ...(provider.retry || {}) };
+    return {
+      signal,
+      timeoutMs: provider.timeoutMs || timeoutMs,
+      retry: settings,
+      onRetry: (info) => {
+        this.logger.warn('Retrying model request', { provider: provider.id, ...info });
+        this.eventBus.emit('model.request.retrying', { provider: provider.id, ...info });
+      },
+    };
+  }
+
   isConfigured(provider) {
     if (!provider.enabled) return false;
     if (provider.type === 'ollama') return true;
@@ -322,13 +728,16 @@ export class ProviderManager {
     const outbound = useText ? toTextProtocolMessages(messages, tools) : messages;
     const wireTools = useText ? [] : tools;
     const { signal, temperature, maxTokens } = options;
+    // In text-protocol mode the tool calls live inside the prose and parseToolCalls rewrites
+    // the content below, so streaming it would show the user call syntax that then vanishes.
+    const onDelta = useText ? null : options.onDelta;
 
     let result;
-    if (resolved.provider.type === 'anthropic') result = await this.#anthropic(resolved, outbound, wireTools, { signal, temperature, maxTokens });
-    else if (resolved.provider.type === 'openai-responses') result = await this.#openAiResponses(resolved, outbound, wireTools, { signal, temperature, maxTokens });
-    else if (resolved.provider.type === 'ollama') result = await this.#ollama(resolved, outbound, wireTools, { signal, temperature });
-    else if (resolved.provider.type === 'gemini') result = await this.#gemini(resolved, outbound, wireTools, { signal, temperature, maxTokens });
-    else result = await this.#openAiCompatible(resolved, outbound, wireTools, { signal, temperature, maxTokens });
+    if (resolved.provider.type === 'anthropic') result = await this.#anthropic(resolved, outbound, wireTools, { signal, temperature, maxTokens, onDelta });
+    else if (resolved.provider.type === 'openai-responses') result = await this.#openAiResponses(resolved, outbound, wireTools, { signal, temperature, maxTokens, onDelta });
+    else if (resolved.provider.type === 'ollama') result = await this.#ollama(resolved, outbound, wireTools, { signal, temperature, onDelta });
+    else if (resolved.provider.type === 'gemini') result = await this.#gemini(resolved, outbound, wireTools, { signal, temperature, maxTokens, onDelta });
+    else result = await this.#openAiCompatible(resolved, outbound, wireTools, { signal, temperature, maxTokens, onDelta });
 
     result.toolProtocol = useText ? 'text' : 'native';
     result.parseErrors = [];
@@ -360,7 +769,7 @@ export class ProviderManager {
     return result;
   }
 
-  async complete({ modelRef, messages, tools = [], signal, temperature = 0.1, maxTokens = 16_384 }) {
+  async complete({ modelRef, messages, tools = [], signal, temperature = 0.1, maxTokens = 16_384, onDelta = null }) {
     const resolved = await this.resolveModel(modelRef);
     const started = Date.now();
     const protocol = this.toolProtocolFor(resolved);
@@ -368,7 +777,7 @@ export class ProviderManager {
     try {
       let result;
       try {
-        result = await this.#dispatch(resolved, messages, tools, { signal, temperature, maxTokens }, protocol);
+        result = await this.#dispatch(resolved, messages, tools, { signal, temperature, maxTokens, onDelta }, protocol);
       } catch (error) {
         // The endpoint rejected the tool schema outright: remember it and re-run in text mode
         // rather than surfacing a dead end to the user.
@@ -380,16 +789,18 @@ export class ProviderManager {
         this.eventBus.emit('model.tool-protocol.downgraded', {
           provider: resolved.provider.id, model: resolved.model, reason: truncate(error.message, 300),
         });
-        result = await this.#dispatch(resolved, messages, tools, { signal, temperature, maxTokens }, 'text');
+        result = await this.#dispatch(resolved, messages, tools, { signal, temperature, maxTokens, onDelta }, 'text');
       }
       result.modelRef = resolved.ref;
       result.providerId = resolved.provider.id;
       result.providerType = resolved.provider.type;
       result.model = resolved.model;
       result.durationMs = Date.now() - started;
+      result.streamed = Boolean(onDelta) && result.toolProtocol !== 'text';
       this.eventBus.emit('model.request.completed', {
         provider: resolved.provider.id, model: resolved.model, durationMs: result.durationMs,
         toolCalls: result.toolCalls.length, usage: result.usage, toolProtocol: result.toolProtocol,
+        streamed: result.streamed,
       });
       return result;
     } catch (error) {
@@ -398,7 +809,7 @@ export class ProviderManager {
     }
   }
 
-  async #openAiResponses(resolved, messages, tools, { signal, temperature, maxTokens }) {
+  async #openAiResponses(resolved, messages, tools, { signal, temperature, maxTokens, onDelta }) {
     const provider = resolved.provider;
     const headers = { 'Content-Type': 'application/json', ...provider.headers };
     const key = this.apiKey(provider);
@@ -413,27 +824,19 @@ export class ProviderManager {
       ...(tools.length ? { tools: toResponsesTools(tools), tool_choice: 'auto', parallel_tool_calls: true } : {}),
       ...provider.requestDefaults,
     };
-    const data = await fetchJson(`${provider.baseUrl.replace(/\/$/, '')}/responses`, {
+    const url = `${provider.baseUrl.replace(/\/$/, '')}/responses`;
+    const requestOptions = this.requestOptions(provider, { signal, timeoutMs: 300_000 });
+    if (onDelta && this.streamingEnabled(provider)) {
+      const stream = await openStream(url, { method: 'POST', headers, body: JSON.stringify({ ...body, stream: true }) }, requestOptions);
+      try { return stream.unary ? parseResponsesBody(stream.unary) : await readResponsesStream(stream.response, stream.touch, onDelta); }
+      finally { stream.release(); }
+    }
+    return parseResponsesBody(await fetchJson(url, {
       method: 'POST', headers, body: JSON.stringify(body),
-    }, { signal, timeoutMs: provider.timeoutMs || 300_000 });
-    const output = data.output || [];
-    const content = output.filter((item) => item.type === 'message')
-      .flatMap((item) => item.content || [])
-      .filter((item) => item.type === 'output_text' || typeof item.text === 'string')
-      .map((item) => item.text || '').join('\n');
-    const toolCalls = output.filter((item) => item.type === 'function_call').map((item, index) => normalizeToolCall({
-      id: item.call_id || item.id, name: item.name, arguments: item.arguments,
-    }, index)).filter((call) => call.name);
-    return {
-      content: content || data.output_text || '',
-      toolCalls,
-      finishReason: data.status || null,
-      usage: data.usage || null,
-      responseId: data.id || null,
-    };
+    }, requestOptions));
   }
 
-  async #openAiCompatible(resolved, messages, tools, { signal, temperature, maxTokens }) {
+  async #openAiCompatible(resolved, messages, tools, { signal, temperature, maxTokens, onDelta }) {
     const provider = resolved.provider;
     const headers = { 'Content-Type': 'application/json', ...provider.headers };
     const key = this.apiKey(provider);
@@ -446,20 +849,20 @@ export class ProviderManager {
       ...(tools.length ? { tools: toOpenAiTools(tools), tool_choice: 'auto', parallel_tool_calls: true } : {}),
       ...provider.requestDefaults,
     };
-    const data = await fetchJson(`${provider.baseUrl.replace(/\/$/, '')}/chat/completions`, {
+    const url = `${provider.baseUrl.replace(/\/$/, '')}/chat/completions`;
+    const requestOptions = this.requestOptions(provider, { signal, timeoutMs: 300_000 });
+    if (onDelta && this.streamingEnabled(provider)) {
+      const streamBody = { ...body, stream: true, stream_options: { include_usage: true } };
+      const stream = await openStream(url, { method: 'POST', headers, body: JSON.stringify(streamBody) }, requestOptions);
+      try { return stream.unary ? parseOpenAiBody(stream.unary) : await readOpenAiStream(stream.response, stream.touch, onDelta); }
+      finally { stream.release(); }
+    }
+    return parseOpenAiBody(await fetchJson(url, {
       method: 'POST', headers, body: JSON.stringify(body),
-    }, { signal, timeoutMs: provider.timeoutMs || 300_000 });
-    const choice = data.choices?.[0] || {};
-    const message = choice.message || {};
-    return {
-      content: typeof message.content === 'string' ? message.content : (message.content || []).map((item) => item.text || '').join(''),
-      toolCalls: (message.tool_calls || []).map(normalizeToolCall).filter((call) => call.name),
-      finishReason: choice.finish_reason || null,
-      usage: data.usage || null,
-    };
+    }, requestOptions));
   }
 
-  async #ollama(resolved, messages, tools, { signal, temperature }) {
+  async #ollama(resolved, messages, tools, { signal, temperature, onDelta }) {
     const provider = resolved.provider;
     const body = {
       model: resolved.model,
@@ -473,23 +876,19 @@ export class ProviderManager {
       ...(tools.length ? { tools: toOpenAiTools(tools) } : {}),
     };
     const headers = { 'Content-Type': 'application/json', ...provider.headers };
-    const data = await fetchJson(`${provider.baseUrl.replace(/\/$/, '')}/api/chat`, {
+    const url = `${provider.baseUrl.replace(/\/$/, '')}/api/chat`;
+    const requestOptions = this.requestOptions(provider, { signal, timeoutMs: 600_000 });
+    if (onDelta && this.streamingEnabled(provider)) {
+      const stream = await openStream(url, { method: 'POST', headers, body: JSON.stringify({ ...body, stream: true }) }, requestOptions);
+      try { return stream.unary ? parseOllamaBody(stream.unary) : await readOllamaStream(stream.response, stream.touch, onDelta); }
+      finally { stream.release(); }
+    }
+    return parseOllamaBody(await fetchJson(url, {
       method: 'POST', headers, body: JSON.stringify(body),
-    }, { signal, timeoutMs: provider.timeoutMs || 600_000 });
-    const message = data.message || {};
-    return {
-      content: message.content || '',
-      toolCalls: (message.tool_calls || []).map(normalizeToolCall).filter((call) => call.name),
-      finishReason: data.done_reason || (data.done ? 'stop' : null),
-      usage: {
-        input_tokens: data.prompt_eval_count,
-        output_tokens: data.eval_count,
-        total_duration_ns: data.total_duration,
-      },
-    };
+    }, requestOptions));
   }
 
-  async #anthropic(resolved, messages, tools, { signal, temperature, maxTokens }) {
+  async #anthropic(resolved, messages, tools, { signal, temperature, maxTokens, onDelta }) {
     const provider = resolved.provider;
     const cachingEnabled = provider.promptCaching !== false;
     const converted = mergeAnthropicMessages(messages);
@@ -517,26 +916,25 @@ export class ProviderManager {
       ...(toolDefs.length ? { tools: toolDefs } : {}),
       ...provider.requestDefaults,
     };
-    const data = await fetchJson(`${provider.baseUrl.replace(/\/$/, '')}/messages`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': this.apiKey(provider),
-        'anthropic-version': provider.anthropicVersion || '2023-06-01',
-        ...provider.headers,
-      },
-      body: JSON.stringify(body),
-    }, { signal, timeoutMs: provider.timeoutMs || 300_000 });
-    const blocks = data.content || [];
-    return {
-      content: blocks.filter((block) => block.type === 'text').map((block) => block.text).join('\n'),
-      toolCalls: blocks.filter((block) => block.type === 'tool_use').map((block, index) => normalizeToolCall(block, index)),
-      finishReason: data.stop_reason || null,
-      usage: data.usage || null,
+    const url = `${provider.baseUrl.replace(/\/$/, '')}/messages`;
+    const headers = {
+      'Content-Type': 'application/json',
+      'x-api-key': this.apiKey(provider),
+      'anthropic-version': provider.anthropicVersion || '2023-06-01',
+      ...provider.headers,
     };
+    const requestOptions = this.requestOptions(provider, { signal, timeoutMs: 300_000 });
+    if (onDelta && this.streamingEnabled(provider)) {
+      const stream = await openStream(url, { method: 'POST', headers, body: JSON.stringify({ ...body, stream: true }) }, requestOptions);
+      try { return stream.unary ? parseAnthropicBody(stream.unary) : await readAnthropicStream(stream.response, stream.touch, onDelta); }
+      finally { stream.release(); }
+    }
+    return parseAnthropicBody(await fetchJson(url, {
+      method: 'POST', headers, body: JSON.stringify(body),
+    }, requestOptions));
   }
 
-  async #gemini(resolved, messages, tools, { signal, temperature, maxTokens }) {
+  async #gemini(resolved, messages, tools, { signal, temperature, maxTokens, onDelta }) {
     const provider = resolved.provider;
     const converted = toGemini(messages);
     const body = {
@@ -549,16 +947,17 @@ export class ProviderManager {
         parameters: tool.inputSchema || { type: 'object', properties: {} },
       })) }] } : {}),
     };
-    const data = await fetchJson(`${provider.baseUrl.replace(/\/$/, '')}/models/${encodeURIComponent(resolved.model)}:generateContent?key=${encodeURIComponent(this.apiKey(provider))}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', ...provider.headers }, body: JSON.stringify(body),
-    }, { signal, timeoutMs: provider.timeoutMs || 300_000 });
-    const candidate = data.candidates?.[0] || {};
-    const parts = candidate.content?.parts || [];
-    return {
-      content: parts.filter((part) => typeof part.text === 'string').map((part) => part.text).join('\n'),
-      toolCalls: parts.filter((part) => part.functionCall).map((part, index) => normalizeToolCall(part, index)),
-      finishReason: candidate.finishReason || null,
-      usage: data.usageMetadata || null,
-    };
+    const base = `${provider.baseUrl.replace(/\/$/, '')}/models/${encodeURIComponent(resolved.model)}`;
+    const key = encodeURIComponent(this.apiKey(provider));
+    const headers = { 'Content-Type': 'application/json', ...provider.headers };
+    const requestOptions = this.requestOptions(provider, { signal, timeoutMs: 300_000 });
+    if (onDelta && this.streamingEnabled(provider)) {
+      const stream = await openStream(`${base}:streamGenerateContent?alt=sse&key=${key}`, { method: 'POST', headers, body: JSON.stringify(body) }, requestOptions);
+      try { return stream.unary ? parseGeminiBody(stream.unary) : await readGeminiStream(stream.response, stream.touch, onDelta); }
+      finally { stream.release(); }
+    }
+    return parseGeminiBody(await fetchJson(`${base}:generateContent?key=${key}`, {
+      method: 'POST', headers, body: JSON.stringify(body),
+    }, requestOptions));
   }
 }

@@ -183,6 +183,64 @@ Supported `type` values are `ollama`, `openai-responses`, `openai-compatible`, `
 
 An `anthropic` provider entry also accepts `promptCaching` (default `true`). When enabled, MaskShift marks the stable system-prompt block, the active tool schema list, and the conversation-so-far boundary with `cache_control: {"type": "ephemeral"}` breakpoints so a run's repeated turns reuse cached input tokens instead of rebilling them in full. Set `"promptCaching": false` on the provider entry if a proxy in front of the Anthropic-compatible endpoint rejects the `cache_control` field.
 
+## Streaming
+
+`streaming` (default `true`) makes model output arrive token by token instead of appearing when
+the turn is finished. `maskshift run` writes tokens straight to stdout, and the interface shows
+the answer being written where it previously showed a spinner. Every provider type streams:
+Server-Sent Events for `openai-responses`, `openai-compatible`, `anthropic` and `gemini`,
+newline-delimited JSON for `ollama`.
+
+```json
+{
+  "streaming": false,
+  "providers": [
+    { "id": "lab-ollama", "streaming": false }
+  ]
+}
+```
+
+Set the top-level key to disable it everywhere, or `streaming: false` on one provider entry to
+disable it for that endpoint alone. Streaming is skipped automatically in two cases: when a
+model is being driven through the [text tool protocol](#providers) — the tool calls live
+inside the prose and are rewritten once the turn completes — and when an endpoint accepts the
+streaming request but answers with a single JSON body anyway, which MaskShift detects from the
+response content type and parses normally rather than reporting an empty turn.
+
+`--json` output is unaffected: it is written once, when the run completes.
+
+## Retries
+
+`providerRetry` governs how a model request recovers from a transient failure. Without it a
+single 429 or a dropped connection ends a run that may already have spent real money.
+
+| Field | Default | Meaning |
+|---|---:|---|
+| `providerRetry.attempts` | `3` | Total attempts, including the first. `1` disables retrying. |
+| `providerRetry.baseMs` | `500` | First backoff window. Doubles per attempt. |
+| `providerRetry.maxMs` | `30000` | Ceiling for a single backoff, and for a `Retry-After` the server asks for. |
+
+Retries apply to HTTP 408, 409, 425, 429, 500, 502, 503 and 504, and to network-level failures.
+A `Retry-After` header is honoured when present; otherwise the wait is exponential with jitter
+so parallel agents do not resynchronise on the same retry. Status codes that mean the request
+itself is wrong — 400, 401, 403, 404, 422 — are never retried, and cancelling a run stops the
+backoff immediately rather than waiting it out.
+
+A streaming request is only retried before its first token reaches the caller, so nothing is
+ever shown twice. Model-listing probes (`maskshift doctor`, provider discovery) stay
+single-shot so a dead endpoint is reported promptly instead of after three waits.
+
+Override per provider with a `retry` object on the provider entry:
+
+```json
+{
+  "providerRetry": { "attempts": 5, "baseMs": 1000 },
+  "providers": [
+    { "id": "flaky-proxy", "retry": { "attempts": 8, "maxMs": 60000 } }
+  ]
+}
+```
+
 ## Memory ranking
 
 `memory` controls how `memory_search`/`memory_list` rank and age persistent memories.

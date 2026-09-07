@@ -215,6 +215,13 @@ export class AgentEngine {
         const system = this.promptBuilder.system({ workspaceContext, capabilityState, planState: entry.planState, run: currentRun, session: currentSession });
         const tools = await this.capabilityController.descriptors(capabilityState);
         this.#event(run.id, 'model-turn', { step, tools: tools.map((tool) => tool.name), skillCount: capabilityState.skills.size }, scope);
+        // Token deltas go straight to the bus, never through #event: that persists a row per
+        // call, and a run streams thousands of tokens.
+        let streamedChars = 0;
+        const onDelta = entry.options.stream === false ? null : (text) => {
+          streamedChars += text.length;
+          this.eventBus.emit('run.assistant-delta', { step, text }, scope);
+        };
         const response = await this.providerManager.complete({
           modelRef: currentRun.model_id,
           messages: [{ role: 'system', content: system.text, blocks: system.blocks }, ...history],
@@ -222,7 +229,9 @@ export class AgentEngine {
           signal,
           temperature: entry.options.temperature ?? 0.1,
           maxTokens: entry.options.maxTokens || 16_384,
+          onDelta,
         });
+        if (streamedChars) this.eventBus.emit('run.assistant-delta-end', { step }, scope);
         usage.push(response.usage);
         costs.push(estimateUsageCost(this.config.get(), response.providerId, response.providerType, response.model, response.usage));
         const assistantMessage = {
@@ -233,7 +242,13 @@ export class AgentEngine {
           sessionId: session.id, role: 'assistant', content: response.content || '',
           meta: { runId: run.id, modelRef: response.modelRef, toolCalls: response.toolCalls || [], finishReason: response.finishReason, usage: response.usage },
         });
-        this.#event(run.id, 'assistant', { content: response.content || '', toolCalls: response.toolCalls || [], modelRef: response.modelRef, usage: response.usage }, scope);
+        this.#event(run.id, 'assistant', {
+          content: response.content || '', toolCalls: response.toolCalls || [],
+          modelRef: response.modelRef, usage: response.usage,
+          // Salvage mode rewrites the content after the fact, so what streamed is not what
+          // this message carries; the renderer must print it again in that case.
+          streamed: streamedChars > 0 && response.toolProtocol !== 'text-salvage',
+        }, scope);
         if (response.content) finalContent = response.content;
 
         // A text-protocol model wrote something call-shaped that would not parse. Correct it
@@ -261,7 +276,7 @@ export class AgentEngine {
           this.#event(run.id, 'completed', { final: finalContent, steps: step, capabilities: meta.capabilities }, scope);
           await this.hooks?.run('Stop', { ...scope, workspacePath, status: 'completed', final: finalContent });
           await this.hooks?.run('RunCompleted', { ...scope, workspacePath, status: 'completed', final: finalContent });
-          if (run.workspace_id && this.config.get().autoIndex) void this.indexer.index(run.workspace_id, { force: true }).catch(() => {});
+          if (run.workspace_id && this.config.get().autoIndex) void this.indexer.index(run.workspace_id).catch(() => {});
           return completed;
         }
 

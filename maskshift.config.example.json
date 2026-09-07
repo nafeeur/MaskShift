@@ -39,6 +39,12 @@
     ".github/copilot-instructions.md",
     ".cursorrules"
   ],
+  "streaming": true,
+  "providerRetry": {
+    "attempts": 3,
+    "baseMs": 500,
+    "maxMs": 30000
+  },
   "providers": [
     {
       "id": "ollama",

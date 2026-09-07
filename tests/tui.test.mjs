@@ -124,6 +124,47 @@ test('every transcript row shares one left edge', async (t) => {
   assert.ok(rows.some((line) => line.includes('fs_read')));
 });
 
+test('a streaming turn renders in place of the spinner without breaking the frame', async (t) => {
+  const project = await createProject(t);
+  const runtime = await runtimeForTest(t, project);
+  const app = new MaskShiftTui(runtime, {
+    workspacePath: project, output: new FakeTerminal(120, 32), headless: true, theme,
+  });
+  await app.bootstrap();
+  app.view = 'chat';
+  app.activeRun = { id: 'run_fixture', status: 'running' };
+
+  // No tokens yet: the spinner label still holds the row.
+  assert.ok(app.snapshot().map(stripAnsi).some((line) => line.includes('Thinking')));
+
+  app.onRunEvent({ type: 'run.assistant-delta', sessionId: app.sessionId, payload: { text: 'Reading the renderer ' } });
+  app.onRunEvent({ type: 'run.assistant-delta', sessionId: app.sessionId, payload: { text: 'and diffing the frame. '.repeat(40) } });
+  app.screen.invalidate();
+
+  const frame = app.snapshot();
+  const plain = frame.map(stripAnsi);
+  assert.ok(plain.some((line) => line.includes('Reading the renderer')), 'streamed text should be on screen');
+  assert.ok(!plain.some((line) => line.includes('Thinking')), 'the spinner label gives way to the text');
+  // The renderer's contract: every row is exactly the terminal width.
+  for (const line of frame) assert.equal(visibleWidth(line), 120);
+
+  // A completed turn hands the content to the transcript and clears the live view.
+  app.onRunEvent({ type: 'run.assistant', sessionId: app.sessionId, payload: { content: 'done', toolCalls: [], streamed: true } });
+  assert.equal(app.streamingText, '');
+});
+
+test('deltas from a subagent never reach the parent transcript', async (t) => {
+  const project = await createProject(t);
+  const runtime = await runtimeForTest(t, project);
+  const app = new MaskShiftTui(runtime, {
+    workspacePath: project, output: new FakeTerminal(100, 24), headless: true, theme,
+  });
+  await app.bootstrap();
+  app.activeRun = { id: 'run_fixture', status: 'running' };
+  app.onRunEvent({ type: 'run.assistant-delta', sessionId: 'ses_some_subagent', payload: { text: 'subagent chatter' } });
+  assert.equal(app.streamingText, '');
+});
+
 test('the active view is named once per screen', async (t) => {
   const project = await createProject(t);
   const runtime = await runtimeForTest(t, project);

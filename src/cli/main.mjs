@@ -128,6 +128,8 @@ async function headlessRun(runtime, ui, args, positional) {
   });
 
   const quiet = Boolean(args.quiet || ui.json);
+  let streaming = false;
+  let lastStreamedTurn = '';
   const unsubscribe = quiet ? () => {} : runtime.eventBus.subscribe((event) => {
     if (event.sessionId !== session.id) return;
     const payload = event.payload || {};
@@ -138,8 +140,19 @@ async function headlessRun(runtime, ui, args, positional) {
       case 'run.model-turn':
         ui.line(ui.theme.paint(`${ui.marks.dot} turn ${String(payload.step).padStart(2, '0')} — ${payload.tools?.length ?? 0} tools active`, { fg: ui.theme.roles.border }));
         break;
+      case 'run.assistant-delta':
+        // First token of the turn: open a blank line, then write through unstyled — markdown
+        // cannot be rendered a fragment at a time.
+        if (!streaming) { ui.line(); streaming = true; lastStreamedTurn = ''; }
+        lastStreamedTurn += payload.text;
+        ui.writeRaw(payload.text);
+        break;
+      case 'run.assistant-delta-end':
+        if (streaming) { ui.writeRaw('\n'); streaming = false; }
+        break;
       case 'run.assistant':
-        if (payload.content?.trim()) { ui.line(); ui.markdown(payload.content); }
+        // Skip content the user already watched arrive.
+        if (!payload.streamed && payload.content?.trim()) { ui.line(); ui.markdown(payload.content); }
         for (const call of payload.toolCalls || []) {
           ui.line(ui.theme.paint(`  ${ui.marks.caret} ${call.name}`, { fg: ui.theme.roles.tool })
             + ui.theme.paint(` ${oneLine(JSON.stringify(call.args ?? {}), ui.width - call.name.length - 8)}`, { fg: ui.theme.roles.border }));
@@ -178,8 +191,9 @@ async function headlessRun(runtime, ui, args, positional) {
       cost: completed.meta?.costEstimate || null,
     }, null, 2));
   } else {
+    const alreadyShown = final?.content?.trim() && final.content.trim() === lastStreamedTurn.trim();
     ui.rule();
-    if (final?.content) ui.markdown(final.content);
+    if (final?.content && !alreadyShown) ui.markdown(final.content);
     ui.line();
     const tone = completed.status === 'completed' ? 'ok' : completed.status === 'cancelled' ? 'warn' : 'fail';
     ui.status(tone, `run ${completed.status}${completed.error ? `: ${completed.error}` : ''}`);

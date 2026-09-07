@@ -24,6 +24,8 @@ export class Ui {
   }
 
   write(text = '') { this.stream.write(`${text}\n`); }
+  // Unterminated write, for streaming model output token by token.
+  writeRaw(text = '') { if (!this.json) this.stream.write(text); }
   writeError(text = '') { this.errorStream.write(`${text}\n`); }
 
   emit(value) {
