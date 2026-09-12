@@ -1,9 +1,24 @@
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import fsp from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { commandExists } from '../src/core/utils.mjs';
 import { createProject, jsonServer, runtimeForTest } from './helpers.mjs';
+
+const repoRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..');
+const bin = path.join(repoRoot, 'bin', 'maskshift.mjs');
+
+function run(args, options) {
+  return new Promise((resolve, reject) => {
+    execFile('node', ['--no-warnings', bin, ...args], options, (error, stdout, stderr) => {
+      if (error) return reject(Object.assign(error, { stdout, stderr }));
+      resolve({ stdout, stderr });
+    });
+  });
+}
 
 function contextFor(runtime, workspace, project) {
   return { workspaceId: workspace.id, workspacePath: project, eventBus: runtime.eventBus, scope: { workspaceId: workspace.id } };
@@ -210,4 +225,17 @@ test('browser artifacts resolve inside the workspace, not the server working dir
   assert.ok(generated.file.startsWith(`${project}${path.sep}`));
 
   assert.deepEqual((await fsp.readdir(process.cwd())).filter((entry) => !before.includes(entry)), []);
+});
+
+test('bin/maskshift.mjs loads a .env file from the working directory on startup', async (t) => {
+  const temp = await fsp.mkdtemp(path.join(os.tmpdir(), 'maskshift-env-'));
+  t.after(() => fsp.rm(temp, { recursive: true, force: true }));
+  const home = path.join(temp, 'home');
+  await fsp.writeFile(
+    path.join(temp, '.env'),
+    `MASKSHIFT_HOME=${home}\nMASKSHIFT_MODEL=lmstudio:regression-model\n`,
+  );
+
+  const { stdout } = await run(['config', 'get', 'defaultModel', '--json'], { cwd: temp, env: { PATH: process.env.PATH } });
+  assert.deepEqual(JSON.parse(stdout), { defaultModel: 'lmstudio:regression-model' });
 });
