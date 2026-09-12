@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.2
 
 - Fixed `.env` in the working directory being silently ignored on every startup path except Docker Compose (which loads it itself for variable substitution). `bin/maskshift.mjs` now calls `process.loadEnvFile()` before the runtime boots, so `OPENROUTER_API_KEY` and the other provider credentials documented in `.env.example` actually reach `process.env`.
 - Published to npm as `maskshift`. `package.json` now carries `files`, `repository`, `homepage`, `bugs` and `author` metadata, and the README documents `npm install -g maskshift` / `npx maskshift` alongside the source-based install paths.

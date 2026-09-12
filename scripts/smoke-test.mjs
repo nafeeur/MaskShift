@@ -9,6 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { Writable } from 'node:stream';
 import { createRuntime } from '../src/runtime.mjs';
+import { VERSION } from '../src/core/utils.mjs';
 import { MaskShiftTui } from '../src/tui/app.mjs';
 import { Theme } from '../src/tui/theme.mjs';
 import { stripAnsi, visibleWidth } from '../src/tui/text.mjs';
@@ -134,7 +135,7 @@ try {
 
   console.log(JSON.stringify({
     result: 'PASS',
-    version: '1.0.0',
+    version: VERSION,
     tools: toolCount,
     skills: skillCount,
     mcp: runtime.mcpManager.listServers().length,

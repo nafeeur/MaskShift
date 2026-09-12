@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 
-export const VERSION = '1.0.0';
+export const VERSION = '1.0.2';
 
 export function id(prefix = 'id') {
   return `${prefix}_${Date.now().toString(36)}_${crypto.randomBytes(6).toString('hex')}`;

@@ -3,6 +3,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 import { main } from '../src/cli/main.mjs';
+import { VERSION } from '../src/core/utils.mjs';
 import { createProject, jsonServer, readJsonBody, respondJson, runtimeForTest, waitFor } from './helpers.mjs';
 
 function captureStdout() {
@@ -157,7 +158,7 @@ test('the CLI exposes the full capability surface without a browser', async (t) 
   assert.equal(configured.maxAgentSteps, 42);
 
   const doctorReport = JSON.parse((await cli(['doctor', ...base])).output);
-  assert.equal(doctorReport.version, '1.0.0');
+  assert.equal(doctorReport.version, VERSION);
   assert.ok(doctorReport.tools >= 140);
   assert.ok(doctorReport.commands.node);
 });
