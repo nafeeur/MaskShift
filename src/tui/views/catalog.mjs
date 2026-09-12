@@ -7,12 +7,33 @@
 // other row in the product. Before that each view hand-rolled `fit` calls with
 // its own magic numbers, and no two lists shared a column edge.
 
+import { maskArt } from '../brand.mjs';
 import { frameColour, glyphs, panel, rule } from '../box.mjs';
 import { hstack, split } from '../layout.mjs';
 import { LAYER, listZone, viewportZone } from '../regions.mjs';
-import { fit, visibleWidth, wrap } from '../text.mjs';
+import { center, fit, underlay, visibleWidth, wrap } from '../text.mjs';
 import { FIELD_LABEL_WIDTH, SPACE } from '../tokens.mjs';
 import { columns, field, gutter, label as typeLabel } from '../type.mjs';
+
+/**
+ * Centred filler for a catalogue with nothing in it. A blank rectangle under
+ * a two-row header reads as broken; the mask glyph the idle heist screen
+ * already uses reads as a considered state, so an empty Network or Mod Shop
+ * pane feels like the same product instead of an unfinished corner of it.
+ */
+function emptyState(theme, width, height, { title, hint = '' } = {}) {
+  const art = width >= 26 && height >= 10 ? maskArt(theme) : [];
+  const block = [...art, '', theme.paint(title, { fg: theme.roles.muted, bold: true })];
+  if (hint) block.push('', theme.paint(hint, { fg: theme.roles.faint, italic: true }));
+  const lines = block.map((line) => fit(center(line, width), width));
+  const top = Math.max(0, Math.floor((height - lines.length) / 2));
+  const out = [];
+  for (let row = 0; row < height; row += 1) {
+    const index = row - top;
+    out.push(index >= 0 && index < lines.length ? lines[index] : ' '.repeat(width));
+  }
+  return out;
+}
 
 /**
  * The section switcher inside a pane.
@@ -96,7 +117,7 @@ export function listRow(app, { selected, marker = '', markerTone = null, cells, 
     : gutter(theme, marker, { tone: markerTone || theme.roles.faint });
   const body = columns(theme, cells, Math.max(0, width - SPACE.gutter));
   const line = fit(`${lead}${body}`, width);
-  return selected ? theme.paint(line, { bg: theme.roles.surfaceRaised }) : line;
+  return selected ? underlay(line, theme.bg(theme.roles.selection)) : line;
 }
 
 /**
@@ -193,7 +214,9 @@ export function renderCatalog(app, region, spec) {
   ];
 
   const listHeight = Math.max(1, height - 2 - header.length);
-  const rows = spec.list.render(theme, listInner, listHeight, spec.row);
+  const rows = spec.list.items.length === 0 && spec.empty
+    ? emptyState(theme, listInner, listHeight, spec.empty)
+    : spec.list.render(theme, listInner, listHeight, spec.row);
 
   // No title on the rail: the view tab at the top of the screen already names
   // this pane, and printing "03 ARSENAL" one row under an "03 ARSENAL" chip

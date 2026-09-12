@@ -145,6 +145,18 @@ export function sanitizeTerminalLine(text) {
   return value;
 }
 
+// Fold a newly-seen escape chunk into the style active at this column,
+// dropping everything before a reset so replaying the result alone always
+// reproduces the current style exactly — including when it is itself later
+// re-sliced, which is what happens when a run() wider than the wrap width
+// gets cut more than once.
+function trackAnsi(active, chunk) {
+  const resets = [...chunk.matchAll(/\x1b\[0?m/g)];
+  if (!resets.length) return active + chunk;
+  const last = resets[resets.length - 1];
+  return chunk.slice(last.index + last[0].length);
+}
+
 // Slice by *visible columns* while preserving styling.
 export function sliceAnsi(text, start = 0, end = Number.POSITIVE_INFINITY) {
   let column = 0;
@@ -153,7 +165,7 @@ export function sliceAnsi(text, start = 0, end = Number.POSITIVE_INFINITY) {
   let opened = false;
   for (const { character, width, ansi } of walk(text)) {
     if (column >= end) break;
-    if (ansi) { carried += ansi; if (column >= start) { out += ansi; opened = true; } }
+    if (ansi) { carried = trackAnsi(carried, ansi); if (column >= start) { out += ansi; opened = true; } }
     if (!character) continue;
     if (column + width > end) break;
     if (column >= start) {
@@ -163,6 +175,20 @@ export function sliceAnsi(text, start = 0, end = Number.POSITIVE_INFINITY) {
     column += width;
   }
   return opened ? `${out}${RESET}` : out;
+}
+
+/**
+ * Lay a background colour underneath text that already carries its own
+ * styling — a table row whose cells were each painted (and so each end in
+ * their own reset) rather than one flat run. Wrapping a reset-bearing string
+ * in a single leading background code only colours it up to that first
+ * reset: every `\x1b[0m` inside it re-applies the background right after, so
+ * it survives every cell boundary instead of vanishing after the first one.
+ */
+export function underlay(text, bgCode) {
+  if (!bgCode) return String(text ?? '');
+  const value = String(text ?? '');
+  return `${bgCode}${value.replace(/\x1b\[0m/g, `$&${bgCode}`)}${RESET}`;
 }
 
 export function truncate(text, width, ellipsis = '…') {
@@ -201,6 +227,13 @@ export function fit(text, width, { align = 'left', ellipsis = '…' } = {}) {
 }
 
 // Word wrap that keeps ANSI styling and never splits mid-escape.
+//
+// A style that is still open when a line breaks (an inline-code span padded
+// with a leading space, say, wrapping partway through) has to be closed at
+// that line's end and reopened at the next one's start — the padding space
+// that carries the opening codes is emitted separately from the word that
+// follows it, so the codes would otherwise be spent on the space alone and
+// never reach the word.
 export function wrap(text, width) {
   if (width <= 0) return [''];
   const lines = [];
@@ -211,10 +244,12 @@ export function wrap(text, width) {
     let currentWidth = 0;
     let word = '';
     let wordWidth = 0;
+    let style = '';
+    const close = (line) => (style ? `${line}${RESET}` : line);
     const flushWord = () => {
       if (!word) return;
       if (currentWidth + wordWidth > width && currentWidth > 0) {
-        lines.push(current);
+        lines.push(close(current));
         current = '';
         currentWidth = 0;
       }
@@ -232,19 +267,20 @@ export function wrap(text, width) {
       wordWidth = 0;
     };
     for (const { character, width: cw, ansi } of walk(paragraph)) {
-      if (ansi) word += ansi;
+      if (ansi) { style = trackAnsi(style, ansi); word += ansi; }
       if (!character) continue;
       if (character === ' ') {
         flushWord();
         if (currentWidth + 1 <= width) { current += ' '; currentWidth += 1; }
-        else { lines.push(current); current = ''; currentWidth = 0; }
+        else { lines.push(close(current)); current = ''; currentWidth = 0; }
         continue;
       }
+      if (!word && style) word += style;
       word += character;
       wordWidth += cw;
     }
     flushWord();
-    lines.push(current);
+    lines.push(close(current));
   }
   return lines.length ? lines : [''];
 }

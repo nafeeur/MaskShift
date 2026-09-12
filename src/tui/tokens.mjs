@@ -92,6 +92,11 @@ export const ROLES = {
   surface: NEUTRAL.panel,
   surfaceRaised: NEUTRAL.raised,
   surfaceSunken: NEUTRAL.well,
+  // A full-row highlight (the selected row in a list) needs more separation
+  // from `background` than surfaceRaised gives it — that value reads fine
+  // behind a short inline-code chip, where the eye is judging it against the
+  // text sitting on it, but nearly vanishes as a wide band against the void.
+  selection: NEUTRAL.edge,
 
   // Structure.
   border: NEUTRAL.line,

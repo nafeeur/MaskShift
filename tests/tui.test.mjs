@@ -303,7 +303,23 @@ test('small terminals render within their real dimensions', async (t) => {
   const frame = app.snapshot();
   assert.equal(frame.length, 8);
   for (const line of frame) assert.equal(visibleWidth(line), 20);
-  assert.ok(frame.some((line) => stripAnsi(line).includes('Resize')));
+  // At 20 columns the full sentence doesn't fit, so the fallback drops down
+  // to its shortest form — but it must still surface the one fact that
+  // matters: the terminal's actual current size.
+  assert.ok(frame.some((line) => stripAnsi(line).includes('20×8')));
+});
+
+test('the undersized-terminal fallback keeps the current size legible at any width', async (t) => {
+  const project = await createProject(t);
+  const runtime = await runtimeForTest(t, project);
+  for (const [columns, rows] of [[39, 20], [20, 8], [8, 3]]) {
+    const output = new FakeTerminal(columns, rows);
+    const app = new MaskShiftTui(runtime, { workspacePath: project, output, headless: true, theme });
+    await app.bootstrap();
+    const frame = app.snapshot();
+    assert.ok(frame.some((line) => stripAnsi(line).includes(`${columns}×${rows}`)),
+      `expected the current size ${columns}x${rows} to survive at ${columns} columns`);
+  }
 });
 
 test('async forms and confirmations stay open and report failures inline', async () => {

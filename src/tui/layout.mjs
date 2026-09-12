@@ -53,10 +53,15 @@ export function split(total, parts) {
   return sizes;
 }
 
-/** Centre a block of lines inside a viewport, returning { row, column }. */
+/**
+ * Centre a block of lines inside a viewport, returning { row, column }.
+ * `viewport.top` shifts the result down by a fixed number of rows — for a
+ * viewport that describes a band starting partway down the real frame
+ * (the body, below the header and tab strip) rather than the frame itself.
+ */
 export function centreOffset(viewport, size) {
   return {
-    row: Math.max(0, Math.floor((viewport.rows - size.rows) / 2)),
+    row: (viewport.top || 0) + Math.max(0, Math.floor((viewport.rows - size.rows) / 2)),
     column: Math.max(0, Math.floor((viewport.columns - size.columns) / 2)),
   };
 }

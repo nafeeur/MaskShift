@@ -6,6 +6,8 @@
 - Made the terminal lifecycle crash- and signal-safe, including raw-mode, mouse, cursor, alternate-screen and title restoration plus suspend/resume handling, and added an honest fallback for terminals below 40×12.
 - Added sequential, visible prompt queuing; workspace-scoped session switching with draft/run guards; correct session telemetry restoration; stale async result suppression; and duplicate-operation locks.
 - Made editors grapheme-aware for emoji, combining marks and wide characters, fixed `ctrl+j`, and made async forms and confirmations retain input, show progress, prevent duplicate submission and report failures inline.
+- Fixed overlays rendering without a scrim (the view behind bled through, and a tall one could overlap the status bar), a markdown word-wrap bug that dropped an inline code span's background across a line break, and a resize prompt on undersized terminals that could truncate the one fact it exists to show.
+- Raised list-selection contrast, sized the header's target/persona fields to their actual content instead of a fixed floor, dropped the arsenal's always-truncated description column in favour of a category field, gave empty catalogues (no MCP servers, no bridges) a considered empty state instead of blank space, and eased overlay borders in on open.
 
 ## 1.3.0
 

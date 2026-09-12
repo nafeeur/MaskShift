@@ -32,9 +32,13 @@ export function items(app) {
     .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
 }
 
-const NAME_WIDTH = 24;
+const NAME_WIDTH = 30;
 const ACCESS_WIDTH = 5;
 
+// No description column: at any real terminal width it had room for a stub
+// of the sentence at best, ellipsis and all, for nearly every row — and the
+// detail pane already shows the whole thing for whichever row is selected.
+// Category earns the space instead: fixed, short, never needs truncating.
 function row(app, item, selected, width) {
   const { theme } = app;
   const mark = glyphs(theme);
@@ -53,7 +57,7 @@ function row(app, item, selected, width) {
     cells: [
       { text: highlightMatch(theme, truncate(item.name, NAME_WIDTH), item.positions, theme.roles.accent, accent), width: NAME_WIDTH },
       { text: access, width: ACCESS_WIDTH, tone: item.kind === 'tool' && !item.readOnly ? theme.roles.warning : theme.roles.muted },
-      { text: item.description || '', tone: theme.roles.muted },
+      { text: item.kind === 'tool' ? (item.category || '') : '', tone: theme.roles.faint },
     ],
   });
 }

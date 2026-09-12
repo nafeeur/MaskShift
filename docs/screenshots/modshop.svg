@@ -8,24 +8,24 @@
 <text x="125.20" y="30.00" fill="#61616f" textLength="50.40" lengthAdjust="spacingAndGlyphs">TARGET</text>
 <text x="184.00" y="30.00" fill="#e7e6ea" textLength="75.60" lengthAdjust="spacingAndGlyphs" font-weight="700">MaskShift</text>
 <text x="268.00" y="30.00" fill="#e7e6ea" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">·</text>
-<text x="284.80" y="30.00" fill="#e7e6ea" textLength="168.00" lengthAdjust="spacingAndGlyphs" font-weight="700">claude/ui-problem-y…</text>
-<text x="461.20" y="30.00" fill="#24242f" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="478.00" y="30.00" fill="#61616f" textLength="58.80" lengthAdjust="spacingAndGlyphs">PERSONA</text>
-<text x="545.20" y="30.00" fill="#e7e6ea" textLength="92.40" lengthAdjust="spacingAndGlyphs" font-weight="700">ollama:auto</text>
+<text x="284.80" y="30.00" fill="#e7e6ea" textLength="33.60" lengthAdjust="spacingAndGlyphs" font-weight="700">main</text>
+<text x="326.80" y="30.00" fill="#24242f" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="343.60" y="30.00" fill="#61616f" textLength="58.80" lengthAdjust="spacingAndGlyphs">PERSONA</text>
+<text x="410.80" y="30.00" fill="#e7e6ea" textLength="92.40" lengthAdjust="spacingAndGlyphs" font-weight="700">ollama:auto</text>
 <text x="654.40" y="30.00" fill="#61616f" textLength="33.60" lengthAdjust="spacingAndGlyphs">MODE</text>
 <text x="696.40" y="30.00" fill="#f0b429" textLength="75.60" lengthAdjust="spacingAndGlyphs" font-weight="700">OVERDRIVE</text>
 <text x="780.40" y="30.00" fill="#24242f" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
 <text x="797.20" y="30.00" fill="#61616f" textLength="42.00" lengthAdjust="spacingAndGlyphs">TOOLS</text>
-<text x="847.60" y="30.00" fill="#2bd9c0" textLength="25.20" lengthAdjust="spacingAndGlyphs" font-weight="700">148</text>
+<text x="847.60" y="30.00" fill="#2bd9c0" textLength="25.20" lengthAdjust="spacingAndGlyphs" font-weight="700">159</text>
 <text x="881.20" y="30.00" fill="#24242f" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
 <text x="898.00" y="30.00" fill="#61616f" textLength="50.40" lengthAdjust="spacingAndGlyphs">SKILLS</text>
-<text x="956.80" y="30.00" fill="#a78bfa" textLength="16.80" lengthAdjust="spacingAndGlyphs" font-weight="700">44</text>
+<text x="956.80" y="30.00" fill="#a78bfa" textLength="16.80" lengthAdjust="spacingAndGlyphs" font-weight="700">50</text>
 <text x="982.00" y="30.00" fill="#24242f" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
 <text x="998.80" y="30.00" fill="#61616f" textLength="25.20" lengthAdjust="spacingAndGlyphs">MCP</text>
 <text x="1032.40" y="30.00" fill="#4aa8ff" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">8</text>
 <text x="1049.20" y="30.00" fill="#24242f" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="1066.00" y="30.00" fill="#61616f" textLength="8.40" lengthAdjust="spacingAndGlyphs">●</text>
-<text x="1082.80" y="30.00" fill="#61616f" textLength="33.60" lengthAdjust="spacingAndGlyphs" font-weight="700">DARK</text>
+<text x="1066.00" y="30.00" fill="#3ecf8e" textLength="8.40" lengthAdjust="spacingAndGlyphs">●</text>
+<text x="1082.80" y="30.00" fill="#e7e6ea" textLength="33.60" lengthAdjust="spacingAndGlyphs" font-weight="700">LINK</text>
 <text x="32.80" y="48.00" fill="#43434f" textLength="16.80" lengthAdjust="spacingAndGlyphs">01</text>
 <text x="58.00" y="48.00" fill="#61616f" textLength="42.00" lengthAdjust="spacingAndGlyphs">HEIST</text>
 <text x="108.40" y="48.00" fill="#24242f" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
@@ -80,13 +80,13 @@
 <text x="511.60" y="84.00" fill="#68222f" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
 <text x="545.20" y="84.00" fill="#e7e6ea" textLength="50.40" lengthAdjust="spacingAndGlyphs">claude</text>
 <text x="604.00" y="84.00" fill="#e7e6ea" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="620.80" y="84.00" fill="#e7e6ea" textLength="58.80" lengthAdjust="spacingAndGlyphs">2.1.261</text>
+<text x="620.80" y="84.00" fill="#e7e6ea" textLength="58.80" lengthAdjust="spacingAndGlyphs">2.1.269</text>
 <text x="688.00" y="84.00" fill="#e7e6ea" textLength="58.80" lengthAdjust="spacingAndGlyphs">(Claude</text>
 <text x="755.20" y="84.00" fill="#e7e6ea" textLength="42.00" lengthAdjust="spacingAndGlyphs">Code)</text>
 <text x="872.80" y="84.00" fill="#61616f" textLength="42.00" lengthAdjust="spacingAndGlyphs">TOOLS</text>
 <text x="1057.60" y="84.00" fill="#2bd9c0" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">4</text>
 <text x="1074.40" y="84.00" fill="#43434f" textLength="8.40" lengthAdjust="spacingAndGlyphs">/</text>
-<text x="1091.20" y="84.00" fill="#43434f" textLength="25.20" lengthAdjust="spacingAndGlyphs">148</text>
+<text x="1091.20" y="84.00" fill="#43434f" textLength="25.20" lengthAdjust="spacingAndGlyphs">159</text>
 <text x="16.00" y="102.00" fill="#68222f" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
 <text x="511.60" y="102.00" fill="#68222f" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
 <text x="545.20" y="102.00" fill="#61616f" textLength="58.80" lengthAdjust="spacingAndGlyphs">COMMAND</text>
@@ -94,16 +94,22 @@
 <text x="872.80" y="102.00" fill="#2bd9c0" textLength="8.40" lengthAdjust="spacingAndGlyphs">━</text>
 <text x="881.20" y="102.00" fill="#33333f" textLength="235.20" lengthAdjust="spacingAndGlyphs">────────────────────────────</text>
 <text x="16.00" y="120.00" fill="#68222f" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
-<rect x="32.80" y="106.00" width="8.40" height="18" fill="#1f1f2a"/>
+<rect x="32.80" y="106.00" width="8.40" height="18" fill="#33333f"/>
 <text x="32.80" y="120.00" fill="#e5384f" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
+<rect x="41.20" y="106.00" width="8.40" height="18" fill="#33333f"/>
+<rect x="49.60" y="106.00" width="92.40" height="18" fill="#33333f"/>
 <text x="49.60" y="120.00" fill="#e7e6ea" textLength="50.40" lengthAdjust="spacingAndGlyphs" font-weight="700">Claude</text>
 <text x="108.40" y="120.00" fill="#e7e6ea" textLength="33.60" lengthAdjust="spacingAndGlyphs" font-weight="700">Code</text>
+<rect x="142.00" y="106.00" width="176.40" height="18" fill="#33333f"/>
+<rect x="318.40" y="106.00" width="75.60" height="18" fill="#33333f"/>
 <text x="318.40" y="120.00" fill="#4aa8ff" textLength="75.60" lengthAdjust="spacingAndGlyphs">AVAILABLE</text>
+<rect x="394.00" y="106.00" width="33.60" height="18" fill="#33333f"/>
+<rect x="427.60" y="106.00" width="75.60" height="18" fill="#33333f"/>
 <text x="427.60" y="120.00" fill="#61616f" textLength="50.40" lengthAdjust="spacingAndGlyphs">claude</text>
 <text x="486.40" y="120.00" fill="#61616f" textLength="16.80" lengthAdjust="spacingAndGlyphs">·…</text>
 <text x="511.60" y="120.00" fill="#68222f" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
 <text x="545.20" y="120.00" fill="#61616f" textLength="67.20" lengthAdjust="spacingAndGlyphs">RESOLVED</text>
-<text x="662.80" y="120.00" fill="#e7e6ea" textLength="159.60" lengthAdjust="spacingAndGlyphs">/opt/node22/bin/cla</text>
+<text x="662.80" y="120.00" fill="#e7e6ea" textLength="159.60" lengthAdjust="spacingAndGlyphs">/home/nitrous/.loca</text>
 <text x="16.00" y="138.00" fill="#68222f" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
 <text x="32.80" y="138.00" fill="#61616f" textLength="8.40" lengthAdjust="spacingAndGlyphs">○</text>
 <text x="49.60" y="138.00" fill="#e7e6ea" textLength="50.40" lengthAdjust="spacingAndGlyphs" font-weight="700">OpenAI</text>
@@ -113,11 +119,11 @@
 <text x="352.00" y="138.00" fill="#61616f" textLength="42.00" lengthAdjust="spacingAndGlyphs">FOUND</text>
 <text x="427.60" y="138.00" fill="#61616f" textLength="42.00" lengthAdjust="spacingAndGlyphs">codex</text>
 <text x="511.60" y="138.00" fill="#68222f" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
-<text x="662.80" y="138.00" fill="#e7e6ea" textLength="25.20" lengthAdjust="spacingAndGlyphs">ude</text>
+<text x="662.80" y="138.00" fill="#e7e6ea" textLength="100.80" lengthAdjust="spacingAndGlyphs">l/bin/claude</text>
 <text x="872.80" y="138.00" fill="#61616f" textLength="50.40" lengthAdjust="spacingAndGlyphs">SKILLS</text>
 <text x="1066.00" y="138.00" fill="#a78bfa" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">2</text>
 <text x="1082.80" y="138.00" fill="#43434f" textLength="8.40" lengthAdjust="spacingAndGlyphs">/</text>
-<text x="1099.60" y="138.00" fill="#43434f" textLength="16.80" lengthAdjust="spacingAndGlyphs">44</text>
+<text x="1099.60" y="138.00" fill="#43434f" textLength="16.80" lengthAdjust="spacingAndGlyphs">50</text>
 <text x="16.00" y="156.00" fill="#68222f" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
 <text x="32.80" y="156.00" fill="#61616f" textLength="8.40" lengthAdjust="spacingAndGlyphs">○</text>
 <text x="49.60" y="156.00" fill="#e7e6ea" textLength="67.20" lengthAdjust="spacingAndGlyphs" font-weight="700">OpenCode</text>
@@ -140,16 +146,16 @@
 <text x="427.60" y="174.00" fill="#61616f" textLength="58.80" lengthAdjust="spacingAndGlyphs">copilot</text>
 <text x="511.60" y="174.00" fill="#68222f" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
 <text x="545.20" y="174.00" fill="#61616f" textLength="58.80" lengthAdjust="spacingAndGlyphs">VERSION</text>
-<text x="662.80" y="174.00" fill="#e7e6ea" textLength="58.80" lengthAdjust="spacingAndGlyphs">2.1.261</text>
+<text x="662.80" y="174.00" fill="#e7e6ea" textLength="58.80" lengthAdjust="spacingAndGlyphs">2.1.269</text>
 <text x="730.00" y="174.00" fill="#e7e6ea" textLength="58.80" lengthAdjust="spacingAndGlyphs">(Claude</text>
 <text x="16.00" y="192.00" fill="#68222f" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
-<text x="32.80" y="192.00" fill="#61616f" textLength="8.40" lengthAdjust="spacingAndGlyphs">○</text>
+<text x="32.80" y="192.00" fill="#4aa8ff" textLength="8.40" lengthAdjust="spacingAndGlyphs">●</text>
 <text x="49.60" y="192.00" fill="#e7e6ea" textLength="33.60" lengthAdjust="spacingAndGlyphs" font-weight="700">Nous</text>
 <text x="91.60" y="192.00" fill="#e7e6ea" textLength="50.40" lengthAdjust="spacingAndGlyphs" font-weight="700">Hermes</text>
 <text x="150.40" y="192.00" fill="#e7e6ea" textLength="42.00" lengthAdjust="spacingAndGlyphs" font-weight="700">Agent</text>
-<text x="318.40" y="192.00" fill="#61616f" textLength="25.20" lengthAdjust="spacingAndGlyphs">NOT</text>
-<text x="352.00" y="192.00" fill="#61616f" textLength="42.00" lengthAdjust="spacingAndGlyphs">FOUND</text>
+<text x="318.40" y="192.00" fill="#4aa8ff" textLength="75.60" lengthAdjust="spacingAndGlyphs">AVAILABLE</text>
 <text x="427.60" y="192.00" fill="#61616f" textLength="50.40" lengthAdjust="spacingAndGlyphs">hermes</text>
+<text x="486.40" y="192.00" fill="#61616f" textLength="16.80" lengthAdjust="spacingAndGlyphs">·…</text>
 <text x="511.60" y="192.00" fill="#68222f" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
 <text x="662.80" y="192.00" fill="#e7e6ea" textLength="42.00" lengthAdjust="spacingAndGlyphs">Code)</text>
 <text x="872.80" y="192.00" fill="#61616f" textLength="25.20" lengthAdjust="spacingAndGlyphs">MCP</text>
@@ -269,5 +275,5 @@
 <text x="385.60" y="696.00" fill="#24242f" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
 <text x="402.40" y="696.00" fill="#f0b429" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">↵</text>
 <text x="419.20" y="696.00" fill="#61616f" textLength="67.20" lengthAdjust="spacingAndGlyphs">delegate</text>
-<text x="1066.00" y="696.00" fill="#43434f" textLength="50.40" lengthAdjust="spacingAndGlyphs">v1.0.0</text>
+<text x="1066.00" y="696.00" fill="#43434f" textLength="50.40" lengthAdjust="spacingAndGlyphs">v1.3.0</text>
 </g></svg>

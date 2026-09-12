@@ -102,6 +102,10 @@ export function render(app, region) {
   const list = items(app);
   app.mcpList.setItems(list);
   const connected = app.mcpServers.filter((server) => server.status === 'connected').length;
+  const query = app.mcpFilter.value.trim();
+  const empty = app.mcpTab === 'registry'
+    ? { title: query ? `No registry matches for "${query}"` : 'Search the official registry above', hint: query ? '' : 'Every MCP server MaskShift can install lives here.' }
+    : { title: query ? `No installed servers match "${query}"` : 'No MCP servers connected yet', hint: query ? '' : 'a adds one · tab browses the registry' };
   return renderCatalog(app, region, {
     tabs: [
       { id: 'installed', label: 'INSTALLED', count: app.mcpServers.length },
@@ -113,6 +117,7 @@ export function render(app, region) {
     list: app.mcpList,
     row: (item, selected, width) => row(app, item, selected, width),
     stamp: `${connected} CONNECTED`,
+    empty,
     detail: detail(app, Math.max(30, Math.floor(region.width * 0.4) - 4)),
     detailTitle: app.mcpList.current?.name ? truncate(app.mcpList.current.name, 30) : 'SERVER',
     onTab: (target, id) => { target.mcpTab = id; target.mcpList.first(); },

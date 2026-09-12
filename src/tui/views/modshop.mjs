@@ -144,6 +144,16 @@ export function detail(app, width) {
   return detailBlock(app, width, sections);
 }
 
+// What each tab suggests when it has nothing to show and no filter is hiding
+// something that does exist.
+const EMPTY_HINTS = {
+  automations: { title: 'No automations scheduled', hint: 'n creates one' },
+  plugins: { title: 'No plugins installed', hint: 'n scaffolds one' },
+  bridges: { title: 'No coding-agent CLIs found on this machine', hint: 'r rescans' },
+  browser: { title: 'No browser instances running', hint: 'launch one from the command palette' },
+  processes: { title: 'No background processes running', hint: '' },
+};
+
 export function render(app, region) {
   const list = items(app);
   app.modList.setItems(list);
@@ -151,6 +161,10 @@ export function render(app, region) {
     automations: app.automations.length, plugins: app.plugins.length, bridges: app.bridges.length,
     browser: app.browsers.length, processes: app.processes.length,
   };
+  const query = app.modFilter.value.trim();
+  const empty = query
+    ? { title: `No matches for "${query}"`, hint: '' }
+    : EMPTY_HINTS[app.modTab];
   return renderCatalog(app, region, {
     tabs: TABS.map((tab) => ({ ...tab, count: counts[tab.id] })),
     activeTab: app.modTab,
@@ -159,6 +173,7 @@ export function render(app, region) {
     list: app.modList,
     row: (item, selected, width) => row(app, item, selected, width),
     stamp: `${list.length} ENTRIES`,
+    empty,
     detail: detail(app, Math.max(30, Math.floor(region.width * 0.4) - 4)),
     detailTitle: app.modList.current?.name ? truncate(app.modList.current.name, 30) : 'DOSSIER',
     onTab: (target, id) => { target.modTab = id; target.modList.first(); void target.refreshModShop(); },

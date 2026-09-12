@@ -13,7 +13,7 @@ import { RAIL_TABS } from './rail.mjs';
 import { LAYER, Regions } from './regions.mjs';
 import { Screen } from './screen.mjs';
 import { Theme } from './theme.mjs';
-import { fit, oneLine, truncate, wrap } from './text.mjs';
+import { fit, oneLine, truncate, visibleWidth, wrap } from './text.mjs';
 import { Composer, ListView, Spinner, TextField, Toasts, Viewport } from './widgets.mjs';
 import { columns, gutter, key as typeKey, label as sectionLabel } from './type.mjs';
 import { VERSION, runCommand, safeJsonParse } from '../core/utils.mjs';
@@ -274,7 +274,7 @@ export class MaskShiftTui {
     const dirty = this.toasts.prune();
     // Anything clock-driven has to keep the loop awake for as long as it is
     // moving, or a toast would sit at half-opacity until the next keystroke.
-    if (this.busy || dirty || this.terminalBusy || this.toasts.animating || this.overlay?.pending) this.requestRender();
+    if (this.busy || dirty || this.terminalBusy || this.toasts.animating || this.overlay?.pending || this.overlay?.animating) this.requestRender();
   }
 
   requestRender() {
@@ -389,8 +389,20 @@ export class MaskShiftTui {
     const theme = this.theme;
     if (columns < MIN_COLUMNS || rows < MIN_ROWS) {
       this.regions.clear();
+      // The current size is the one fact worth protecting here — on a
+      // terminal too small even for this message, a plain truncation from
+      // the right would cut exactly that off the end.
+      const need = `${MIN_COLUMNS}×${MIN_ROWS}`;
+      const now = `${columns}×${rows}`;
+      const candidates = [
+        ` Resize to at least ${need} (now ${now})`,
+        ` Resize to ${need} (now ${now})`,
+        ` ${now} → ${need}`,
+        now,
+      ];
+      const message = candidates.find((candidate) => visibleWidth(candidate) <= columns) ?? truncate(now, columns, '');
       const frame = new Array(rows).fill('').map((line, index) => {
-        if (index === Math.floor(rows / 2)) return fit(` Resize to at least ${MIN_COLUMNS}×${MIN_ROWS} (now ${columns}×${rows})`, columns);
+        if (index === Math.floor(rows / 2)) return fit(message, columns);
         return fit(line, columns);
       });
       this.screen.render(frame, null);
@@ -435,7 +447,12 @@ export class MaskShiftTui {
     }
 
     if (this.overlay) {
-      const drawn = this.overlay.render(this, { columns, rows });
+      // Confined to the body band (never the header, tab strip, status or
+      // hint rows) so a tall overlay can't collide with global chrome, and
+      // curtained first so nothing behind it bleeds through on either side.
+      const drawn = this.overlay.render(this, { columns, rows: bodyHeight, top: 2 });
+      const curtain = new Array(bodyHeight).fill(' '.repeat(columns));
+      frame = paintOverlay(frame, curtain, { row: 2, column: 0 }, columns);
       frame = paintOverlay(frame, drawn.lines, drawn.offset, columns);
       cursor = drawn.cursor;
     }

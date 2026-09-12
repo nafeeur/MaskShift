@@ -1,20 +1,38 @@
 // Floating surfaces: the command palette, pickers, forms, confirmations and
 // the key reference. Each overlay owns the keyboard while it is open.
 
-import { glyphs, panel } from './box.mjs';
+import { frameColour, glyphs, panel } from './box.mjs';
 import { centreOffset } from './layout.mjs';
+import { presence } from './motion.mjs';
 import { LAYER } from './regions.mjs';
-import { fit, repeat, truncate, visibleWidth, wrap } from './text.mjs';
-import { SPACE } from './tokens.mjs';
+import { fit, repeat, truncate, underlay, visibleWidth, wrap } from './text.mjs';
+import { DURATION, SPACE } from './tokens.mjs';
 import { chip, columns, gutter, key as typeKey } from './type.mjs';
 import { Composer, ListView, TextField, fuzzy, highlightMatch } from './widgets.mjs';
 
 class Overlay {
   constructor({ title = '' } = {}) {
     this.title = title;
+    this.createdAt = Date.now();
     // The app dismisses an overlay when a click lands outside it. A dialogue
     // that must be answered can opt out.
     this.dismissOnOutsideClick = true;
+  }
+
+  /**
+   * An overlay answers "what just happened?" — it appeared. The border eases
+   * in from the surface toward its resting colour over one DURATION.base
+   * rather than snapping to full strength, so opening one reads as an
+   * arrival rather than the frame simply cutting to a different screen.
+   */
+  enter(theme, colour) {
+    const level = presence(Number.POSITIVE_INFINITY, { ageMs: Date.now() - this.createdAt });
+    return level >= 1 ? colour : theme.mixed(theme.roles.background, colour, level);
+  }
+
+  /** Still easing in — the app keeps rendering while this is true. */
+  get animating() {
+    return Date.now() - this.createdAt < DURATION.base;
   }
 
   size(viewport) {
@@ -125,7 +143,7 @@ export class PaletteOverlay extends Overlay {
             { text: item.key || '', width: 10, align: 'right', tone: theme.roles.accent },
           ], Math.max(0, itemWidth - SPACE.gutter));
         return selected
-          ? theme.paint(fit(line, itemWidth), { bg: theme.roles.surfaceRaised })
+          ? underlay(fit(line, itemWidth), theme.bg(theme.roles.selection))
           : fit(line, itemWidth);
       }),
     ];
@@ -133,6 +151,7 @@ export class PaletteOverlay extends Overlay {
     const lines = panel({
       theme, width, height: size.rows, title: 'COMMAND PALETTE',
       stamp: `${rows.length} ACTIONS`, focused: true, body,
+      colour: this.enter(theme, frameColour(theme, true)),
     });
     const placed = this.place(app, viewport, lines, 2 + 3 + input.cursorColumn, 1);
     this.claim(app, placed.offset, width, lines.length);
@@ -206,7 +225,7 @@ export class PickerOverlay extends Overlay {
             { text: item.detail || '', tone: theme.roles.muted },
           ], Math.max(0, itemWidth - SPACE.gutter));
         return selected
-          ? theme.paint(fit(line, itemWidth), { bg: theme.roles.surfaceRaised })
+          ? underlay(fit(line, itemWidth), theme.bg(theme.roles.selection))
           : fit(line, itemWidth);
       }),
     ];
@@ -215,6 +234,7 @@ export class PickerOverlay extends Overlay {
     const lines = panel({
       theme, width, height: size.rows, title: this.title,
       stamp: `${this.list.items.length}`, focused: true, body,
+      colour: this.enter(theme, frameColour(theme, true)),
     });
     const placed = this.place(app, viewport, lines, 2 + 3 + input.cursorColumn, 1);
     this.claim(app, placed.offset, width, lines.length);
@@ -349,6 +369,7 @@ export class FormOverlay extends Overlay {
     const lines = panel({
       theme, width, height: Math.min(viewport.rows - 2, body.length + 2), title: this.title,
       stamp: `${this.fields.length} FIELDS`, focused: true, body,
+      colour: this.enter(theme, frameColour(theme, true)),
     });
     const offset = centreOffset(viewport, { columns: width, rows: lines.length });
 
@@ -497,7 +518,7 @@ export class ConfirmOverlay extends Overlay {
       theme, width, height: body.length + 2, title: this.title,
       note: this.danger ? `${mark.warn} DESTRUCTIVE` : '',
       stamp: '←/→ then ↵', focused: true, body,
-      colour: this.danger ? theme.roles.danger : theme.roles.accent,
+      colour: this.enter(theme, this.danger ? theme.roles.danger : theme.roles.accent),
     });
     const offset = centreOffset(viewport, { columns: width, rows: lines.length });
 
@@ -571,6 +592,7 @@ export class TextOverlay extends Overlay {
       theme, width, height, title: this.title,
       stamp: this.stamp || `${this.body.length} LINES`, focused: true,
       body: this.body.slice(this.offset, this.offset + inner),
+      colour: this.enter(theme, frameColour(theme, true)),
     });
     const offset = centreOffset(viewport, { columns: width, rows: lines.length });
 

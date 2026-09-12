@@ -75,14 +75,21 @@ export function headerBand(app, width) {
     { priority: 0, text: link },
   ];
 
+  const target = workspace ? `${workspace.name}${app.gitBranch ? ` ${glyphs(theme).dot} ${app.gitBranch}` : ''}` : 'NO TARGET';
+  const model = app.modelRef || config.defaultModel || '';
+
   // Budget the row explicitly instead of guessing at it. The left group's
-  // fixed cost — the wordmark, two separators and two labels — plus a floor
-  // under the two values it carries is what the right group has to fit around;
-  // chips fall off the left of that group until it does.
+  // fixed cost — the wordmark, two separators and two labels — plus what the
+  // workspace/branch and model actually need (not a guessed constant: a
+  // short branch name shouldn't reserve the same room as a long one) is what
+  // the right group has to fit around; chips fall off the left of that group
+  // until it does, in priority order, before the target or persona loses a
+  // single character — they identify *this* session, a tool/skill/MCP count
+  // is available one keystroke away in the palette.
   const gapWidth = visibleWidth(divider(theme));
   const labelCost = visibleWidth('TARGET ') + visibleWidth('PERSONA ');
   const leftFixed = visibleWidth(brand) + gapWidth * 2 + labelCost;
-  const valueFloor = 24;
+  const valueFloor = Math.min(Math.floor(width * 0.55), Math.max(24, visibleWidth(target) + visibleWidth(model)));
 
   let spare = width - leftFixed - valueFloor - 3;
   const kept = new Set();
@@ -96,8 +103,6 @@ export function headerBand(app, width) {
 
   const tail = right.join(divider(theme));
   const available = Math.max(12, width - leftFixed - visibleWidth(tail) - 3);
-  const target = workspace ? `${workspace.name}${app.gitBranch ? ` ${glyphs(theme).dot} ${app.gitBranch}` : ''}` : 'NO TARGET';
-  const model = app.modelRef || config.defaultModel || '';
   // The model reference is usually short and fixed; the workspace and branch
   // are neither. Give the model what it actually needs and hand the remainder
   // to the target instead of splitting the row down the middle and truncating
