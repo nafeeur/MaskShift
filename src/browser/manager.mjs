@@ -127,7 +127,8 @@ export class BrowserManager {
       this.eventBus?.emit('browser.exited', { instanceId, code, signal });
     });
     child.once('error', (error) => { instance.stderr += `\n${error.message}`; instance.closed = true; });
-    const deadline = Date.now() + 20_000;
+    const launchTimeoutMs = Number(process.env.MASKSHIFT_BROWSER_LAUNCH_TIMEOUT_MS) || (process.env.CI ? 60_000 : 20_000);
+    const deadline = Date.now() + launchTimeoutMs;
     let version;
     while (Date.now() < deadline) {
       if (instance.closed) throw new Error(`Browser exited during startup: ${truncate(instance.stderr, 4000)}`);
