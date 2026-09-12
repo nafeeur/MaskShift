@@ -248,3 +248,10 @@ For full host authority, run the user service directly instead.
 ## License
 
 [GNU General Public License v3.0](LICENSE).
+
+---
+
+<p align="center">
+  <img alt="npm downloads (total)" src="https://img.shields.io/npm/dt/maskshift?style=flat-square&color=cb3837&label=downloads">
+  <img alt="npm downloads (monthly)" src="https://img.shields.io/npm/dm/maskshift?style=flat-square&color=cb3837&label=downloads%2Fmonth">
+</p>
