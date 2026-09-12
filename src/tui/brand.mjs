@@ -1,7 +1,9 @@
 // The MaskShift wordmark and other identity pieces used across CLI and TUI.
 
 import { glyphs } from './box.mjs';
+import { smooth } from './motion.mjs';
 import { center, fit, repeat, visibleWidth } from './text.mjs';
+import { DURATION } from './tokens.mjs';
 
 // Full block wordmark for the CLI banner and the empty-state hero.
 const WORDMARK = [
@@ -67,12 +69,22 @@ export function wordmark(theme, width) {
 export const MASK_WIDTH = Math.max(...MASK.map((line) => line.length));
 export const MASK_HEIGHT = MASK.length;
 
-export function maskArt(theme) {
+/**
+ * `busy` answers "is a heist running right now, even off-screen?" — the mask
+ * is the one mark visible from every idle view, so it is where that question
+ * gets answered without a status line. Otherwise it just breathes, the same
+ * "still alive, nothing new" signal `breathe()` gives the run lamp.
+ */
+export function maskArt(theme, { busy = false } = {}) {
+  const period = busy ? DURATION.sweep : DURATION.breath;
+  const floor = busy ? 0.5 : 0.28;
+  const pulse = floor + (1 - floor) * smooth(theme.motion.pulse(period));
   // Plain ASCII, so it renders the same with MASKSHIFT_ASCII set as without.
   // The mask fades into the background from the brow down, so it sits behind
-  // the wordmark instead of competing with it.
+  // the wordmark instead of competing with it; the pulse scales that same
+  // fade rather than replacing it, so the shape never flattens out.
   return MASK.map((line, index) => theme.paint(line, {
-    fg: theme.mixed(theme.roles.background, theme.roles.primary, 1 - (index / (MASK.length + 2))),
+    fg: theme.mixed(theme.roles.background, theme.roles.primary, pulse * (1 - (index / (MASK.length + 2)))),
   }));
 }
 

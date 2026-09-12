@@ -28,6 +28,16 @@ const VIEWS = [chatView, filesView, arsenalView, networkView, modshopView, termi
 const EVENT_LIMIT = 400;
 const TERMINAL_LIMIT = 2000;
 const MIN_COLUMNS = 40;
+
+// How a finished heist is announced — in character rather than as a bare
+// status word, since this is the one moment the operator is guaranteed to
+// look up from whatever else they switched to while it ran.
+const HEIST_OUTCOME = {
+  'run.completed': { tone: 'success', label: 'CLEAN GETAWAY' },
+  'run.cancelled': { tone: 'warn', label: 'CALLED OFF' },
+  'run.failed': { tone: 'error', label: 'BLOWN COVER' },
+  'run.max-steps': { tone: 'error', label: 'RAN OUT OF TIME' },
+};
 const MIN_ROWS = 12;
 
 export class MaskShiftTui {
@@ -150,6 +160,10 @@ export class MaskShiftTui {
     this.renderScheduled = false;
     this.actions = this.buildActions();
     this.quitArmed = false;
+    // Set true for one frame by whichever empty-state renders the mask glyph,
+    // so tick() knows to keep the breathing animation moving — reset before
+    // every paint so a view that never touches it correctly reads false.
+    this.maskBreathing = false;
     this.promptQueue = [];
     this.operationLocks = new Set();
     this.fileTreeGeneration = 0;
@@ -274,7 +288,8 @@ export class MaskShiftTui {
     const dirty = this.toasts.prune();
     // Anything clock-driven has to keep the loop awake for as long as it is
     // moving, or a toast would sit at half-opacity until the next keystroke.
-    if (this.busy || dirty || this.terminalBusy || this.toasts.animating || this.overlay?.pending || this.overlay?.animating) this.requestRender();
+    if (this.busy || dirty || this.terminalBusy || this.toasts.animating || this.overlay?.pending
+      || this.overlay?.animating || this.maskBreathing) this.requestRender();
   }
 
   requestRender() {
@@ -422,6 +437,7 @@ export class MaskShiftTui {
     const module = this.modules.get(this.view);
     const region = { row: 2, column: 0, width: mainWidth, height: bodyHeight };
     this.bodyRegion = region;
+    this.maskBreathing = false;
     const rendered = module.render(this, region);
     let body = rendered.lines;
     this.lastRegion = region;
@@ -884,8 +900,8 @@ export class MaskShiftTui {
         if (run?.meta?.costEstimate?.total) this.totals.cost = run.meta.costEstimate.total;
         const session = this.runtime.store.getSession(this.sessionId);
         this.sessionTitle = session?.title || this.sessionTitle;
-        const tone = event.type === 'run.completed' ? 'success' : event.type === 'run.cancelled' ? 'warn' : 'error';
-        this.toast(`Run ${event.type.replace('run.', '')}${payload.error ? `: ${oneLine(payload.error, 90)}` : ''}`, tone);
+        const outcome = HEIST_OUTCOME[event.type] || { tone: 'error', label: event.type.replace('run.', '').toUpperCase() };
+        this.toast(`${outcome.label}${payload.error ? ` — ${oneLine(payload.error, 90)}` : ''}`, outcome.tone);
         void this.refreshGit();
         if (this.promptQueue.length) setImmediate(() => void this.drainPromptQueue());
         break;

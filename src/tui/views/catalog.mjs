@@ -23,8 +23,11 @@ import { columns, field, gutter, label as typeLabel } from '../type.mjs';
  * The art only appears when the pane can actually fit it — a raster mark cut
  * off at the edges reads worse than the plain text alone.
  */
-function emptyState(theme, width, height, { title, hint = '' } = {}) {
-  const art = width >= MASK_WIDTH && height >= MASK_HEIGHT + 4 ? maskArt(theme) : [];
+function emptyState(app, width, height, { title, hint = '' } = {}) {
+  const { theme } = app;
+  const showArt = width >= MASK_WIDTH && height >= MASK_HEIGHT + 4;
+  if (showArt) app.maskBreathing = true;
+  const art = showArt ? maskArt(theme, { busy: app.busy }) : [];
   const block = [...art, '', theme.paint(title, { fg: theme.roles.muted, bold: true })];
   if (hint) block.push('', theme.paint(hint, { fg: theme.roles.faint, italic: true }));
   const lines = block.map((line) => fit(center(line, width), width));
@@ -217,7 +220,7 @@ export function renderCatalog(app, region, spec) {
 
   const listHeight = Math.max(1, height - 2 - header.length);
   const rows = spec.list.items.length === 0 && spec.empty
-    ? emptyState(theme, listInner, listHeight, spec.empty)
+    ? emptyState(app, listInner, listHeight, spec.empty)
     : spec.list.render(theme, listInner, listHeight, spec.row);
 
   // No title on the rail: the view tab at the top of the screen already names

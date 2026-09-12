@@ -154,10 +154,12 @@ function emptyState(app, width, height) {
   const mark = glyphs(theme);
   const lines = [];
   const hero = heroBlock(theme, width);
-  const art = width >= MASK_WIDTH ? maskArt(theme) : [];
+  const art = width >= MASK_WIDTH ? maskArt(theme, { busy: app.busy }) : [];
   const artBlock = art.map((line) => center(line, width));
   const chrome = STARTERS.length + 3;
-  const block = art.length && height > hero.length + art.length + chrome + 4 ? [...artBlock, '', ...hero] : hero;
+  const showArt = art.length > 0 && height > hero.length + art.length + chrome + 4;
+  app.maskBreathing = showArt;
+  const block = showArt ? [...artBlock, '', ...hero] : hero;
   const pad = Math.max(0, Math.floor((height - block.length - chrome) / 2));
   for (let index = 0; index < pad; index += 1) lines.push('');
   lines.push(...block);
