@@ -59,6 +59,8 @@ test('the text protocol parser survives the output small models actually produce
     ['name carried on the attribute', '<tool_call name="fs_read">{"path":"a.js"}</tool_call>'],
     ['uppercase tag', '<TOOL_CALL>{"name":"fs_read","arguments":{"path":"a.js"}}</TOOL_CALL>'],
     ['prose trailing the json', '<tool_call>{"name":"fs_read","arguments":{"path":"a.js"}} that should do it</tool_call>'],
+    ['Llama-style function/parameter tags', '<function=fs_read>\n<parameter=path>\na.js\n</parameter>\n</function>'],
+    ['Llama-style tags with a stray closing tag', 'Sure.\n\n<function=fs_read>\n<parameter=path>\na.js\n</parameter>\n</function>\n</tool_call>'],
   ];
 
   for (const [label, input] of variants) {
@@ -190,6 +192,22 @@ test('auto mode salvages a native-protocol model that writes its call as text', 
   const project = await createProject(t);
   const { server } = scriptedModel(t, [
     '<tool_call>{"name":"fs_write","arguments":{"path":"salvaged.txt","content":"OK"}}</tool_call>',
+    'Done.',
+  ]);
+  const runtime = await textProtocolRuntime(t, project, (await server).url);
+
+  const session = runtime.engine.createSession({ workspaceId: (await runtime.workspaceManager.open(project)).id });
+  const started = await runtime.engine.startRun({ sessionId: session.id, prompt: 'Write salvaged.txt', modelRef: 'small:small-model' });
+  const run = await runtime.engine.waitForRun(started.id);
+
+  assert.equal(run.status, 'completed');
+  assert.equal(await fsp.readFile(path.join(project, 'salvaged.txt'), 'utf8'), 'OK');
+});
+
+test('auto mode salvages a native-protocol model that writes a Llama-style function call as text', async (t) => {
+  const project = await createProject(t);
+  const { server } = scriptedModel(t, [
+    "I'll write the file.\n\n<function=fs_write>\n<parameter=path>\nsalvaged.txt\n</parameter>\n<parameter=content>\nOK\n</parameter>\n</function>\n</tool_call>",
     'Done.',
   ]);
   const runtime = await textProtocolRuntime(t, project, (await server).url);

@@ -122,6 +122,35 @@ function nameFromAttributes(attributes) {
   return match ? match[1] : null;
 }
 
+// Some open-weight fine-tunes (Llama-3.1-style tool templates, and variants of it seen from
+// Qwen-family coder models) write calls as `<function=NAME><parameter=KEY>value</parameter>
+// ...</function>` instead of the `<tool_call>{json}</tool_call>` shape taught above. It shows
+// up unprompted even in native tool-calling mode, so it is worth recognising on its own.
+function functionTagPattern() {
+  return /<\s*function\s*=\s*([A-Za-z0-9_.:-]+)\s*>([\s\S]*?)(?:<\s*\/\s*function\s*>|$)/gi;
+}
+
+function parameterPattern() {
+  return /<\s*parameter(?:\s+name\s*=\s*["']?([A-Za-z0-9_.:-]+)["']?|\s*=\s*([A-Za-z0-9_.:-]+))\s*>([\s\S]*?)(?:<\s*\/\s*parameter\s*>|$)/gi;
+}
+
+function parseFunctionParameters(body) {
+  const args = {};
+  for (const match of String(body || '').matchAll(parameterPattern())) {
+    const key = String(match[1] || match[2] || '').trim();
+    if (!key) continue;
+    const raw = match[3].trim();
+    args[key] = parseJsonLoose(raw) ?? raw;
+  }
+  return args;
+}
+
+// Stray closing tags left behind when a model half-emits this format (or mixes it with the
+// `<tool_call>` convention) are protocol debris, never something a user should see.
+function stripStrayTags(text) {
+  return String(text || '').replace(/<\s*\/\s*(tool_call|function_call|tool-call|toolcall|invoke|tool_use|function|parameter)\s*>/gi, '');
+}
+
 /**
  * Extract tool calls from model prose.
  *
@@ -159,6 +188,15 @@ export function parseToolCalls(rawContent) {
 
   consume(tagPattern(), (groups) => groups[2], (groups) => nameFromAttributes(groups[1]));
   consume(fencePattern(), (groups) => groups[0], () => null);
+
+  content = content.replace(functionTagPattern(), (match, name, body) => {
+    const trimmedName = String(name || '').trim();
+    if (!trimmedName) { parseErrors.push(truncate(match.trim(), 400)); return ''; }
+    toolCalls.push({ id: `txt_${Date.now()}_${index}`, name: trimmedName, args: parseFunctionParameters(body) });
+    index += 1;
+    return '';
+  });
+  content = stripStrayTags(content);
 
   // A reply that is nothing but a JSON call, with no tags at all.
   if (!toolCalls.length && !parseErrors.length) {
