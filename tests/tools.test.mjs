@@ -47,7 +47,9 @@ test('pdf_read extracts text via pdftotext when available', async (t) => {
 
   const psPath = path.join(project, 'fixture.ps');
   const pdfPath = path.join(project, 'fixture.pdf');
-  await fsp.writeFile(psPath, '%!PS\n/Helvetica findfont 24 scalefont setfont\n72 700 moveto\n(MASKSHIFT_PDF_OK) show\nshowpage\n');
+  // Courier avoids a Ghostscript/Poppler Helvetica ligature substitution that can
+  // make pdftotext render "SHIFT" as "SHIFFT" on some Linux distributions.
+  await fsp.writeFile(psPath, '%!PS\n/Courier findfont 24 scalefont setfont\n72 700 moveto\n(MASKSHIFT_PDF_OK) show\nshowpage\n');
   const converted = await runCommand(`ps2pdf ${psPath} ${pdfPath}`, { timeoutMs: 20_000 });
   assert.equal(converted.code, 0);
 

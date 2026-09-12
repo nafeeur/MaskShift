@@ -31,7 +31,7 @@ function isAbort(error, signal) {
 export class AgentEngine {
   constructor({
     store, config, logger, eventBus, hooks, providerManager, workspaceManager,
-    indexer, toolRegistry, capabilityController, promptBuilder, contextBuilder, mcpManager,
+    indexer, toolRegistry, capabilityController, promptBuilder, contextBuilder, mcpManager, intelligenceRouter,
   }) {
     this.store = store;
     this.config = config;
@@ -46,6 +46,7 @@ export class AgentEngine {
     this.promptBuilder = promptBuilder;
     this.contextBuilder = contextBuilder;
     this.mcpManager = mcpManager;
+    this.intelligenceRouter = intelligenceRouter;
     this.active = new Map();
     this.recentCompletions = new Map();
   }
@@ -64,11 +65,16 @@ export class AgentEngine {
     else if (!session.workspace_id && workspaceId) session = this.store.updateSession(session.id, { workspace_id: workspaceId });
     if (/^new run$/i.test(session.title || '')) session = this.store.updateSession(session.id, { title: titleFromPrompt(prompt) });
 
-    const selectedModel = modelRef || session.model_id || this.config.get().defaultModel;
+    let selectedModel = modelRef || session.model_id || this.config.get().defaultModel;
+    let route = null;
+    if (selectedModel === 'router:auto' || (this.config.get().routing?.autoSelect && !modelRef)) {
+      route = this.intelligenceRouter.routeModel(prompt, { workspaceId, fallback: this.config.get().defaultModel });
+      selectedModel = route.selected;
+    }
     this.store.addMessage({ sessionId: session.id, role: 'user', content: String(prompt), meta: { source: options.source || 'user', parentRunId: options.parentRunId || null } });
     const run = this.store.createRun({
       sessionId: session.id, workspaceId, prompt: String(prompt), modelId: selectedModel,
-      meta: { parentRunId: options.parentRunId || null, depth: options.depth || 0, source: options.source || 'user', isolated: Boolean(options.isolated) },
+      meta: { parentRunId: options.parentRunId || null, depth: options.depth || 0, source: options.source || 'user', isolated: Boolean(options.isolated), route },
     });
     const controller = new AbortController();
     const entry = {
@@ -133,7 +139,7 @@ export class AgentEngine {
     const parent = this.store.getRun(parentContext.runId);
     const depth = Number(parent?.meta?.depth || 0) + 1;
     if (depth > this.config.get().maxSubagentDepth) throw new Error(`Subagent depth ${depth} exceeds configured maximum`);
-    let workspaceId = parentContext.workspaceId;
+    let workspaceId = args.workspaceId || parentContext.workspaceId;
     let isolation = null;
     if (args.isolated) {
       isolation = await this.workspaceManager.createWorktree(workspaceId, {
@@ -162,7 +168,7 @@ export class AgentEngine {
       diff = result.stdout;
     }
     const response = {
-      task: args.task, runId: run.id, sessionId: session.id, status: completed?.status,
+      task: args.task, runId: run.id, sessionId: session.id, workspaceId, status: completed?.status,
       final: truncate(final, 80_000), isolation: isolation ? { path: isolation.path, branch: isolation.branch, workspaceId } : null,
       diff: truncate(diff || '', 100_000), error: completed?.error || null,
     };
@@ -254,14 +260,16 @@ export class AgentEngine {
           const meta = {
             ...currentRun.meta, checkpointId: checkpoint?.id || null,
             capabilities: this.capabilityController.snapshot(capabilityState), plan: entry.planState,
-            usage, costEstimate: summarizeCosts(costs),
+            usage, costEstimate: summarizeCosts(costs), contextPlan: workspaceContext.contextPlan,
           };
           const completed = this.store.updateRun(run.id, { status: 'completed', ended_at: nowIso(), meta });
           this.store.updateSession(session.id, { status: 'idle', model_id: response.modelRef || currentRun.model_id });
           this.#event(run.id, 'completed', { final: finalContent, steps: step, capabilities: meta.capabilities }, scope);
           await this.hooks?.run('Stop', { ...scope, workspacePath, status: 'completed', final: finalContent });
           await this.hooks?.run('RunCompleted', { ...scope, workspacePath, status: 'completed', final: finalContent });
-          if (run.workspace_id && this.config.get().autoIndex) void this.indexer.index(run.workspace_id, { force: true }).catch(() => {});
+          if (run.workspace_id && this.config.get().autoIndex) void this.indexer.index(run.workspace_id, { force: true })
+            .then(() => this.config.get().codeGraph?.enabled !== false ? this.contextBuilder.codeGraph?.build(run.workspace_id) : null)
+            .catch(() => {});
           return completed;
         }
 

@@ -17,6 +17,8 @@ import { registerBrowserTools } from './browser-tools.mjs';
 import { registerPlatformTools } from './platform-tools.mjs';
 import { registerDocumentTools } from './document-tools.mjs';
 import { registerVisionTools } from './vision-tools.mjs';
+import { registerCodeIntelligenceTools } from './code-intelligence-tools.mjs';
+import { registerIntelligenceTools } from './intelligence-tools.mjs';
 
 export function registerAllTools(registry, dependencies) {
   registerFilesystemTools(registry, dependencies);
@@ -38,5 +40,7 @@ export function registerAllTools(registry, dependencies) {
   registerPlatformTools(registry, dependencies);
   registerDocumentTools(registry, dependencies);
   registerVisionTools(registry, dependencies);
+  registerCodeIntelligenceTools(registry, dependencies);
+  registerIntelligenceTools(registry, dependencies);
   return registry;
 }

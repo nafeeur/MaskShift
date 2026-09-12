@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.0
+
+- Added the v1.2 codebase-intelligence layer: a persistent file/symbol/import/call graph, reverse dependency and change-impact analysis, likely-test discovery, an explicit context budget planner, retrieval decision metadata, and file-hash provenance for durable memory. Memories backed by changed or missing source files are excluded from automatic run context instead of silently becoming stale instructions.
+- Added the v1.3 intelligence-orchestration layer: configurable task-aware model routing, routing recommendations across installed external coding-agent bridges, executable dependency DAGs with bounded parallel waves and worktree-isolated edit nodes, and evidence-gated skill promotion based on recorded A/B outcomes.
+- Added ten native tools: `code_graph_build`, `code_graph_query`, `change_impact`, `context_plan_explain`, `model_route`, `agent_route`, `plan_dag_update`, `agent_dag_execute`, `skill_evaluate`, and `skill_promote_validated`.
+- Added deterministic coverage for graph persistence, transitive impact, memory invalidation, routing, DAG validation/execution, and validated skill promotion. The broader v1.1 completion/verifier release remains intentionally deferred; only existing checkpoints, test guidance, and run evidence are used here.
+
 ## 1.0.3
 
 - Fixed `browser_launch` crashing on CI runners (GitHub Actions' `ubuntu-latest` included) with "No usable sandbox!": `--no-sandbox` was only added when running as root, but modern runner kernels disable unprivileged user namespaces for every UID, not just non-root ones. Also added `.github/workflows/publish.yml`, which runs `npm run verify` and publishes to npm on every push to `main` whose `package.json` version isn't already on the registry.

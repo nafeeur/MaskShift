@@ -10,8 +10,10 @@ function renderSkills(state) {
 }
 
 function renderPlan(plan) {
-  if (!plan?.steps?.length) return 'No execution plan has been recorded yet.';
-  return [plan.summary || '', ...plan.steps.map((step) => `- [${step.status}] ${step.id}: ${step.text}${step.detail ? ` — ${step.detail}` : ''}`)].filter(Boolean).join('\n');
+  if (!plan?.steps?.length && !plan?.dag?.length) return 'No execution plan has been recorded yet.';
+  const linear = (plan.steps || []).map((step) => `- [${step.status}] ${step.id}: ${step.text}${step.detail ? ` — ${step.detail}` : ''}`);
+  const dag = (plan.dag || []).map((node) => `- [${node.status}] ${node.id}: ${node.task} (depends on: ${(node.dependsOn || []).join(', ') || 'none'})`);
+  return [plan.summary || '', ...linear, ...(dag.length ? ['Executable DAG:', ...dag] : [])].filter(Boolean).join('\n');
 }
 
 export class PromptBuilder {

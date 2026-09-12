@@ -123,6 +123,17 @@ export function defaultConfig() {
       embedBatchSize: 32,
       embedMaxChunks: 4000,
     },
+    codeGraph: {
+      enabled: true,
+    },
+    contextPlanner: {
+      weights: { snapshot: 0.12, tree: 0.10, instructions: 0.16, memories: 0.12, source: 0.42, reserve: 0.08 },
+    },
+    routing: {
+      autoSelect: true,
+      models: [],
+      agents: {},
+    },
     memory: {
       decayHalfLifeDays: 30,
     },
@@ -187,6 +198,16 @@ function mergeConfig(base, override) {
   merged.automations = { ...base.automations, ...(override?.automations || {}) };
   merged.browser = { ...base.browser, ...(override?.browser || {}) };
   merged.indexing = { ...base.indexing, ...(override?.indexing || {}) };
+  merged.codeGraph = { ...base.codeGraph, ...(override?.codeGraph || {}) };
+  merged.contextPlanner = {
+    ...base.contextPlanner, ...(override?.contextPlanner || {}),
+    weights: { ...(base.contextPlanner?.weights || {}), ...(override?.contextPlanner?.weights || {}) },
+  };
+  merged.routing = {
+    ...base.routing, ...(override?.routing || {}),
+    agents: { ...(base.routing?.agents || {}), ...(override?.routing?.agents || {}) },
+    models: override?.routing?.models || base.routing?.models || [],
+  };
   merged.memory = { ...base.memory, ...(override?.memory || {}) };
   merged.pricing = {
     ...base.pricing, ...(override?.pricing || {}),

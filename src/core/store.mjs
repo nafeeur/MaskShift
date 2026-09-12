@@ -134,6 +134,43 @@ export class Store {
       );
       CREATE INDEX IF NOT EXISTS idx_repo_chunks_workspace_path ON repo_chunks(workspace_id, path);
 
+      CREATE TABLE IF NOT EXISTS code_nodes (
+        id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        name TEXT NOT NULL,
+        path TEXT NOT NULL,
+        line INTEGER,
+        language TEXT,
+        meta TEXT NOT NULL DEFAULT '{}'
+      );
+      CREATE INDEX IF NOT EXISTS idx_code_nodes_workspace_name ON code_nodes(workspace_id, name);
+      CREATE INDEX IF NOT EXISTS idx_code_nodes_workspace_path ON code_nodes(workspace_id, path);
+
+      CREATE TABLE IF NOT EXISTS code_edges (
+        id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL,
+        source_id TEXT NOT NULL,
+        target_id TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        confidence REAL NOT NULL DEFAULT 1,
+        meta TEXT NOT NULL DEFAULT '{}'
+      );
+      CREATE INDEX IF NOT EXISTS idx_code_edges_workspace_source ON code_edges(workspace_id, source_id);
+      CREATE INDEX IF NOT EXISTS idx_code_edges_workspace_target ON code_edges(workspace_id, target_id);
+
+      CREATE TABLE IF NOT EXISTS skill_evaluations (
+        id TEXT PRIMARY KEY,
+        workspace_id TEXT,
+        skill_name TEXT NOT NULL,
+        task_key TEXT NOT NULL,
+        baseline_passed INTEGER NOT NULL,
+        candidate_passed INTEGER NOT NULL,
+        evidence TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_skill_evaluations_name ON skill_evaluations(skill_name, created_at DESC);
+
       CREATE VIRTUAL TABLE IF NOT EXISTS repo_fts USING fts5(
         chunk_id UNINDEXED,
         workspace_id UNINDEXED,
@@ -492,6 +529,60 @@ export class Store {
     return plain(this.db.prepare(`SELECT COUNT(*) AS chunks, COUNT(DISTINCT path) AS files,
       COALESCE(SUM(length(content)), 0) AS characters, MAX(indexed_at) AS indexed_at
       FROM repo_chunks WHERE workspace_id = ?`).get(workspaceId));
+  }
+
+  replaceCodeGraph(workspaceId, { nodes = [], edges = [] } = {}) {
+    return this.transaction(() => {
+      this.db.prepare('DELETE FROM code_edges WHERE workspace_id = ?').run(workspaceId);
+      this.db.prepare('DELETE FROM code_nodes WHERE workspace_id = ?').run(workspaceId);
+      const insertNode = this.db.prepare(`INSERT INTO code_nodes(id, workspace_id, kind, name, path, line, language, meta)
+        VALUES(?, ?, ?, ?, ?, ?, ?, ?)`);
+      const insertEdge = this.db.prepare(`INSERT INTO code_edges(id, workspace_id, source_id, target_id, kind, confidence, meta)
+        VALUES(?, ?, ?, ?, ?, ?, ?)`);
+      for (const node of nodes) insertNode.run(node.id, workspaceId, node.kind, node.name, node.path, node.line || null, node.language || null, JSON.stringify(node.meta || {}));
+      for (const edge of edges) insertEdge.run(edge.id, workspaceId, edge.sourceId, edge.targetId, edge.kind, edge.confidence ?? 1, JSON.stringify(edge.meta || {}));
+      return { nodes: nodes.length, edges: edges.length };
+    });
+  }
+
+  codeGraph(workspaceId) {
+    const nodes = this.db.prepare('SELECT * FROM code_nodes WHERE workspace_id = ?').all(workspaceId)
+      .map((row) => parseFields(row, ['meta']));
+    const edges = this.db.prepare('SELECT * FROM code_edges WHERE workspace_id = ?').all(workspaceId)
+      .map((row) => ({ ...parseFields(row, ['meta']), sourceId: row.source_id, targetId: row.target_id }));
+    return { nodes, edges };
+  }
+
+  codeGraphStats(workspaceId) {
+    const nodes = this.db.prepare('SELECT COUNT(*) AS count FROM code_nodes WHERE workspace_id = ?').get(workspaceId)?.count || 0;
+    const edges = this.db.prepare('SELECT COUNT(*) AS count FROM code_edges WHERE workspace_id = ?').get(workspaceId)?.count || 0;
+    const builtAt = this.getSetting(`codeGraph:${workspaceId}:builtAt`, null);
+    return { nodes, edges, builtAt };
+  }
+
+  saveSkillEvaluation({ workspaceId = null, skillName, taskKey, baselinePassed, candidatePassed, evidence = {} }) {
+    const evaluation = {
+      id: id('ske'), workspace_id: workspaceId, skill_name: skillName, task_key: taskKey,
+      baseline_passed: baselinePassed ? 1 : 0, candidate_passed: candidatePassed ? 1 : 0,
+      evidence, created_at: nowIso(),
+    };
+    this.db.prepare(`INSERT INTO skill_evaluations(id, workspace_id, skill_name, task_key, baseline_passed, candidate_passed, evidence, created_at)
+      VALUES(?, ?, ?, ?, ?, ?, ?, ?)`).run(evaluation.id, workspaceId, skillName, taskKey,
+      evaluation.baseline_passed, evaluation.candidate_passed, JSON.stringify(evidence), evaluation.created_at);
+    return { ...evaluation, baseline_passed: Boolean(evaluation.baseline_passed), candidate_passed: Boolean(evaluation.candidate_passed) };
+  }
+
+  listSkillEvaluations(skillName, { workspaceId, limit = 100 } = {}) {
+    const rows = workspaceId
+      ? this.db.prepare(`SELECT * FROM skill_evaluations WHERE skill_name = ? AND (workspace_id = ? OR workspace_id IS NULL)
+          ORDER BY created_at DESC LIMIT ?`).all(skillName, workspaceId, limit)
+      : this.db.prepare('SELECT * FROM skill_evaluations WHERE skill_name = ? ORDER BY created_at DESC LIMIT ?').all(skillName, limit);
+    return rows.map((row) => {
+      const item = parseFields(row, ['evidence']);
+      item.baseline_passed = Boolean(item.baseline_passed);
+      item.candidate_passed = Boolean(item.candidate_passed);
+      return item;
+    });
   }
 
   saveCheckpoint({ workspaceId, runId = null, kind, ref = null, manifest = {} }) {

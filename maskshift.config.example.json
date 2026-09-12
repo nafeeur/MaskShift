@@ -156,6 +156,29 @@
     "embedBatchSize": 32,
     "embedMaxChunks": 4000
   },
+  "codeGraph": {
+    "enabled": true
+  },
+  "contextPlanner": {
+    "weights": {
+      "snapshot": 0.12,
+      "tree": 0.10,
+      "instructions": 0.16,
+      "memories": 0.12,
+      "source": 0.42,
+      "reserve": 0.08
+    }
+  },
+  "routing": {
+    "autoSelect": true,
+    "models": [
+      { "model": "ollama:qwen3-coder:latest", "tags": ["systems", "general-coding"], "priority": 1 }
+    ],
+    "agents": {
+      "frontend": ["claude", "codex"],
+      "systems": ["codex", "claude"]
+    }
+  },
   "memory": {
     "decayHalfLifeDays": 30
   },

@@ -14,7 +14,7 @@
   <img alt="npm downloads" src="https://img.shields.io/npm/dt/maskshift?style=flat-square&color=cb3837&label=downloads">
   <img alt="Node 22+" src="https://img.shields.io/badge/node-%E2%89%A522-3ecf8e?style=flat-square">
   <img alt="Runtime dependencies: none" src="https://img.shields.io/badge/runtime%20deps-0-4aa8ff?style=flat-square">
-  <img alt="149 tools" src="https://img.shields.io/badge/tools-149-2bd9c0?style=flat-square">
+  <img alt="159 tools" src="https://img.shields.io/badge/tools-159-2bd9c0?style=flat-square">
   <img alt="50 skills" src="https://img.shields.io/badge/skills-50-a78bfa?style=flat-square">
   <img alt="GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-e5384f?style=flat-square">
 </p>
@@ -42,12 +42,15 @@ runtime dependency tree, no HTTP server, no browser, no listening socket.
 
 | | |
 |---|---|
-| **149 native tools** | Filesystem, shell and process control, search and indexing, Git worktrees and checkpoints, LSP, browsers over CDP, containers and Kubernetes, SSH and rsync, databases, runtimes, images, PDF and Jupyter, web retrieval, plugins, automations, memory and orchestration. → [tool inventory](docs/TOOLS.md) |
+| **159 native tools** | Filesystem, shell and process control, search and indexing, Git worktrees and checkpoints, LSP, browsers over CDP, containers and Kubernetes, SSH and rsync, databases, runtimes, images, PDF and Jupyter, web retrieval, plugins, automations, memory and orchestration. → [tool inventory](docs/TOOLS.md) |
 | **50 bundled skills** | Loaded lazily by description, including 14 Apache-2.0 skills imported from Anthropic, alongside skills from Claude, Codex, Copilot and workspace directories. → [skills](docs/SKILLS.md) |
 | **Lazy MCP fabric** | stdio and Streamable HTTP, stateless and legacy initialization, resources, prompts, qualified tools, imported configs, and the live official MCP Registry. Servers connect on demand, so the catalog never floods the context window. → [MCP config](docs/CONFIGURATION.md#mcp-definitions) |
 | **Any model** | Ollama, OpenAI Responses, OpenAI-compatible servers, Anthropic, Gemini, OpenRouter, LM Studio and vLLM — with a text protocol that gives models *without* a native tool API the full tool surface. → [providers](docs/CONFIGURATION.md#providers) |
-| **Autonomous repo context** | Project instructions, manifests, repository tree, indexed code chunks (lexical plus optional semantic retrieval), stored memory, recent history and Git state. → [architecture](docs/ARCHITECTURE.md) |
-| **Parallel agents** | Independent sessions and optional isolated Git worktrees for delegated work. |
+| **Codebase intelligence** | Persistent file/symbol/import/call graph, reverse change-impact analysis, likely-test discovery, and budgeted context selection with decision metadata. → [architecture](docs/ARCHITECTURE.md) |
+| **Provenance-aware memory** | Durable facts can cite workspace files by content hash; changed or missing sources make those memories stale and exclude them from automatic context. |
+| **Intelligence routing** | Task-aware model and external-agent recommendations, adjusted by prior run outcomes when evidence exists. |
+| **Executable DAG agents** | Dependency-aware plans run ready nodes concurrently, pass predecessor results forward, block downstream failures, and isolate edit workers in Git worktrees by default. |
+| **Validated skills** | Skill improvements can be promoted only after recorded A/B trials show uplift without regressions. |
 | **Cost-aware** | Anthropic prompt-cache breakpoints on the stable prefix, decay- and access-aware memory ranking, and a `usage_report` tool that prices spend from a user-editable table — never a guessed number. |
 | **Scheduled work** | Agent runs, direct tool calls or host shell commands on an interval, a cron expression or a one-shot timestamp. → [automations](docs/CONFIGURATION.md#automations) |
 | **Extensible** | Plugins register tools, skill directories, MCP servers and event listeners in-process; bridges delegate scoped work to Claude Code, Codex, OpenCode, Copilot CLI, Hermes or Aider. → [extension boundary](docs/ARCHITECTURE.md#extension-boundary) |

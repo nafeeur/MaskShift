@@ -1,5 +1,38 @@
 # MaskShift Architecture
 
+## v1.2 codebase intelligence
+
+The repository index now has two complementary views. SQLite FTS plus optional embeddings select
+relevant text. A persistent structural graph records files, symbols, local imports, containment,
+and conservative likely-call edges. `change_impact` walks those edges in reverse to predict the
+blast radius of changing a file or symbol and to identify affected tests.
+
+`ContextPlanner` allocates a bounded character budget across the workspace snapshot, source tree,
+instructions, memory, retrieved source, and reserve. Candidates are ranked by query overlap,
+retrieval rank, code role, recency, and provenance. The selection report is stored with the run so
+operators can answer why a file entered context without exposing model chain-of-thought.
+
+Durable memories may cite source files. MaskShift stores each source's hash and checks it before
+recall; changed, deleted, or escaped sources mark the memory stale and keep it out of automatic
+context until it is refreshed.
+
+## v1.3 intelligence orchestration
+
+`IntelligenceRouter` classifies work by domain and complexity, then ranks configured model profiles.
+When matching historical runs exist, observed completion/verification outcomes influence the score.
+The agent router applies the same task profile to the external bridge inventory and falls back to an
+internal subagent when no preferred CLI is installed.
+
+Executable plans are validated DAGs. Nodes become runnable only when all dependencies complete;
+independent ready nodes execute in bounded parallel waves, dependency summaries flow into downstream
+tasks, failed dependencies block their descendants, and edit nodes use isolated Git worktrees by
+default. The resulting branches are deliberately not auto-merged: review and integration remain an
+explicit operation.
+
+Skill self-improvement is evidence-gated. `skill_evaluate` records comparable baseline/candidate
+outcomes, while `skill_promote_validated` requires a minimum trial count, positive uplift, and zero
+recorded regressions before modifying a skill.
+
 ## Design objective
 
 MaskShift separates **capability availability** from **model-context cost**. The harness may know about hundreds or thousands of local tools, skills, MCP servers, and plugins, but a run starts with a small always-available kernel. The capability controller searches the entire catalog and activates only what the current task or step requires.

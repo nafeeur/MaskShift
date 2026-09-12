@@ -1,6 +1,6 @@
 # Native Tool Inventory
 
-Generated from the MaskShift 1.0.0 runtime. **149 native tools** are available before plugins or MCP servers add more capabilities.
+Generated from the MaskShift 1.3.0 runtime. **159 native tools** are available before plugins or MCP servers add more capabilities.
 
 Only activated descriptors enter a model request; this document is the complete local catalog.
 
@@ -158,17 +158,21 @@ Only activated descriptors enter a model request; this document is the complete 
 | `memory_save` | write | write | Save a durable project or global fact, architectural decision, convention, result, or reusable lesson. Automatically merges into an existing memory with the same title in the same scope instead of creating a duplicate, unless dedupe is set to false. |
 | `memory_search` | read | normal | Search project and global long-term memory, ranked by a blend of text relevance, importance, and recency (older, untouched memories decay in rank without being deleted). |
 
-## orchestration (9)
+## orchestration (13)
 
 | Tool | Access | Risk | Description |
 |---|---|---|---|
 | `agent_cancel` | write | agent | Cancel a running subagent or other active MaskShift run. |
+| `agent_dag_execute` | write | agent | Execute the current dependency DAG in bounded parallel waves. Edit nodes default to isolated Git worktrees; failed dependencies block downstream work. |
 | `agent_delegate` | write | agent | Run a focused subagent with its own session and capability context. Optionally isolate editing in a Git worktree and branch. |
 | `agent_parallel` | write | agent | Delegate multiple independent research, review, test, or implementation tasks concurrently and aggregate their final results. |
+| `agent_route` | read | normal | Recommend an available external coding-agent bridge or internal subagent based on the task profile. |
 | `agent_run_status` | read | normal | Inspect active and recent agent runs, including parent/subagent relationships. |
 | `capability_activate` | write | dynamic-load | Load selected capabilities into the current model context. Local tools add schemas, skills add instructions, and MCP servers connect lazily and expose their tools. |
 | `capability_search` | read | normal | Search local tools, reusable skills, imported MCP servers, and discovered MCP tools. Use this whenever the current tool set is insufficient. |
 | `capability_state` | read | normal | Show the exact tools, skills, and MCP servers currently loaded for this run. |
+| `model_route` | read | normal | Rank configured models for a task using language/domain fit and prior MaskShift outcomes. |
+| `plan_dag_update` | write | state | Create a dependency-aware execution plan whose ready nodes can run concurrently and whose dependent nodes receive predecessor results. |
 | `plan_get` | read | normal | Return the current run plan and progress. |
 | `plan_update` | write | state | Create or update the run plan with concise steps and statuses. Use it for multi-step work and keep it synchronized with actual progress. |
 
@@ -184,10 +188,14 @@ Only activated descriptors enter a model request; this document is the complete 
 | `plugin_scaffold` | write | write | Generate and activate a complete single-tool MaskShift plugin scaffold. |
 | `plugin_scan` | write | host-exec | Rescan user and workspace plugin directories and activate newly discovered plugins. |
 
-## project (8)
+## project (12)
 
 | Tool | Access | Risk | Description |
 |---|---|---|---|
+| `change_impact` | read | normal | Walk reverse imports and call relationships before an edit to identify affected symbols, modules, and likely tests. |
+| `code_graph_build` | write | state | Build a persistent repository graph of files, symbols, imports, containment, and likely calls for dependency-aware navigation. |
+| `code_graph_query` | read | normal | Find files and symbols in the persistent code graph, including incoming and outgoing relationship counts. |
+| `context_plan_explain` | read | normal | Build a dry context plan and report budgets, selected source files, retrieval reasons, and excluded stale memories. |
 | `project_index_status` | read | normal | Show local indexed file, chunk, character, and freshness statistics. |
 | `project_inspect` | read | normal | Summarize repository shape, dominant languages, build manifests, instructions, Git state, and local index health. |
 | `project_instructions` | read | normal | Load AGENTS.md, CLAUDE.md, MASKSHIFT.md, Copilot instructions, and other configured context files from repository root through the working directory. |
@@ -236,13 +244,15 @@ Only activated descriptors enter a model request; this document is the complete 
 | `shell_start` | write | host-exec | Start a persistent host process with live stdout/stderr streaming. Returns a process ID for later reads, input, or termination. |
 | `system_info` | read | normal | Return operating system, CPU, memory, process, shell, runtime, and workspace information. |
 
-## skills (5)
+## skills (7)
 
 | Tool | Access | Risk | Description |
 |---|---|---|---|
 | `skill_create` | write | write | Create a durable user skill from a successful workflow so future runs can discover it automatically. |
+| `skill_evaluate` | write | state | Record comparable baseline and candidate outcomes for a reusable skill. This creates empirical evidence without changing the skill. |
 | `skill_improve` | write | write | Append a validated lesson or refinement to an existing skill. |
 | `skill_load` | read | normal | Load the full instructions and metadata for a selected skill into the current run. |
+| `skill_promote_validated` | write | write | Apply a skill improvement only when recorded A/B trials meet minimum evidence and improve success without regressions. |
 | `skill_read_reference` | read | normal | Read a file referenced by a skill while preventing path escape from the skill directory. |
 | `skill_search` | read | normal | Search all bundled, project, Claude, Codex, Copilot, and user skill catalogs. Skill bodies are loaded only when selected. |
 

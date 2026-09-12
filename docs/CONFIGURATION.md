@@ -55,6 +55,49 @@ shift+drag.
 
 Embeddings are best-effort: if the configured Ollama endpoint or model is unreachable, `repo_search` and repository context construction silently fall back to lexical FTS only. Embeddings are keyed by content hash and carried over across reindexes, so unchanged files are never re-embedded.
 
+## Code graph and context planning
+
+`codeGraph.enabled` defaults to `true`. The graph is stored in SQLite and records source files,
+top-level symbols, containment, resolved local imports, and conservative likely-call edges. Use
+`code_graph_build` to refresh it explicitly and `change_impact` before broad edits. The graph is
+static analysis, so dynamic imports and runtime dispatch may not be visible; edge confidence is
+returned rather than presenting heuristic calls as certainty.
+
+`contextPlanner.weights` divides the constructed context budget among the workspace snapshot,
+tree, repository instructions, memories, retrieved source, and reserve. The defaults are:
+
+```json
+{"snapshot":0.12,"tree":0.10,"instructions":0.16,"memories":0.12,"source":0.42,"reserve":0.08}
+```
+
+`context_plan_explain` reports which sources were selected and why. `memory_save.sources` accepts
+workspace-relative files; their hashes are captured on save and checked before automatic recall.
+
+## Intelligence routing
+
+Routing is active when `routing.autoSelect` is `true`, but it changes the configured default only
+when `routing.models` contains candidates. Each candidate has a model reference, task tags, and an
+optional priority. Historical success for matching task tags adjusts the ranking once runs exist.
+
+```json
+{
+  "routing": {
+    "autoSelect": true,
+    "models": [
+      {"model":"openai:MODEL_ID","tags":["frontend","verification"],"priority":1},
+      {"model":"ollama:qwen3-coder:latest","tags":["systems","general-coding"],"priority":1}
+    ],
+    "agents": {
+      "frontend": ["claude", "codex"],
+      "research": ["hermes", "claude"]
+    }
+  }
+}
+```
+
+Supported task tags are `frontend`, `systems`, `verification`, `large-change`, `research`, and
+`general-coding`. An explicit `--model` still wins. `router:auto` requests routing for one run.
+
 ## Images and scanned PDFs
 
 `image_read` and the OCR fallback in `pdf_read` give any model — including ones with no native
