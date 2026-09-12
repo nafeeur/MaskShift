@@ -6,7 +6,7 @@ import { createRuntime } from '../src/runtime.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const home = await fsp.mkdtemp(path.join(os.tmpdir(), 'maskshift-docs-'));
-const runtime = await createRuntime({ workspacePath: root, configOverrides: { home, autoIndex: false } });
+const runtime = await createRuntime({ workspacePath: root, configOverrides: { home, autoIndex: false, skillsDirs: [] } });
 
 function cell(value) {
   return String(value ?? '').replaceAll('|', '\\|').replaceAll('\n', ' ');
@@ -34,10 +34,14 @@ try {
   }
   await fsp.writeFile(path.join(root, 'docs', 'TOOLS.md'), `${toolLines.join('\n')}\n`);
 
-  const skills = runtime.skillManager.list();
+  // Generated release documentation must describe only files shipped by MaskShift.
+  // User- and host-installed skill directories vary by machine and are not portable.
+  const skills = runtime.skillManager.list().filter((skill) => skill.source === 'bundled');
   const skillLines = [
     '# Bundled Skills', '',
     `MaskShift ships with **${skills.length} skills**. Descriptions are indexed at startup; full skill bodies are loaded only after activation.`, '',
+    'Fourteen skills are imported from [`anthropics/skills`](https://github.com/anthropics/skills) under Apache-2.0.',
+    'Their individual license files and third-party notices are retained in `skills/`.', '',
     '| Skill | Description | Source |', '|---|---|---|',
   ];
   for (const skill of skills.sort((a, b) => a.name.localeCompare(b.name))) {

@@ -135,6 +135,29 @@ test('every bundled skill parses, loads, and is discoverable by name', async (t)
   }
 });
 
+test('the Apache-licensed Anthropic skill pack ships as lazy bundled skills', async (t) => {
+  const project = await createProject(t);
+  const runtime = await runtimeForTest(t, project);
+  const expected = [
+    'academy-guide', 'algorithmic-art', 'brand-guidelines', 'canvas-design',
+    'claude-api', 'discernment-nudge', 'frontend-design', 'internal-comms',
+    'mcp-builder', 'skill-creator', 'slack-gif-creator', 'theme-factory',
+    'web-artifacts-builder', 'webapp-testing',
+  ];
+
+  for (const name of expected) {
+    const bundledPath = path.resolve('skills', name);
+    await fsp.access(path.join(bundledPath, 'SKILL.md'));
+    const skill = runtime.skillManager.get(name);
+    if (skill?.source === 'bundled') assert.ok(skill.description.length > 24, `${name} has no usable description`);
+    assert.match(await fsp.readFile(path.join(bundledPath, 'LICENSE.txt'), 'utf8'), /Apache License/);
+  }
+
+  for (const name of ['docx', 'pdf', 'pptx', 'xlsx']) {
+    await assert.rejects(fsp.access(path.resolve('skills', name)), `${name} must not be bundled`);
+  }
+});
+
 test('skill references cannot escape the skill directory', async (t) => {
   const project = await createProject(t);
   const runtime = await runtimeForTest(t, project);

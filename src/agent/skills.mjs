@@ -9,7 +9,10 @@ function parseScalar(value) {
   const trimmed = value.trim();
   if (/^(true|false)$/i.test(trimmed)) return trimmed.toLowerCase() === 'true';
   if (/^-?\d+(?:\.\d+)?$/.test(trimmed)) return Number(trimmed);
-  return trimmed.replace(/^['"]|['"]$/g, '');
+  if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
 }
 
 function parseFrontmatter(content) {
@@ -19,12 +22,26 @@ function parseFrontmatter(content) {
   const raw = content.slice(4, end);
   const meta = {};
   let current = null;
-  for (const line of raw.split('\n')) {
+  const lines = raw.split('\n');
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
     if (!line.trim() || line.trim().startsWith('#')) continue;
     const keyMatch = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
     if (keyMatch) {
       current = keyMatch[1];
-      meta[current] = keyMatch[2] ? parseScalar(keyMatch[2]) : {};
+      const value = keyMatch[2];
+      if (/^[>|][-+]?$/u.test(value)) {
+        const block = [];
+        while (index + 1 < lines.length && /^\s+/u.test(lines[index + 1])) {
+          block.push(lines[index + 1].replace(/^\s{2}/u, ''));
+          index += 1;
+        }
+        meta[current] = value.startsWith('>')
+          ? block.join(' ').replace(/\s+/gu, ' ').trim()
+          : block.join('\n').trimEnd();
+      } else {
+        meta[current] = value ? parseScalar(value) : {};
+      }
       continue;
     }
     const nested = line.match(/^\s{2,}([A-Za-z0-9_-]+):\s*(.*)$/);
