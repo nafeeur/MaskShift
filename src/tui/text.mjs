@@ -8,6 +8,42 @@ const ANSI_PATTERN = new RegExp(`${ESC}\\[[0-9;?]*[A-Za-z]|${ESC}\\][^\\u0007]*(
 
 const RESET = `${ESC}[0m`;
 
+const GRAPHEME_SEGMENTER = typeof Intl?.Segmenter === 'function'
+  ? new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+  : null;
+
+/** Split text into user-perceived characters while retaining UTF-16 offsets. */
+export function graphemes(text) {
+  const value = String(text ?? '');
+  if (!GRAPHEME_SEGMENTER) {
+    let index = 0;
+    return [...value].map((segment) => {
+      const item = { segment, index };
+      index += segment.length;
+      return item;
+    });
+  }
+  return [...GRAPHEME_SEGMENTER.segment(value)].map(({ segment, index }) => ({ segment, index }));
+}
+
+export function previousGraphemeBoundary(text, offset) {
+  let previous = 0;
+  for (const item of graphemes(text)) {
+    if (item.index >= offset) break;
+    previous = item.index;
+  }
+  return previous;
+}
+
+export function nextGraphemeBoundary(text, offset) {
+  const value = String(text ?? '');
+  for (const item of graphemes(value)) {
+    if (item.index > offset) return item.index;
+    if (item.index === offset) return item.index + item.segment.length;
+  }
+  return value.length;
+}
+
 export function stripAnsi(text) {
   return String(text ?? '').replace(ANSI_PATTERN, '');
 }
@@ -47,9 +83,18 @@ export function charWidth(character) {
   return isWide(code) ? 2 : 1;
 }
 
+function graphemeWidth(grapheme) {
+  // Emoji ZWJ sequences, skin-tone clusters and regional-indicator flags are
+  // displayed as one two-column glyph by modern terminals.
+  if (/\u200d|[\u{1f1e6}-\u{1f1ff}]|\p{Extended_Pictographic}/u.test(grapheme)) return 2;
+  let width = 0;
+  for (const character of grapheme) width += charWidth(character);
+  return width;
+}
+
 export function visibleWidth(text) {
   let width = 0;
-  for (const character of stripAnsi(text)) width += charWidth(character);
+  for (const { segment } of graphemes(stripAnsi(text))) width += graphemeWidth(segment);
   return width;
 }
 
@@ -67,12 +112,37 @@ function* walk(text) {
       index = ANSI_PATTERN.lastIndex;
       continue;
     }
-    const character = String.fromCodePoint(value.codePointAt(index));
-    yield { character, width: charWidth(character), ansi: pending };
-    pending = '';
-    index += character.length;
+    const nextAnsi = match?.index ?? value.length;
+    const plain = value.slice(index, nextAnsi);
+    for (const { segment } of graphemes(plain)) {
+      yield { character: segment, width: graphemeWidth(segment), ansi: pending };
+      pending = '';
+    }
+    index = nextAnsi;
   }
   if (pending) yield { character: '', width: 0, ansi: pending };
+}
+
+/**
+ * Remove terminal controls from an already-rendered row while preserving the
+ * SGR colour/style sequences emitted by Theme. This is the final trust
+ * boundary for model text, tool output, filenames, file contents and paste.
+ */
+export function sanitizeTerminalLine(text) {
+  let value = String(text ?? '');
+  const safeSgr = [];
+  value = value.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, (sequence) => (
+    /^\x1b\[[0-9;]*m$/.test(sequence)
+      ? `\ue000${safeSgr.push(sequence) - 1}\ue001`
+      : ''
+  ));
+  value = value.replace(/\x1b\][^\x07]*(?:\x07|\x1b\\)?/g, '');
+  value = value.replace(/\x1b[P^_][\s\S]*?(?:\x1b\\|$)/g, '');
+  value = value.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f\x1b]/g, '');
+  // Directional overrides can visually disguise filenames and commands.
+  value = value.replace(/[\u202a-\u202e\u2066-\u2069]/g, '');
+  value = value.replace(/\ue000(\d+)\ue001/g, (match, index) => safeSgr[Number(index)] || '');
+  return value;
 }
 
 // Slice by *visible columns* while preserving styling.

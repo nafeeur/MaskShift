@@ -27,6 +27,8 @@ import * as terminalView from './views/terminal.mjs';
 const VIEWS = [chatView, filesView, arsenalView, networkView, modshopView, terminalView];
 const EVENT_LIMIT = 400;
 const TERMINAL_LIMIT = 2000;
+const MIN_COLUMNS = 40;
+const MIN_ROWS = 12;
 
 export class MaskShiftTui {
   constructor(runtime, {
@@ -79,6 +81,7 @@ export class MaskShiftTui {
     this.tokenHistory = [];
     this.totals = { input: 0, output: 0, cost: 0 };
     this.startedAt = null;
+    this.endedAt = null;
     this.step = 0;
     this.events = [];
     this.gitBranch = '';
@@ -147,30 +150,43 @@ export class MaskShiftTui {
     this.renderScheduled = false;
     this.actions = this.buildActions();
     this.quitArmed = false;
+    this.promptQueue = [];
+    this.operationLocks = new Set();
+    this.fileTreeGeneration = 0;
+    this.previewGeneration = 0;
+    this.registryGeneration = 0;
+    this.processHandlers = null;
   }
 
   // ---------------------------------------------------------------- lifecycle
 
   async start() {
-    this.running = true;
     if (this.headless) throw new Error('Headless MaskShift TUI instances cannot take over the terminal');
-    this.unsubscribe = this.runtime.eventBus.subscribe((event) => this.onEvent(event));
-    this.screen.onResize = () => this.requestRender();
-    this.screen.enter();
-    this.screen.setTitle('MaskShift');
-    this.keyboard.on('key', (event) => this.onKey(event));
-    this.keyboard.on('mouse', (event) => this.onMouse(event));
-    this.keyboard.start();
-    this.ticker = setInterval(() => this.tick(), 120);
+    this.running = true;
+    const exit = new Promise((resolve) => { this.resolveExit = resolve; });
+    this.installProcessHandlers();
+    try {
+      this.unsubscribe = this.runtime.eventBus.subscribe((event) => this.onEvent(event));
+      this.screen.onResize = () => this.requestRender();
+      this.screen.enter();
+      this.screen.setTitle('MaskShift');
+      this.keyboard.on('key', (event) => this.onKey(event));
+      this.keyboard.on('mouse', (event) => this.onMouse(event));
+      this.keyboard.start();
+      this.ticker = setInterval(() => this.tick(), 120);
 
-    await this.bootstrap();
-    if (this.initialPrompt) {
-      this.composer.set(this.initialPrompt);
-      await this.submitPrompt();
+      await this.bootstrap();
+      if (!this.running) return this.exitCode;
+      if (this.initialPrompt) {
+        this.composer.set(this.initialPrompt);
+        await this.submitPrompt();
+      }
+      this.requestRender();
+      await exit;
+      return this.exitCode;
+    } finally {
+      this.cleanupTerminal();
     }
-    this.requestRender();
-    await new Promise((resolve) => { this.resolveExit = resolve; });
-    return this.exitCode;
   }
 
   async bootstrap() {
@@ -191,14 +207,66 @@ export class MaskShiftTui {
   }
 
   stop(code = 0) {
-    if (!this.running) return;
+    if (!this.running) { this.cleanupTerminal(); return; }
     this.running = false;
     this.exitCode = code;
     clearInterval(this.ticker);
     this.unsubscribe?.();
+    this.cleanupTerminal();
+    this.resolveExit?.(code);
+  }
+
+  cleanupTerminal() {
+    clearInterval(this.ticker);
+    this.unsubscribe?.();
+    this.unsubscribe = null;
+    this.screen.onResize = null;
     this.keyboard.stop();
     this.screen.leave();
-    this.resolveExit?.(code);
+    this.removeProcessHandlers();
+  }
+
+  installProcessHandlers() {
+    if (this.processHandlers) return;
+    const stopFor = (code) => () => this.stop(code);
+    const fatal = (error) => {
+      this.screen.leave();
+      process.stderr.write(`MaskShift fatal TUI error: ${error?.stack || error}\n`);
+      this.stop(1);
+    };
+    const resume = () => {
+      if (!this.running) return;
+      this.screen.enter();
+      this.screen.setTitle('MaskShift');
+      this.keyboard.start();
+      this.screen.invalidate();
+      this.requestRender();
+    };
+    const suspend = () => {
+      if (process.platform === 'win32') return;
+      this.keyboard.stop();
+      this.screen.leave();
+      process.off('SIGTSTP', suspend);
+      process.once('SIGCONT', () => {
+        process.on('SIGTSTP', suspend);
+        resume();
+      });
+      process.kill(process.pid, 'SIGTSTP');
+    };
+    this.processHandlers = {
+      SIGINT: stopFor(130), SIGTERM: stopFor(143), SIGHUP: stopFor(129),
+      SIGTSTP: suspend, uncaughtException: fatal, unhandledRejection: fatal,
+    };
+    for (const [name, handler] of Object.entries(this.processHandlers)) {
+      if (process.platform === 'win32' && ['SIGHUP', 'SIGTSTP'].includes(name)) continue;
+      process.on(name, handler);
+    }
+  }
+
+  removeProcessHandlers() {
+    if (!this.processHandlers) return;
+    for (const [name, handler] of Object.entries(this.processHandlers)) process.off(name, handler);
+    this.processHandlers = null;
   }
 
   tick() {
@@ -206,7 +274,7 @@ export class MaskShiftTui {
     const dirty = this.toasts.prune();
     // Anything clock-driven has to keep the loop awake for as long as it is
     // moving, or a toast would sit at half-opacity until the next keystroke.
-    if (this.busy || dirty || this.terminalBusy || this.toasts.animating) this.requestRender();
+    if (this.busy || dirty || this.terminalBusy || this.toasts.animating || this.overlay?.pending) this.requestRender();
   }
 
   requestRender() {
@@ -229,7 +297,7 @@ export class MaskShiftTui {
   }
 
   get metrics() {
-    const elapsed = this.startedAt ? Date.now() - this.startedAt : 0;
+    const elapsed = this.startedAt ? Math.max(0, (this.endedAt || Date.now()) - this.startedAt) : 0;
     const seconds = Math.floor(elapsed / 1000);
     return {
       step: this.step,
@@ -242,7 +310,7 @@ export class MaskShiftTui {
   }
 
   get liveTrail() {
-    if (!this.busy && this.pendingCalls.size === 0) return [];
+    if (!this.busy && this.pendingCalls.size === 0 && this.promptQueue.length === 0) return [];
     const entries = [];
     for (const call of this.pendingCalls.values()) {
       // A call in flight is laid out on the same columns as the completed call
@@ -267,13 +335,22 @@ export class MaskShiftTui {
         )],
       });
     }
+    for (const [index, queued] of this.promptQueue.entries()) {
+      entries.push({
+        render: (theme, width) => [fit(
+          gutter(theme, String(index + 1), { tone: theme.roles.warning })
+          + theme.paint(`QUEUED  ${oneLine(queued.prompt, Math.max(8, width - 10))}`, { fg: theme.roles.muted }),
+          width,
+        )],
+      });
+    }
     return entries;
   }
 
   // Chrome is upper case; anything the operator is being spoken to in is not.
   composerPlaceholder() {
     return this.busy
-      ? 'Run in flight — esc cancels, or queue the next order…'
+      ? `Run in flight — esc cancels, or queue the next order${this.promptQueue.length ? ` (${this.promptQueue.length} queued)` : ''}…`
       : 'Describe what success looks like…';
   }
 
@@ -310,6 +387,16 @@ export class MaskShiftTui {
   paint() {
     const { columns, rows } = this.screen.size;
     const theme = this.theme;
+    if (columns < MIN_COLUMNS || rows < MIN_ROWS) {
+      this.regions.clear();
+      const frame = new Array(rows).fill('').map((line, index) => {
+        if (index === Math.floor(rows / 2)) return fit(` Resize to at least ${MIN_COLUMNS}×${MIN_ROWS} (now ${columns}×${rows})`, columns);
+        return fit(line, columns);
+      });
+      this.screen.render(frame, null);
+      this.lastFrame = frame;
+      return frame;
+    }
     const bodyHeight = Math.max(4, rows - 4);
     this.bodyRegion = { row: 2, column: 0, width: columns, height: bodyHeight };
     // Click targets describe the frame being drawn, so they are rebuilt with it.
@@ -467,7 +554,7 @@ export class MaskShiftTui {
     if (event.ctrl && event.name === 'p') { this.openSessionPicker(); return true; }
     if (event.ctrl && event.name === 'g') { this.openModelPicker(); return true; }
     if (event.ctrl && event.name === 'o') { this.openWorkspaceDialog(); return true; }
-    if (event.ctrl && event.name === 'n') { this.newSession(); return true; }
+    if (event.ctrl && event.name === 'n') { this.requestNewSession(); return true; }
     if (event.ctrl && event.name === 'b') { this.railVisible = !this.railVisible; this.screen.invalidate(); return true; }
     if (event.ctrl && event.name === 'r') { this.cycleRail(1); return true; }
     if (event.ctrl && event.name === 'y') { this.focus = this.focus === 'rail' ? 'composer' : 'rail'; return true; }
@@ -518,11 +605,17 @@ export class MaskShiftTui {
   // ------------------------------------------------------------- runtime data
 
   setWorkspace(workspace) {
+    this.fileTreeGeneration += 1;
+    this.previewGeneration += 1;
+    this.registryGeneration += 1;
     this.workspace = workspace;
     this.workspaceId = workspace.id;
     this.terminalCwd = workspace.path;
     this.runtime.store.setSetting('lastWorkspaceId', workspace.id);
     this.collapsedDirs.clear();
+    this.previewPath = '';
+    this.previewLines = [];
+    this.previewError = '';
   }
 
   refreshCatalogs() {
@@ -540,7 +633,9 @@ export class MaskShiftTui {
   }
 
   openLatestSession() {
-    const sessions = this.runtime.store.listSessions({ workspaceId: this.workspaceId, limit: 1 });
+    const sessions = this.workspaceId
+      ? this.runtime.store.listSessions({ workspaceId: this.workspaceId, limit: 1 })
+      : [];
     if (sessions.length) this.loadSession(sessions[0].id);
     else this.newSession({ silent: true });
   }
@@ -548,17 +643,59 @@ export class MaskShiftTui {
   loadSession(sessionId) {
     const session = this.runtime.store.getSession(sessionId);
     if (!session) return;
+    if (session.workspace_id !== this.workspaceId) {
+      this.toast('That heist belongs to a different workspace', 'error');
+      return;
+    }
     this.sessionId = session.id;
     this.messages = this.runtime.store.listMessages(session.id, 1000);
     this.sessionTitle = this.messages.length ? (session.title || '') : 'STANDBY FOR ORDERS';
     this.modelRef = session.model_id || this.modelRef;
     this.transcript.toBottom();
     const runs = this.runtime.store.listRuns({ sessionId: session.id, limit: 1 });
-    this.activeRun = runs[0] && ['running', 'queued'].includes(runs[0].status) ? runs[0] : null;
+    const latest = runs[0] || null;
+    this.activeRun = latest && ['running', 'queued'].includes(latest.status) ? latest : null;
     this.runId = this.activeRun?.id || null;
-    this.plan = runs[0]?.meta?.plan || null;
-    this.capabilitySnapshot = runs[0]?.meta?.capabilities || null;
+    this.plan = latest?.meta?.plan || null;
+    this.capabilitySnapshot = latest?.meta?.capabilities || null;
+    this.activeCapabilities = new Set(this.capabilitySnapshot?.tools || []);
+    this.pendingCalls.clear();
+    this.tokenHistory = [];
+    this.totals = { input: 0, output: 0, cost: latest?.meta?.costEstimate?.total || 0 };
+    for (const message of this.messages) {
+      const usage = message.meta?.usage;
+      if (!usage) continue;
+      const input = usage.inputTokens || usage.input_tokens || 0;
+      const output = usage.outputTokens || usage.output_tokens || 0;
+      this.totals.input += input;
+      this.totals.output += output;
+      if (output) this.tokenHistory.push(output);
+    }
+    this.step = latest?.step_count || 0;
+    this.startedAt = latest?.started_at ? new Date(latest.started_at).getTime() : null;
+    this.endedAt = latest?.ended_at ? new Date(latest.ended_at).getTime() : null;
+    this.subagents = 0;
     this.requestRender();
+  }
+
+  requestSessionLoad(sessionId) {
+    if (sessionId === this.sessionId) return;
+    if (!this.busy && !this.composer.value && this.promptQueue.length === 0) {
+      this.loadSession(sessionId);
+      return;
+    }
+    this.overlay = new ConfirmOverlay({
+      title: 'SWITCH HEIST', danger: Boolean(this.busy || this.promptQueue.length),
+      message: this.busy || this.promptQueue.length
+        ? 'Cancel the active run, discard queued orders and the current draft, then switch heists?'
+        : 'Discard the current draft and switch heists?',
+      onConfirm: async () => {
+        if (this.busy) this.cancelRun();
+        this.promptQueue = [];
+        this.composer.clear();
+        this.loadSession(sessionId);
+      },
+    });
   }
 
   newSession({ silent = false } = {}) {
@@ -577,21 +714,52 @@ export class MaskShiftTui {
     this.tokenHistory = [];
     this.step = 0;
     this.startedAt = null;
+    this.endedAt = null;
     this.view = 'chat';
     this.focus = 'composer';
     if (!silent) this.toast('New heist opened', 'success');
     this.requestRender();
   }
 
+  requestNewSession() {
+    if (!this.busy && !this.composer.value && this.promptQueue.length === 0) {
+      this.newSession();
+      return;
+    }
+    this.overlay = new ConfirmOverlay({
+      title: 'NEW HEIST', danger: Boolean(this.busy || this.promptQueue.length),
+      message: this.busy || this.promptQueue.length
+        ? 'Cancel the active run, discard queued orders and the current draft, then start a new heist?'
+        : 'Discard the current draft and start a new heist?',
+      onConfirm: async () => {
+        if (this.busy) this.cancelRun();
+        this.promptQueue = [];
+        this.composer.clear();
+        this.newSession();
+      },
+    });
+  }
+
   async submitPrompt() {
-    const prompt = this.composer.value.trim();
+    const original = this.composer.value;
+    const prompt = original.trim();
     if (!prompt) return;
     if (prompt.startsWith('/')) { this.composer.clear(); await this.runSlash(prompt); return; }
-    this.composer.remember(this.composer.value);
+    this.composer.remember(original);
     this.composer.clear();
     this.view = 'chat';
     this.focus = 'composer';
     this.transcript.toBottom();
+    if (this.busy) {
+      this.promptQueue.push({ id: `queued-${Date.now()}-${this.promptQueue.length}`, prompt, queuedAt: Date.now() });
+      this.toast(`Order queued (${this.promptQueue.length})`, 'info');
+      this.requestRender();
+      return;
+    }
+    await this.startPrompt(prompt, { restoreOnFailure: original });
+  }
+
+  async startPrompt(prompt, { restoreOnFailure = '' } = {}) {
     try {
       const run = await this.runtime.engine.startRun({
         sessionId: this.sessionId, workspaceId: this.workspaceId, prompt,
@@ -601,6 +769,7 @@ export class MaskShiftTui {
       this.sessionId = run.session_id;
       this.activeRun = run;
       this.startedAt = Date.now();
+      this.endedAt = null;
       this.step = 0;
       this.pendingCalls.clear();
       this.messages = this.runtime.store.listMessages(this.sessionId, 1000);
@@ -608,8 +777,16 @@ export class MaskShiftTui {
       this.sessionTitle = session?.title || this.sessionTitle;
     } catch (error) {
       this.toast(error.message, 'error');
+      if (restoreOnFailure && !this.composer.value) this.composer.set(restoreOnFailure);
     }
     this.requestRender();
+  }
+
+  async drainPromptQueue() {
+    if (this.busy || !this.promptQueue.length) return;
+    const next = this.promptQueue.shift();
+    await this.startPrompt(next.prompt);
+    if (!this.busy && this.promptQueue.length) void this.drainPromptQueue();
   }
 
   cancelRun() {
@@ -622,6 +799,8 @@ export class MaskShiftTui {
 
   onEvent(event) {
     if (event.type.startsWith('run.')) this.onRunEvent(event);
+    if (event.type === 'subagent.started' && (!event.sessionId || event.sessionId === this.sessionId)) this.subagents += 1;
+    if (event.type === 'subagent.completed' && (!event.sessionId || event.sessionId === this.sessionId)) this.subagents = Math.max(0, this.subagents - 1);
     this.events.push(event);
     if (this.events.length > EVENT_LIMIT) this.events.splice(0, this.events.length - EVENT_LIMIT);
     if (['mcp.connected', 'mcp.disconnected', 'mcp.added', 'mcp.removed'].includes(event.type)) {
@@ -643,6 +822,7 @@ export class MaskShiftTui {
     switch (event.type) {
       case 'run.started':
         this.startedAt = Date.now();
+        this.endedAt = null;
         this.step = 0;
         this.pendingCalls.clear();
         this.thinkingLabel = 'STUDYING THE TARGET';
@@ -680,6 +860,8 @@ export class MaskShiftTui {
         this.messages = this.runtime.store.listMessages(this.sessionId, 1000);
         const run = this.runId ? this.runtime.store.getRun(this.runId) : null;
         this.activeRun = null;
+        this.runId = null;
+        this.endedAt = run?.ended_at ? new Date(run.ended_at).getTime() : Date.now();
         this.plan = run?.meta?.plan || this.plan;
         this.capabilitySnapshot = run?.meta?.capabilities || this.capabilitySnapshot;
         if (run?.meta?.costEstimate?.total) this.totals.cost = run.meta.costEstimate.total;
@@ -688,6 +870,7 @@ export class MaskShiftTui {
         const tone = event.type === 'run.completed' ? 'success' : event.type === 'run.cancelled' ? 'warn' : 'error';
         this.toast(`Run ${event.type.replace('run.', '')}${payload.error ? `: ${oneLine(payload.error, 90)}` : ''}`, tone);
         void this.refreshGit();
+        if (this.promptQueue.length) setImmediate(() => void this.drainPromptQueue());
         break;
       }
       default: break;
@@ -707,16 +890,19 @@ export class MaskShiftTui {
 
   async loadFileTree({ force = false, keepFilter = false } = {}) {
     if (!this.workspaceId) return;
+    const generation = ++this.fileTreeGeneration;
     try {
       const filter = this.fileFilter.value.trim().toLowerCase();
       const result = await this.runtime.workspaceManager.listFiles(this.workspaceId, {
         depth: filter ? 12 : 4, includeHidden: this.showHidden, maxEntries: filter ? 20_000 : 4000,
       });
+      if (generation !== this.fileTreeGeneration) return;
       this.fileEntries = filter
         ? result.entries.filter((entry) => entry.path.toLowerCase().includes(filter))
         : result.entries;
       if (!keepFilter) this.fileList.first();
     } catch (error) {
+      if (generation !== this.fileTreeGeneration) return;
       this.toast(`File tree failed: ${error.message}`, 'error');
     }
     this.requestRender();
@@ -730,17 +916,20 @@ export class MaskShiftTui {
 
   async openFile(relative, { quiet = false } = {}) {
     if (!this.workspaceId) return;
+    const generation = ++this.previewGeneration;
     this.previewPath = relative;
     this.previewError = '';
     try {
       const result = await this.runtime.toolRegistry.execute('fs_read', {
         path: relative, withLineNumbers: false,
       }, this.toolContext());
+      if (generation !== this.previewGeneration) return;
       const content = typeof result === 'string' ? result : (result.content ?? result.text ?? '');
       this.previewLines = String(content).split('\n').slice(0, 5000);
       this.preview.toTop();
       if (!quiet) this.focus = 'preview';
     } catch (error) {
+      if (generation !== this.previewGeneration) return;
       this.previewLines = [];
       this.previewError = error.message;
     }
@@ -790,51 +979,61 @@ export class MaskShiftTui {
   }
 
   async connectMcp(name, force = false) {
-    this.toast(`Linking ${name}…`, 'info');
-    try {
-      await this.runtime.mcpManager.connect(name, { workspaceId: this.workspaceId, force });
-      const tools = await this.runtime.mcpManager.tools(name, this.workspaceId);
-      this.mcpTools.set(name, tools);
-      this.toast(`${name} linked (${tools.length} tools)`, 'success');
-    } catch (error) {
-      this.toast(`${name}: ${error.message}`, 'error');
-    }
-    await this.refreshMcp();
+    return this.withOperation(`mcp:${name}`, `MCP server ${name}`, async () => {
+      this.toast(`Linking ${name}…`, 'info');
+      try {
+        await this.runtime.mcpManager.connect(name, { workspaceId: this.workspaceId, force });
+        const tools = await this.runtime.mcpManager.tools(name, this.workspaceId);
+        this.mcpTools.set(name, tools);
+        this.toast(`${name} linked (${tools.length} tools)`, 'success');
+      } catch (error) {
+        this.toast(`${name}: ${error.message}`, 'error');
+      }
+      await this.refreshMcp();
+    });
   }
 
   async disconnectMcp(name) {
-    try {
-      await this.runtime.mcpManager.disconnect(name, this.workspaceId);
-      this.mcpTools.delete(name);
-      this.toast(`${name} disconnected`, 'warn');
-    } catch (error) {
-      this.toast(error.message, 'error');
-    }
-    await this.refreshMcp();
+    return this.withOperation(`mcp:${name}`, `MCP server ${name}`, async () => {
+      try {
+        await this.runtime.mcpManager.disconnect(name, this.workspaceId);
+        this.mcpTools.delete(name);
+        this.toast(`${name} disconnected`, 'warn');
+      } catch (error) {
+        this.toast(error.message, 'error');
+      }
+      await this.refreshMcp();
+    });
   }
 
   async searchRegistry(query) {
+    const generation = ++this.registryGeneration;
     this.toast('Searching the official registry…', 'info');
     try {
-      this.registryResults = await this.runtime.mcpManager.registrySearch(query || '', 40);
+      const results = await this.runtime.mcpManager.registrySearch(query || '', 40);
+      if (generation !== this.registryGeneration) return;
+      this.registryResults = results;
       this.toast(`${this.registryResults.length} registry entries`, 'success');
     } catch (error) {
+      if (generation !== this.registryGeneration) return;
       this.toast(`Registry search failed: ${error.message}`, 'error');
     }
     this.requestRender();
   }
 
   async installRegistryServer(item) {
-    try {
-      const installed = await this.runtime.mcpManager.installRegistry(item, {
-        prefer: 'remote', workspacePath: this.workspace?.path || process.cwd(),
-      });
-      this.toast(`Installed ${installed.name}`, 'success');
-      this.mcpTab = 'installed';
-      await this.refreshMcp();
-    } catch (error) {
-      this.toast(`Install failed: ${error.message}`, 'error');
-    }
+    return this.withOperation(`mcp-install:${item.name}`, `MCP install ${item.name}`, async () => {
+      try {
+        const installed = await this.runtime.mcpManager.installRegistry(item, {
+          prefer: 'remote', workspacePath: this.workspace?.path || process.cwd(),
+        });
+        this.toast(`Installed ${installed.name}`, 'success');
+        this.mcpTab = 'installed';
+        await this.refreshMcp();
+      } catch (error) {
+        this.toast(`Install failed: ${error.message}`, 'error');
+      }
+    });
   }
 
   openMcpDialog() {
@@ -997,13 +1196,15 @@ export class MaskShiftTui {
   }
 
   async runAutomation(automationId) {
-    try {
-      await this.runtime.automationScheduler.execute(automationId, { manual: true });
-      this.toast('Automation executed', 'success');
-    } catch (error) {
-      this.toast(error.message, 'error');
-    }
-    await this.refreshModShop();
+    return this.withOperation(`automation:${automationId}`, 'Automation', async () => {
+      try {
+        await this.runtime.automationScheduler.execute(automationId, { manual: true });
+        this.toast('Automation executed', 'success');
+      } catch (error) {
+        this.toast(error.message, 'error');
+      }
+      await this.refreshModShop();
+    });
   }
 
   async toggleAutomation(automation) {
@@ -1025,36 +1226,46 @@ export class MaskShiftTui {
   }
 
   async activatePlugin(name) {
-    try { await this.runtime.pluginManager.activate(name); this.toast(`${name} activated`, 'success'); }
-    catch (error) { this.toast(error.message, 'error'); }
-    this.refreshCatalogs();
-    await this.refreshModShop();
+    return this.withOperation(`plugin:${name}`, `Plugin ${name}`, async () => {
+      try { await this.runtime.pluginManager.activate(name); this.toast(`${name} activated`, 'success'); }
+      catch (error) { this.toast(error.message, 'error'); }
+      this.refreshCatalogs();
+      await this.refreshModShop();
+    });
   }
 
   async deactivatePlugin(name) {
-    try { await this.runtime.pluginManager.deactivate(name); this.toast(`${name} deactivated`, 'warn'); }
-    catch (error) { this.toast(error.message, 'error'); }
-    this.refreshCatalogs();
-    await this.refreshModShop();
+    return this.withOperation(`plugin:${name}`, `Plugin ${name}`, async () => {
+      try { await this.runtime.pluginManager.deactivate(name); this.toast(`${name} deactivated`, 'warn'); }
+      catch (error) { this.toast(error.message, 'error'); }
+      this.refreshCatalogs();
+      await this.refreshModShop();
+    });
   }
 
   async reloadPlugin(name) {
-    try { await this.runtime.pluginManager.reload(name); this.toast(`${name} reloaded`, 'success'); }
-    catch (error) { this.toast(error.message, 'error'); }
-    this.refreshCatalogs();
-    await this.refreshModShop();
+    return this.withOperation(`plugin:${name}`, `Plugin ${name}`, async () => {
+      try { await this.runtime.pluginManager.reload(name); this.toast(`${name} reloaded`, 'success'); }
+      catch (error) { this.toast(error.message, 'error'); }
+      this.refreshCatalogs();
+      await this.refreshModShop();
+    });
   }
 
   async closeBrowser(instanceId) {
-    try { await this.runtime.browserManager.close(instanceId); this.toast('Browser closed', 'warn'); }
-    catch (error) { this.toast(error.message, 'error'); }
-    await this.refreshModShop();
+    return this.withOperation(`browser:${instanceId}`, 'Browser close', async () => {
+      try { await this.runtime.browserManager.close(instanceId); this.toast('Browser closed', 'warn'); }
+      catch (error) { this.toast(error.message, 'error'); }
+      await this.refreshModShop();
+    });
   }
 
   async stopProcess(processId) {
-    try { this.runtime.processManager.stop(processId, 'SIGTERM'); this.toast('Signal sent', 'warn'); }
-    catch (error) { this.toast(error.message, 'error'); }
-    await this.refreshModShop();
+    return this.withOperation(`process:${processId}`, 'Process stop', async () => {
+      try { this.runtime.processManager.stop(processId, 'SIGTERM'); this.toast('Signal sent', 'warn'); }
+      catch (error) { this.toast(error.message, 'error'); }
+      await this.refreshModShop();
+    });
   }
 
   // ---------------------------------------------------------------- terminal
@@ -1062,6 +1273,7 @@ export class MaskShiftTui {
   async runTerminalCommand(command) {
     const value = command.trim();
     if (!value) return;
+    if (this.terminalBusy) { this.toast('A terminal command is already running', 'warn'); return; }
     this.terminalField.remember(value);
     this.terminalField.clear();
     const theme = this.theme;
@@ -1138,6 +1350,21 @@ export class MaskShiftTui {
     this.requestRender();
   }
 
+  async withOperation(key, label, operation) {
+    if (this.operationLocks.has(key)) {
+      this.toast(`${label} is already in progress`, 'warn');
+      return null;
+    }
+    this.operationLocks.add(key);
+    this.requestRender();
+    try {
+      return await operation();
+    } finally {
+      this.operationLocks.delete(key);
+      this.requestRender();
+    }
+  }
+
   openPalette() {
     this.overlay = new PaletteOverlay(this.actions);
   }
@@ -1195,7 +1422,7 @@ export class MaskShiftTui {
   }
 
   openSessionPicker() {
-    const sessions = this.runtime.store.listSessions({ limit: 200 });
+    const sessions = this.runtime.store.listSessions({ workspaceId: this.workspaceId, limit: 200 });
     this.overlay = new PickerOverlay({
       title: 'HEIST ARCHIVE',
       placeholder: 'Filter heists…',
@@ -1204,7 +1431,7 @@ export class MaskShiftTui {
         detail: `${session.model_id || ''} · ${this.stamp(session.updated_at)}`,
         tone: session.id === this.sessionId ? this.theme.roles.primary : undefined,
       })),
-      onSelect: (item) => this.loadSession(item.id),
+      onSelect: (item) => this.requestSessionLoad(item.id),
     });
   }
 
@@ -1230,7 +1457,22 @@ export class MaskShiftTui {
     });
   }
 
-  openWorkspaceDialog() {
+  openWorkspaceDialog({ force = false } = {}) {
+    if (!force && (this.busy || this.composer.value || this.promptQueue.length)) {
+      this.overlay = new ConfirmOverlay({
+        title: 'SWITCH TARGET', danger: Boolean(this.busy || this.promptQueue.length),
+        message: this.busy || this.promptQueue.length
+          ? 'Cancel the active run, discard queued orders and the current draft, then choose another workspace?'
+          : 'Discard the current draft and choose another workspace?',
+        onConfirm: async () => {
+          if (this.busy) this.cancelRun();
+          this.promptQueue = [];
+          this.composer.clear();
+          this.openWorkspaceDialog({ force: true });
+        },
+      });
+      return;
+    }
     this.overlay = new FormOverlay({
       title: 'OPEN WORKSPACE', submitLabel: 'OPEN + INDEX',
       note: 'MaskShift detects Git, imports project instructions and MCP configuration, and builds a local context index.',
@@ -1375,8 +1617,9 @@ export class MaskShiftTui {
   }
 
   async runAction(id) {
-    switch (id) {
-      case 'run.new': this.newSession(); break;
+    try {
+      switch (id) {
+      case 'run.new': this.requestNewSession(); break;
       case 'run.switch': this.openSessionPicker(); break;
       case 'run.cancel': this.cancelRun(); break;
       case 'run.rename': this.openRenameDialog(); break;
@@ -1422,7 +1665,10 @@ export class MaskShiftTui {
       case 'help': this.openHelp(); break;
       case 'refresh': this.refreshAll(); break;
       case 'quit': this.stop(0); break;
-      default: this.toast(`Unknown action: ${id}`, 'warn');
+        default: this.toast(`Unknown action: ${id}`, 'warn');
+      }
+    } catch (error) {
+      this.toast(error.message, 'error');
     }
     this.requestRender();
   }
@@ -1452,6 +1698,7 @@ export class MaskShiftTui {
 
   confirmDeleteSession() {
     if (!this.sessionId) return;
+    if (this.busy) { this.toast('Cancel the active run before deleting this heist', 'warn'); return; }
     this.overlay = new ConfirmOverlay({
       title: 'DELETE HEIST', danger: true,
       message: `Delete "${this.sessionTitle}" and every message in it?`,
@@ -1465,13 +1712,15 @@ export class MaskShiftTui {
 
   async reindex() {
     if (!this.workspaceId) return;
-    this.toast('Indexing the target…', 'info');
-    try {
-      const stats = await this.runtime.indexer.index(this.workspaceId, { force: true });
-      this.toast(`Indexed ${stats.files ?? stats.chunks ?? 0} entries`, 'success');
-    } catch (error) {
-      this.toast(error.message, 'error');
-    }
+    return this.withOperation(`index:${this.workspaceId}`, 'Workspace indexing', async () => {
+      this.toast('Indexing the target…', 'info');
+      try {
+        const stats = await this.runtime.indexer.index(this.workspaceId, { force: true });
+        this.toast(`Indexed ${stats.files ?? stats.chunks ?? 0} entries`, 'success');
+      } catch (error) {
+        this.toast(error.message, 'error');
+      }
+    });
   }
 
   async showInspection() {
@@ -1501,16 +1750,19 @@ export class MaskShiftTui {
 
   async createCheckpoint() {
     if (!this.workspaceId) return;
-    try {
-      const checkpoint = await this.runtime.workspaceManager.createCheckpoint(this.workspaceId, { label: 'manual' });
-      this.toast(`Checkpoint ${checkpoint.kind} saved`, 'success');
-    } catch (error) {
-      this.toast(error.message, 'error');
-    }
+    return this.withOperation(`checkpoint:${this.workspaceId}`, 'Checkpoint creation', async () => {
+      try {
+        const checkpoint = await this.runtime.workspaceManager.createCheckpoint(this.workspaceId, { label: 'manual' });
+        this.toast(`Checkpoint ${checkpoint.kind} saved`, 'success');
+      } catch (error) {
+        this.toast(error.message, 'error');
+      }
+    });
   }
 
   openCheckpointPicker() {
     if (!this.workspaceId) return;
+    if (this.busy) { this.toast('Cancel the active run before restoring a checkpoint', 'warn'); return; }
     const checkpoints = this.runtime.store.listCheckpoints(this.workspaceId, 100);
     if (!checkpoints.length) { this.toast('No checkpoints recorded', 'warn'); return; }
     this.overlay = new PickerOverlay({
@@ -1589,7 +1841,7 @@ export class MaskShiftTui {
     const [command, ...rest] = input.slice(1).split(/\s+/);
     const argument = rest.join(' ');
     switch (command) {
-      case 'new': this.newSession(); break;
+      case 'new': this.requestNewSession(); break;
       case 'clear': this.messages = []; this.transcript.toBottom(); break;
       case 'model':
         if (argument) { this.modelRef = argument; this.toast(`Persona set to ${argument}`, 'success'); }

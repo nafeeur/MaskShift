@@ -11,10 +11,11 @@ import { transcriptLines } from '../src/tui/views/chat.mjs';
 import { renderMarkdown } from '../src/tui/markdown.mjs';
 import { Screen } from '../src/tui/screen.mjs';
 import { Theme, detectDepth } from '../src/tui/theme.mjs';
-import { fit, sliceAnsi, stripAnsi, truncate, visibleWidth, wrap } from '../src/tui/text.mjs';
+import { fit, sanitizeTerminalLine, sliceAnsi, stripAnsi, truncate, visibleWidth, wrap } from '../src/tui/text.mjs';
 import { Composer, ListView, TextField, Viewport, fuzzy } from '../src/tui/widgets.mjs';
 import { Regions } from '../src/tui/regions.mjs';
 import { resolveMouseMode } from '../src/tui/app.mjs';
+import { ConfirmOverlay, FormOverlay } from '../src/tui/overlays.mjs';
 import { createProject, runtimeForTest } from './helpers.mjs';
 
 const ESC = String.fromCharCode(27);
@@ -188,6 +189,25 @@ test('the key decoder handles control, escape, modifier and paste sequences', ()
   assert.equal(paste.text, 'two words');
   assert.equal(decode(`ab${ESC}[`).rest, `${ESC}[`);
   assert.ok(matches(decode(String.fromCharCode(11)).events[0], 'ctrl+k'));
+  assert.ok(matches(decode(String.fromCharCode(10)).events[0], 'ctrl+j'));
+});
+
+test('text editing moves and deletes whole grapheme clusters', () => {
+  const field = new TextField({ value: 'A👨‍👩‍👧‍👦e\u0301界' });
+  field.cursor = 1 + '👨‍👩‍👧‍👦'.length;
+  field.handle({ name: 'backspace' });
+  assert.equal(field.value, 'Ae\u0301界');
+  assert.equal(field.cursor, 1);
+
+  const composer = new Composer({ value: 'x🇧🇩y' });
+  composer.cursor = 1 + '🇧🇩'.length;
+  composer.handle({ name: 'left' });
+  assert.equal(composer.cursor, 1);
+  composer.handle({ name: 'delete' });
+  assert.equal(composer.value, 'xy');
+  assert.equal(visibleWidth('👨‍👩‍👧‍👦🇧🇩e\u0301'), 5);
+  assert.deepEqual(new Composer({ value: '界界' }).layout(2, 4).rows, ['界', '界']);
+  assert.match(stripAnsi(new TextField({ value: '界' }).render(theme, 2).text), /界/);
 });
 
 test('the composer edits, wraps and tracks the caret across lines', () => {
@@ -261,6 +281,121 @@ test('the screen only rewrites rows that changed', () => {
   output.written = '';
   screen.render(['one', 'CHANGED', 'three', 'four']);
   assert.equal(output.written, '');
+});
+
+test('the screen strips terminal injection while retaining internal SGR styles', () => {
+  const output = new FakeTerminal(80, 2);
+  const screen = new Screen({ theme, output });
+  const styled = theme.paint('safe', { fg: theme.roles.text });
+  screen.render([`${styled}\u001b]52;c;ZXhmaWx0cmF0ZQ==\u0007\u001b[2Jvisible`, 'ok\u202evil']);
+  assert.match(output.written, /safe/);
+  assert.match(output.written, /visible/);
+  assert.doesNotMatch(output.written, /52;c|\u001b\[2J|\u0007|\u202e/);
+  assert.match(sanitizeTerminalLine(styled), /\u001b\[[0-9;]+m/);
+});
+
+test('small terminals render within their real dimensions', async (t) => {
+  const project = await createProject(t);
+  const runtime = await runtimeForTest(t, project);
+  const output = new FakeTerminal(20, 8);
+  const app = new MaskShiftTui(runtime, { workspacePath: project, output, headless: true, theme });
+  await app.bootstrap();
+  const frame = app.snapshot();
+  assert.equal(frame.length, 8);
+  for (const line of frame) assert.equal(visibleWidth(line), 20);
+  assert.ok(frame.some((line) => stripAnsi(line).includes('Resize')));
+});
+
+test('async forms and confirmations stay open and report failures inline', async () => {
+  const app = { overlay: null, renders: 0, requestRender() { this.renders += 1; }, closeOverlay() { this.overlay = null; } };
+  let release;
+  const form = new FormOverlay({
+    title: 'ASYNC', fields: [{ name: 'value', label: 'value', value: 'x' }],
+    onSubmit: () => new Promise((resolve) => { release = resolve; }),
+  });
+  app.overlay = form;
+  const pending = form.submit(app);
+  assert.equal(app.overlay, form);
+  assert.equal(form.pending, true);
+  release();
+  await pending;
+  assert.equal(app.overlay, null);
+
+  const confirm = new ConfirmOverlay({ title: 'FAIL', message: 'fail?', onConfirm: async () => { throw new Error('restore failed'); } });
+  app.overlay = confirm;
+  await confirm.confirm(app);
+  assert.equal(app.overlay, confirm);
+  assert.equal(confirm.pending, false);
+  assert.equal(confirm.error, 'restore failed');
+});
+
+test('prompts submitted during a run are queued and drained sequentially', async (t) => {
+  const project = await createProject(t);
+  const runtime = await runtimeForTest(t, project);
+  const app = new MaskShiftTui(runtime, { workspacePath: project, output: new FakeTerminal(), headless: true, theme });
+  await app.bootstrap();
+  const started = [];
+  runtime.engine.startRun = async ({ prompt, sessionId, workspaceId }) => {
+    started.push(prompt);
+    return { id: `run-${started.length}`, session_id: sessionId, workspace_id: workspaceId, status: 'queued' };
+  };
+  app.activeRun = { id: 'active', status: 'running' };
+  app.runId = 'active';
+  app.composer.set('second order');
+  await app.submitPrompt();
+  assert.deepEqual(started, []);
+  assert.equal(app.promptQueue.length, 1);
+  assert.ok(app.liveTrail.some((entry) => stripAnsi(entry.render(theme, 80)[0]).includes('QUEUED')));
+  app.activeRun = null;
+  app.runId = null;
+  await app.drainPromptQueue();
+  assert.deepEqual(started, ['second order']);
+  assert.equal(app.promptQueue.length, 0);
+});
+
+test('session switching is workspace-scoped and guarded when work is active', async (t) => {
+  const project = await createProject(t);
+  const runtime = await runtimeForTest(t, project);
+  const app = new MaskShiftTui(runtime, { workspacePath: project, output: new FakeTerminal(), headless: true, theme });
+  await app.bootstrap();
+  const other = runtime.store.upsertWorkspace(`${project}-other`, 'other');
+  runtime.store.createSession({ workspaceId: other.id, title: 'foreign' });
+  app.openSessionPicker();
+  assert.ok(app.overlay.items.every((session) => session.label !== 'foreign'));
+
+  app.closeOverlay();
+  app.composer.set('draft');
+  app.requestNewSession();
+  assert.equal(app.overlay?.constructor.name, 'ConfirmOverlay');
+});
+
+test('stale file previews and duplicate operations cannot replace current state', async (t) => {
+  const project = await createProject(t);
+  const runtime = await runtimeForTest(t, project);
+  const app = new MaskShiftTui(runtime, { workspacePath: project, output: new FakeTerminal(), headless: true, theme });
+  await app.bootstrap();
+  const resolvers = new Map();
+  runtime.toolRegistry.execute = async (name, args) => new Promise((resolve) => resolvers.set(args.path, resolve));
+  const first = app.openFile('first.txt', { quiet: true });
+  const second = app.openFile('second.txt', { quiet: true });
+  resolvers.get('second.txt')('second');
+  await second;
+  resolvers.get('first.txt')('first');
+  await first;
+  assert.equal(app.previewPath, 'second.txt');
+  assert.deepEqual(app.previewLines, ['second']);
+
+  let release;
+  let calls = 0;
+  const one = app.withOperation('same', 'Same action', async () => {
+    calls += 1;
+    await new Promise((resolve) => { release = resolve; });
+  });
+  const duplicate = await app.withOperation('same', 'Same action', async () => { calls += 1; });
+  assert.equal(duplicate, null);
+  assert.equal(calls, 1);
+  release();
+  await one;
 });
 
 test('the interface paints every view and overlay at the terminal size', async (t) => {

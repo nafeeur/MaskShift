@@ -4,7 +4,9 @@
 import { glyphs } from './box.mjs';
 import { DURATION } from './tokens.mjs';
 import { SPINNERS, presence, spin } from './motion.mjs';
-import { fit, repeat, truncate } from './text.mjs';
+import {
+  fit, graphemes, nextGraphemeBoundary, previousGraphemeBoundary, repeat, truncate, visibleWidth,
+} from './text.mjs';
 
 export class TextField {
   constructor({ value = '', placeholder = '', onSubmit = null, mask = false } = {}) {
@@ -34,20 +36,21 @@ export class TextField {
     if (event.name === 'paste') { this.insert(event.text.replace(/\n/g, ' ')); return true; }
     if (event.printable && !event.ctrl && !event.alt) { this.insert(event.name); return true; }
     switch (true) {
-      case event.name === 'left' && !event.ctrl: this.cursor = Math.max(0, this.cursor - 1); return true;
-      case event.name === 'right' && !event.ctrl: this.cursor = Math.min(this.value.length, this.cursor + 1); return true;
+      case event.name === 'left' && !event.ctrl: this.cursor = previousGraphemeBoundary(this.value, this.cursor); return true;
+      case event.name === 'right' && !event.ctrl: this.cursor = nextGraphemeBoundary(this.value, this.cursor); return true;
       case event.name === 'left' && event.ctrl: this.cursor = this.wordLeft(); return true;
       case event.name === 'right' && event.ctrl: this.cursor = this.wordRight(); return true;
       case event.name === 'home' || (event.ctrl && event.name === 'a'): this.cursor = 0; return true;
       case event.name === 'end' || (event.ctrl && event.name === 'e'): this.cursor = this.value.length; return true;
       case event.name === 'backspace': {
         if (this.cursor === 0) return true;
-        this.value = this.value.slice(0, this.cursor - 1) + this.value.slice(this.cursor);
-        this.cursor -= 1;
+        const previous = previousGraphemeBoundary(this.value, this.cursor);
+        this.value = this.value.slice(0, previous) + this.value.slice(this.cursor);
+        this.cursor = previous;
         return true;
       }
       case event.name === 'delete': {
-        this.value = this.value.slice(0, this.cursor) + this.value.slice(this.cursor + 1);
+        this.value = this.value.slice(0, this.cursor) + this.value.slice(nextGraphemeBoundary(this.value, this.cursor));
         return true;
       }
       case event.ctrl && event.name === 'u': this.value = this.value.slice(this.cursor); this.cursor = 0; return true;
@@ -102,12 +105,23 @@ export class TextField {
       const hint = theme.paint(truncate(this.placeholder, width), { fg: theme.roles.muted, italic: true });
       return { text: fit(hint, width), cursorColumn: 0 };
     }
-    const shown = this.mask ? repeat(mark.dot, this.value.length) : this.value;
-    const offset = Math.max(0, this.cursor - width + 1);
-    const window = shown.slice(offset, offset + width);
+    let offset = this.cursor;
+    while (offset > 0) {
+      const candidate = previousGraphemeBoundary(this.value, offset);
+      if (visibleWidth(this.value.slice(candidate, this.cursor)) >= width) {
+        if (offset === this.cursor) offset = candidate;
+        break;
+      }
+      offset = candidate;
+    }
+    const sourceWindow = this.value.slice(offset);
+    const shown = this.mask ? repeat(mark.dot, graphemes(sourceWindow).length) : sourceWindow;
+    const window = truncate(shown, width, '');
     return {
       text: fit(theme.paint(window, { fg: focused ? theme.roles.text : theme.roles.muted }), width),
-      cursorColumn: Math.min(width - 1, this.cursor - offset),
+      cursorColumn: Math.min(width - 1, this.mask
+        ? graphemes(this.value.slice(offset, this.cursor)).length
+        : visibleWidth(this.value.slice(offset, this.cursor))),
     };
   }
 }
@@ -149,15 +163,16 @@ export class Composer {
     switch (true) {
       case event.name === 'backspace': {
         if (this.cursor === 0) return true;
-        this.value = this.value.slice(0, this.cursor - 1) + this.value.slice(this.cursor);
-        this.cursor -= 1;
+        const previous = previousGraphemeBoundary(this.value, this.cursor);
+        this.value = this.value.slice(0, previous) + this.value.slice(this.cursor);
+        this.cursor = previous;
         return true;
       }
       case event.name === 'delete':
-        this.value = this.value.slice(0, this.cursor) + this.value.slice(this.cursor + 1);
+        this.value = this.value.slice(0, this.cursor) + this.value.slice(nextGraphemeBoundary(this.value, this.cursor));
         return true;
-      case event.name === 'left': this.cursor = Math.max(0, this.cursor - 1); return true;
-      case event.name === 'right': this.cursor = Math.min(this.value.length, this.cursor + 1); return true;
+      case event.name === 'left': this.cursor = previousGraphemeBoundary(this.value, this.cursor); return true;
+      case event.name === 'right': this.cursor = nextGraphemeBoundary(this.value, this.cursor); return true;
       case event.name === 'home': this.cursor = this.lineBounds().start; return true;
       case event.name === 'end': this.cursor = this.lineBounds().end; return true;
       case event.ctrl && event.name === 'u': this.value = this.value.slice(this.cursor); this.cursor = 0; return true;
@@ -208,17 +223,16 @@ export class Composer {
     let caret = { row: 0, column: 0 };
     let consumed = 0;
     for (const logical of this.value.split('\n')) {
-      const pieces = width > 0 ? chunk(logical, width) : [logical];
+      const pieces = width > 0 ? chunk(logical, width) : [{ text: logical, start: 0, end: logical.length }];
       for (const [index, piece] of pieces.entries()) {
-        const start = consumed;
-        const end = consumed + piece.length;
+        const start = consumed + piece.start;
+        const end = consumed + piece.end;
         if (this.cursor >= start && (this.cursor < end || (this.cursor === end && index === pieces.length - 1))) {
-          caret = { row: rows.length, column: this.cursor - start };
+          caret = { row: rows.length, column: visibleWidth(piece.text.slice(0, Math.max(0, this.cursor - start))) };
         }
-        rows.push(piece);
-        consumed = end;
+        rows.push(piece.text);
       }
-      consumed += 1; // the newline
+      consumed += logical.length + 1; // the newline
     }
     if (rows.length === 0) rows.push('');
     const offset = Math.max(0, caret.row - maxRows + 1);
@@ -227,17 +241,31 @@ export class Composer {
 }
 
 function chunk(text, width) {
-  if (text.length === 0) return [''];
+  if (text.length === 0) return [{ text: '', start: 0, end: 0 }];
   const pieces = [];
-  let index = 0;
-  while (index < text.length) {
-    let take = Math.min(width, text.length - index);
-    if (index + take < text.length) {
-      const space = text.lastIndexOf(' ', index + take);
-      if (space > index + Math.floor(width / 3)) take = space - index + 1;
+  const units = graphemes(text);
+  let unit = 0;
+  while (unit < units.length) {
+    const start = units[unit].index;
+    let used = 0;
+    let endUnit = unit;
+    let lastSpace = -1;
+    while (endUnit < units.length) {
+      const candidate = units[endUnit].segment;
+      const size = visibleWidth(candidate);
+      if (used + size > width && endUnit > unit) break;
+      used += size;
+      if (/\s/u.test(candidate)) lastSpace = endUnit;
+      endUnit += 1;
+      if (used >= width) break;
     }
-    pieces.push(text.slice(index, index + take));
-    index += take;
+    if (endUnit < units.length && lastSpace >= unit && lastSpace - unit >= Math.floor((endUnit - unit) / 3)) {
+      endUnit = lastSpace + 1;
+    }
+    if (endUnit === unit) endUnit += 1;
+    const end = endUnit < units.length ? units[endUnit].index : text.length;
+    pieces.push({ text: text.slice(start, end), start, end });
+    unit = endUnit;
   }
   return pieces;
 }

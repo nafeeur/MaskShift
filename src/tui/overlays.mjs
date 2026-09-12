@@ -221,7 +221,14 @@ export class PickerOverlay extends Overlay {
     this.listZone(app, {
       offset: placed.offset, columns: width, top: 3, height: listHeight, list: this.list,
       id: 'overlay:picker',
-      onPick: (target, item) => { target.closeOverlay(); if (item) void this.onSelect(item); },
+      onPick: (target, item) => {
+        target.closeOverlay();
+        if (!item) return;
+        try {
+          const result = this.onSelect(item);
+          if (result && typeof result.catch === 'function') result.catch((error) => target.toast(error.message, 'error'));
+        } catch (error) { target.toast(error.message, 'error'); }
+      },
     });
     return placed;
   }
@@ -232,7 +239,12 @@ export class PickerOverlay extends Overlay {
     if (event.name === 'enter') {
       const item = this.list.current;
       app.closeOverlay();
-      if (item) void this.onSelect(item);
+      if (item) {
+        try {
+          const result = this.onSelect(item);
+          if (result && typeof result.catch === 'function') result.catch((error) => app.toast(error.message, 'error'));
+        } catch (error) { app.toast(error.message, 'error'); }
+      }
       return true;
     }
     if (this.list.handle(event, 10)) return true;
@@ -262,6 +274,7 @@ export class FormOverlay extends Overlay {
     this.onSubmit = onSubmit;
     this.note = note;
     this.error = '';
+    this.pending = false;
   }
 
   size(viewport) {
@@ -325,7 +338,7 @@ export class FormOverlay extends Overlay {
     // A modal's primary action is the one other place a filled chip is
     // correct: there is no tab strip on screen to confuse it with, and a
     // dialogue has to say plainly what pressing return will do.
-    const submitChip = chip(theme, this.submitLabel);
+    const submitChip = chip(theme, this.pending ? `${spinLabel(theme)} WORKING` : this.submitLabel);
     const cancelChip = theme.paint(' CANCEL ', { fg: theme.roles.muted });
     const submitRow = body.length;
     body.push(`${submitChip}  ${cancelChip}   `
@@ -369,7 +382,7 @@ export class FormOverlay extends Overlay {
         width: visibleWidth(submitChip),
         height: 1,
         id: 'overlay:submit',
-        onPress: (target) => this.submit(target),
+        onPress: (target) => { void this.submit(target); },
       });
       this.zone(app, {
         row: offset.row + 1 + submitRow,
@@ -377,7 +390,7 @@ export class FormOverlay extends Overlay {
         width: visibleWidth(cancelChip),
         height: 1,
         id: 'overlay:cancel',
-        onPress: (target) => target.closeOverlay(),
+        onPress: (target) => { if (!this.pending) target.closeOverlay(); },
       });
     }
 
@@ -387,20 +400,28 @@ export class FormOverlay extends Overlay {
     };
   }
 
-  submit(app) {
+  async submit(app) {
+    if (this.pending) return;
+    this.pending = true;
+    this.dismissOnOutsideClick = false;
+    this.error = '';
+    app.requestRender();
     try {
-      const result = this.onSubmit(this.values());
-      if (result && typeof result.catch === 'function') result.catch((error) => app.toast(error.message, 'error'));
-      app.closeOverlay();
+      await this.onSubmit(this.values());
+      if (app.overlay === this) app.closeOverlay();
     } catch (error) {
       this.error = error.message;
+      this.pending = false;
+      this.dismissOnOutsideClick = true;
+      app.requestRender();
     }
   }
 
   handle(app, event) {
     const field = this.fields[this.index];
+    if (this.pending) return true;
     if (event.name === 'escape') { app.closeOverlay(); return true; }
-    if (event.ctrl && event.name === 's') { this.submit(app); return true; }
+    if (event.ctrl && event.name === 's') { void this.submit(app); return true; }
     if (event.name === 'tab') {
       this.index = (this.index + (event.shift ? -1 : 1) + this.fields.length) % this.fields.length;
       return true;
@@ -429,7 +450,7 @@ export class FormOverlay extends Overlay {
       return true;
     }
     if (event.name === 'enter') {
-      if (this.index === this.fields.length - 1) this.submit(app);
+      if (this.index === this.fields.length - 1) void this.submit(app);
       else this.index += 1;
       return true;
     }
@@ -450,6 +471,8 @@ export class ConfirmOverlay extends Overlay {
     this.danger = danger;
     this.onConfirm = onConfirm;
     this.choice = danger ? 1 : 0;
+    this.pending = false;
+    this.error = '';
   }
 
   render(app, viewport) {
@@ -468,6 +491,8 @@ export class ConfirmOverlay extends Overlay {
       : theme.paint('  NO  ', { fg: theme.roles.muted });
     const buttonRow = body.length;
     body.push(`${yes}   ${no}`);
+    if (this.pending) body.push('', theme.paint(`${spinLabel(theme)} Working…`, { fg: theme.roles.muted }));
+    if (this.error) body.push('', theme.paint(truncate(this.error, width - 4), { fg: theme.roles.danger }));
     const lines = panel({
       theme, width, height: body.length + 2, title: this.title,
       note: this.danger ? `${mark.warn} DESTRUCTIVE` : '',
@@ -480,29 +505,52 @@ export class ConfirmOverlay extends Overlay {
     this.zone(app, {
       row: offset.row + 1 + buttonRow, column: offset.column + 2,
       width: visibleWidth(yes), height: 1, id: 'overlay:yes',
-      onPress: (target) => { target.closeOverlay(); void this.onConfirm(); },
+      onPress: (target) => { void this.confirm(target); },
     });
     this.zone(app, {
       row: offset.row + 1 + buttonRow,
       column: offset.column + 2 + visibleWidth(yes) + 3,
       width: visibleWidth(no), height: 1, id: 'overlay:no',
-      onPress: (target) => target.closeOverlay(),
+      onPress: (target) => { if (!this.pending) target.closeOverlay(); },
     });
 
     return { lines, offset, cursor: null };
   }
 
   handle(app, event) {
+    if (this.pending) return true;
     if (event.name === 'escape' || event.name === 'n') { app.closeOverlay(); return true; }
     if (event.name === 'left' || event.name === 'right' || event.name === 'tab') { this.choice = this.choice === 0 ? 1 : 0; return true; }
-    if (event.name === 'y') { app.closeOverlay(); void this.onConfirm(); return true; }
+    if (event.name === 'y') { void this.confirm(app); return true; }
     if (event.name === 'enter') {
-      app.closeOverlay();
-      if (this.choice === 0) void this.onConfirm();
+      if (this.choice === 0) void this.confirm(app);
+      else app.closeOverlay();
       return true;
     }
     return true;
   }
+
+  async confirm(app) {
+    if (this.pending) return;
+    this.pending = true;
+    this.dismissOnOutsideClick = false;
+    this.error = '';
+    app.requestRender();
+    try {
+      await this.onConfirm();
+      if (app.overlay === this) app.closeOverlay();
+    } catch (error) {
+      this.pending = false;
+      this.dismissOnOutsideClick = true;
+      this.error = error.message;
+      app.requestRender();
+    }
+  }
+}
+
+function spinLabel(theme) {
+  const frames = theme.unicode ? ['◐', '◓', '◑', '◒'] : ['|', '/', '-', '\\'];
+  return frames[Math.floor(theme.motion.elapsed / 120) % frames.length];
 }
 
 export class TextOverlay extends Overlay {

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Hardened the TUI trust boundary by stripping terminal control and bidirectional-override sequences from rendered model, tool, file, shell and pasted content while preserving MaskShift's own SGR styling.
+- Made the terminal lifecycle crash- and signal-safe, including raw-mode, mouse, cursor, alternate-screen and title restoration plus suspend/resume handling, and added an honest fallback for terminals below 40×12.
+- Added sequential, visible prompt queuing; workspace-scoped session switching with draft/run guards; correct session telemetry restoration; stale async result suppression; and duplicate-operation locks.
+- Made editors grapheme-aware for emoji, combining marks and wide characters, fixed `ctrl+j`, and made async forms and confirmations retain input, show progress, prevent duplicate submission and report failures inline.
+
 ## 1.3.0
 
 - Added the v1.2 codebase-intelligence layer: a persistent file/symbol/import/call graph, reverse dependency and change-impact analysis, likely-test discovery, an explicit context budget planner, retrieval decision metadata, and file-hash provenance for durable memory. Memories backed by changed or missing source files are excluded from automatic run context instead of silently becoming stale instructions.
