@@ -10,7 +10,7 @@ import { EventEmitter } from 'node:events';
 import { ESC } from './theme.mjs';
 
 const CTRL_NAMES = {
-  0x00: 'space', 0x08: 'backspace', 0x09: 'tab', 0x0a: 'enter', 0x0d: 'enter', 0x7f: 'backspace',
+  0x00: 'space', 0x08: 'backspace', 0x09: 'tab', 0x0d: 'enter', 0x7f: 'backspace',
 };
 
 const CSI_FINAL = {
@@ -184,6 +184,8 @@ export class Keyboard extends EventEmitter {
     this.buffer = '';
     this.attached = false;
     this.paused = false;
+    this.wasRaw = Boolean(input.isRaw);
+    this.wasPaused = Boolean(input.isPaused?.());
     this.handleData = (chunk) => {
       if (this.paused) return;
       this.buffer += chunk;
@@ -212,6 +214,8 @@ export class Keyboard extends EventEmitter {
   start() {
     if (this.attached) return;
     this.attached = true;
+    this.wasRaw = Boolean(this.input.isRaw);
+    this.wasPaused = Boolean(this.input.isPaused?.());
     if (this.input.isTTY) this.input.setRawMode(true);
     this.input.setEncoding('utf8');
     this.input.resume();
@@ -223,8 +227,8 @@ export class Keyboard extends EventEmitter {
     this.attached = false;
     clearTimeout(this.escapeTimer);
     this.input.off('data', this.handleData);
-    if (this.input.isTTY) this.input.setRawMode(false);
-    this.input.pause();
+    if (this.input.isTTY) this.input.setRawMode(this.wasRaw);
+    if (this.wasPaused) this.input.pause();
   }
 }
 

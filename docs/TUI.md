@@ -213,6 +213,11 @@ default.
 | `esc` | Retreat from the running heist |
 | `f1`–`f3` | Fill the composer from a starter prompt (empty transcript only) |
 
+Prompts submitted while a heist is running enter a visible FIFO queue and run
+one at a time in the same session. Switching heists or workspaces while a run,
+queue or draft exists requires an explicit confirmation so work cannot silently
+cross session or workspace boundaries.
+
 ### Catalogue views
 
 | Key | Action |

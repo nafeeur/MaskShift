@@ -5,7 +5,7 @@
 // keeps large repaints flicker-free over SSH.
 
 import { ESC } from './theme.mjs';
-import { fit } from './text.mjs';
+import { fit, sanitizeTerminalLine } from './text.mjs';
 
 const CSI = `${ESC}[`;
 const BEL = String.fromCharCode(7);
@@ -21,6 +21,8 @@ export const ANSI = {
   reset: `${CSI}0m`,
   bracketedPasteOn: `${CSI}?2004h`,
   bracketedPasteOff: `${CSI}?2004l`,
+  saveTitle: `${CSI}22;0t`,
+  restoreTitle: `${CSI}23;0t`,
   // ?1000 button reports, ?1002 adds drag, ?1003 adds bare hover motion, and
   // ?1006 is the SGR encoding — the only one that addresses a cell past
   // column 223 and survives a UTF-8 stream.
@@ -49,8 +51,8 @@ export class Screen {
 
   get size() {
     return {
-      columns: Math.max(40, this.output.columns || 80),
-      rows: Math.max(12, this.output.rows || 24),
+      columns: Math.max(1, this.output.columns || 80),
+      rows: Math.max(1, this.output.rows || 24),
     };
   }
 
@@ -62,7 +64,7 @@ export class Screen {
     if (this.active) return;
     this.active = true;
     this.previous = [];
-    this.write(`${ANSI.altScreenOn}${ANSI.hideCursor}${ANSI.clear}`);
+    this.write(`${ANSI.saveTitle}${ANSI.altScreenOn}${ANSI.hideCursor}${ANSI.clear}`);
     this.applyMouse();
     this.output.on('resize', this.handleResize);
   }
@@ -72,7 +74,7 @@ export class Screen {
     this.active = false;
     this.output.off('resize', this.handleResize);
     if (this.mouseActive) { this.write(ANSI.mouseOff); this.mouseActive = false; }
-    this.write(`${ANSI.reset}${ANSI.showCursor}${ANSI.altScreenOff}`);
+    this.write(`${ANSI.reset}${ANSI.showCursor}${ANSI.altScreenOff}${ANSI.restoreTitle}`);
   }
 
   /**
@@ -104,7 +106,9 @@ export class Screen {
   render(lines, cursor = null) {
     const { columns, rows } = this.size;
     const frame = [];
-    for (let row = 0; row < rows; row += 1) frame.push(fit(lines[row] ?? '', columns));
+    for (let row = 0; row < rows; row += 1) {
+      frame.push(fit(sanitizeTerminalLine(lines[row] ?? ''), columns));
+    }
     let out = '';
     for (let row = 0; row < rows; row += 1) {
       if (this.previous[row] === frame[row]) continue;
