@@ -11,6 +11,7 @@
 
 <p align="center">
   <img alt="npm version" src="https://img.shields.io/npm/v/maskshift?style=flat-square&color=cb3837">
+  <img alt="npm downloads" src="https://img.shields.io/npm/dt/maskshift?style=flat-square&color=cb3837&label=downloads">
   <img alt="Node 22+" src="https://img.shields.io/badge/node-%E2%89%A522-3ecf8e?style=flat-square">
   <img alt="Runtime dependencies: none" src="https://img.shields.io/badge/runtime%20deps-0-4aa8ff?style=flat-square">
   <img alt="149 tools" src="https://img.shields.io/badge/tools-149-2bd9c0?style=flat-square">
@@ -248,10 +249,3 @@ For full host authority, run the user service directly instead.
 ## License
 
 [GNU General Public License v3.0](LICENSE).
-
----
-
-<p align="center">
-  <img alt="npm downloads (total)" src="https://img.shields.io/npm/dt/maskshift?style=flat-square&color=cb3837&label=downloads">
-  <img alt="npm downloads (monthly)" src="https://img.shields.io/npm/dm/maskshift?style=flat-square&color=cb3837&label=downloads%2Fmonth">
-</p>
