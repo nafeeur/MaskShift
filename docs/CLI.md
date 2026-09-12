@@ -96,6 +96,7 @@ message. With `--json` it emits a single object:
 | `mcp remove NAME` | Remove a definition. |
 | `mcp registry [QUERY]` | Search the official MCP registry. |
 | `mcp install REGISTRY_NAME` | Install from the registry. `--prefer remote\|package`. |
+| `mcp serve` | Run MaskShift itself as a stdio MCP server for the current workspace, so Claude Desktop, Claude Code, an IDE, or another MaskShift instance can drive its native tool catalog. `--read-only` exposes only read-only tools; `--tools a,b,c` restricts the catalog to an explicit allowlist. |
 
 ## Mod shop
 

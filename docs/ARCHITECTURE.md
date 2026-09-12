@@ -210,6 +210,12 @@ Copilot CLI, Nous Hermes, Aider, plus any custom `agentBridges` entry — and ca
 work to them while retaining the parent run, telemetry and repository context. These CLIs are
 not vendored; a bridge activates when the executable is on `PATH`.
 
+The MCP fabric runs in both directions. MaskShift is an MCP client to the servers configured in
+`docs/CONFIGURATION.md#mcp-definitions`, and `maskshift mcp serve` makes it an MCP server too,
+exposing the live tool registry over stdio to any client that speaks the standard handshake —
+Claude Desktop, Claude Code, an IDE extension, or another MaskShift instance. → [MCP server
+config](docs/CONFIGURATION.md#running-maskshift-as-an-mcp-server)
+
 ## Recovery model
 
 Recovery is layered:

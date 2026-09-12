@@ -6,6 +6,7 @@
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { safeJsonParse, truncate } from '../core/utils.mjs';
+import { McpServer } from '../mcp/server.mjs';
 import { oneLine } from './ui.mjs';
 
 const STATUS_TONE = (theme, status) => ({
@@ -560,6 +561,32 @@ const mcpCommands = {
       const result = await context.runtime.mcpManager.callQualified(name, parsed, { workspaceId: workspace.id });
       if (context.ui.emit(result)) return;
       context.ui.line(typeof result === 'string' ? result : JSON.stringify(result, null, 2));
+    },
+  },
+  serve: {
+    usage: 'mcp serve [--read-only] [--tools a,b,c]',
+    summary: 'Run MaskShift itself as a stdio MCP server for this workspace',
+    async run(context) {
+      const workspace = await resolveWorkspace(context);
+      const tools = context.args.tools
+        ? String(context.args.tools).split(',').map((name) => name.trim()).filter(Boolean)
+        : null;
+      const server = new McpServer({
+        toolRegistry: context.runtime.toolRegistry,
+        buildContext: () => toolContext(context.runtime, workspace),
+        logger: context.runtime.logger,
+        tools,
+        readOnly: Boolean(context.args['read-only']),
+      });
+      context.runtime.logger.info('MCP server listening on stdio', {
+        workspace: workspace.path, tools: server.exposedTools().length, readOnly: server.readOnly,
+      });
+      const interrupted = new Promise((resolve) => {
+        process.once('SIGINT', resolve);
+        process.once('SIGTERM', resolve);
+      });
+      await Promise.race([server.listen(), interrupted]);
+      server.close();
     },
   },
 };

@@ -295,6 +295,34 @@ connect them, but it cannot fabricate credentials.
 
 Environment placeholders are expanded at connection time. `${workspace}` in stdio arguments or `cwd` resolves to the active workspace root.
 
+## Running MaskShift as an MCP server
+
+`maskshift mcp serve` runs MaskShift itself as a stdio MCP server bound to one workspace,
+exposing the same native tool registry the CLI and interface use. Any MCP client that speaks
+the standard `initialize` → `tools/list` → `tools/call` handshake can drive it — Claude Desktop,
+Claude Code, an MCP-aware IDE extension, or another MaskShift instance.
+
+`--read-only` restricts the exposed catalog to tools marked `readOnly` (no `fs_write`,
+`shell_exec`, and the like); `--tools a,b,c` restricts it to an explicit allowlist instead. Both
+apply to `tools/list` and `tools/call` alike, so a tool that isn't listed cannot be invoked
+either. Standard output carries only JSON-RPC frames — diagnostics go to the log file and to
+stderr, never stdout, so nothing corrupts the transport.
+
+A Claude Desktop-style client config:
+
+```json
+{
+  "mcpServers": {
+    "maskshift": {
+      "command": "maskshift",
+      "args": ["mcp", "serve", "--workspace", "/path/to/repository"]
+    }
+  }
+}
+```
+
+Add `"--read-only"` to `args` for a client that should only ever inspect the workspace.
+
 ## External agent bridges
 
 ```json
