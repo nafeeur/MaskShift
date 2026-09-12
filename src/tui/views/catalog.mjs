@@ -7,7 +7,7 @@
 // other row in the product. Before that each view hand-rolled `fit` calls with
 // its own magic numbers, and no two lists shared a column edge.
 
-import { maskArt } from '../brand.mjs';
+import { MASK_HEIGHT, MASK_WIDTH, maskArt } from '../brand.mjs';
 import { frameColour, glyphs, panel, rule } from '../box.mjs';
 import { hstack, split } from '../layout.mjs';
 import { LAYER, listZone, viewportZone } from '../regions.mjs';
@@ -20,9 +20,11 @@ import { columns, field, gutter, label as typeLabel } from '../type.mjs';
  * a two-row header reads as broken; the mask glyph the idle heist screen
  * already uses reads as a considered state, so an empty Network or Mod Shop
  * pane feels like the same product instead of an unfinished corner of it.
+ * The art only appears when the pane can actually fit it — a raster mark cut
+ * off at the edges reads worse than the plain text alone.
  */
 function emptyState(theme, width, height, { title, hint = '' } = {}) {
-  const art = width >= 26 && height >= 10 ? maskArt(theme) : [];
+  const art = width >= MASK_WIDTH && height >= MASK_HEIGHT + 4 ? maskArt(theme) : [];
   const block = [...art, '', theme.paint(title, { fg: theme.roles.muted, bold: true })];
   if (hint) block.push('', theme.paint(hint, { fg: theme.roles.faint, italic: true }));
   const lines = block.map((line) => fit(center(line, width), width));

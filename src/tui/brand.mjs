@@ -20,14 +20,37 @@ const COMPACT = [
   '┴ ┴ ┴ ┴ └─┘ ┴ ┴ └─┘ ┴ ┴ ┴ ┴    ┴ ',
 ];
 
-// The phantom mask, drawn once for the idle hero.
+// The phantom mask, drawn once for the idle hero — a raster rendering of the
+// brand mark rather than typed line art, so it reads as the same mask
+// wherever the logo appears.
 const MASK = [
-  '      ╱▔▔▔▔▔▔▔▔▔╲      ',
-  '    ╱   ▄▄   ▄▄   ╲    ',
-  '   │   ▝██▘ ▝██▘   │   ',
-  '   │    ╲  ▁  ╱    │   ',
-  '    ╲    ▔▔▔▔▔    ╱    ',
-  '      ╲▁▁▁▁▁▁▁▁▁╱      ',
+  '                               P                               ',
+  '                             PAAA                              ',
+  '                           gAAAAAAA               11           ',
+  '                          AAAAAAAAAAA             11           ',
+  '                        AAAAAAAAAAAAAAA                        ',
+  '                      AAAAAAAAAAAAAAAAAAA                      ',
+  '                    AAAH11IAAAAAAAAAAAAAAA0                    ',
+  '                  F   J11111111XAAAAAAAAA                      ',
+  '                J       g111112 11111E       A                 ',
+  '              oA           11     13           A               ',
+  '             A           4           6          BA             ',
+  '           AA       311111          111111e       12           ',
+  '         AA         1111111        31111114        312         ',
+  '       AAAA          111 1111    11114 112         11111       ',
+  '         AAAAW         2111111111111111          11111         ',
+  '          kAAL1      11111111111111111111r     11111           ',
+  '            d1111e 1111111111111111111111113 11111             ',
+  '              3111111111111111111111111111111111               ',
+  '                111111111111111111111111111111l                ',
+  '                  111111111111111111111111110                  ',
+  '                    11111111111111111111113                    ',
+  '                      1111111111111111111                      ',
+  '                        111111111111111                        ',
+  '                         411111111111                          ',
+  '                           31111111                            ',
+  '                             2111j                             ',
+  '                               1                               ',
 ];
 
 export function wordmark(theme, width) {
@@ -41,8 +64,11 @@ export function wordmark(theme, width) {
   ));
 }
 
+export const MASK_WIDTH = Math.max(...MASK.map((line) => line.length));
+export const MASK_HEIGHT = MASK.length;
+
 export function maskArt(theme) {
-  if (!theme.unicode) return [];
+  // Plain ASCII, so it renders the same with MASKSHIFT_ASCII set as without.
   // The mask fades into the background from the brow down, so it sits behind
   // the wordmark instead of competing with it.
   return MASK.map((line, index) => theme.paint(line, {
