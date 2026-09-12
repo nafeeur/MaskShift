@@ -9,6 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      id-token: write
+
     steps:
       - uses: actions/checkout@v4
 
@@ -32,8 +34,12 @@ jobs:
             echo "published=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # Trusted publishing (OIDC) needs a recent npm CLI; the one bundled
+      # with setup-node's Node 22 predates it.
+      - name: Update npm
+        if: steps.version-check.outputs.published == 'false'
+        run: npm install -g npm@latest
+
       - name: Publish
         if: steps.version-check.outputs.published == 'false'
         run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
