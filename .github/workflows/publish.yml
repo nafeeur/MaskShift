@@ -21,7 +21,13 @@ jobs:
 
       - run: npm install
 
-      - run: npm run verify
+      # The runner has no D-Bus session bus, which makes Chrome (launched by
+      # the browser regression test) stall probing it before it hands back
+      # its debugging endpoint. dbus-run-session gives it one to talk to.
+      - name: Install dbus
+        run: sudo apt-get update && sudo apt-get install -y dbus-x11
+
+      - run: dbus-run-session -- npm run verify
 
       - name: Check whether this version is already published
         id: version-check
