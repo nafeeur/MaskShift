@@ -10,6 +10,7 @@ import { SPACE } from '../src/tui/tokens.mjs';
 import { transcriptLines } from '../src/tui/views/chat.mjs';
 import { renderMarkdown } from '../src/tui/markdown.mjs';
 import { Screen } from '../src/tui/screen.mjs';
+import { split } from '../src/tui/layout.mjs';
 import { Theme, detectDepth } from '../src/tui/theme.mjs';
 import { fit, sanitizeTerminalLine, sliceAnsi, stripAnsi, truncate, visibleWidth, wrap } from '../src/tui/text.mjs';
 import { Composer, ListView, TextField, Viewport, fuzzy } from '../src/tui/widgets.mjs';
@@ -319,6 +320,42 @@ test('the undersized-terminal fallback keeps the current size legible at any wid
     const frame = app.snapshot();
     assert.ok(frame.some((line) => stripAnsi(line).includes(`${columns}×${rows}`)),
       `expected the current size ${columns}x${rows} to survive at ${columns} columns`);
+  }
+});
+
+test('split() never returns columns that overflow the total, even below every minimum', () => {
+  // files.mjs asks for two panes with minimums (34 and 30) that add up to
+  // more than a 40-column terminal can give them — the absolute floor the
+  // rest of the interface promises to render at.
+  assert.deepEqual(
+    split(40, [{ weight: 1, min: 34, max: 56 }, { weight: 2, min: 30 }]).reduce((a, b) => a + b, 0),
+    40,
+  );
+  for (const total of [1, 5, 20, 39, 40, 64, 65, 200]) {
+    const sizes = split(total, [{ weight: 1, min: 34, max: 56 }, { weight: 2, min: 30 }]);
+    assert.deepEqual(sizes.reduce((a, b) => a + b, 0), total, `total=${total}`);
+    for (const size of sizes) assert.ok(size >= 0, `negative column width at total=${total}`);
+  }
+});
+
+test('every view renders exactly to size across the full range of real terminals', async (t) => {
+  const project = await createProject(t);
+  const runtime = await runtimeForTest(t, project);
+  const sizes = [[1, 1], [8, 3], [20, 8], [40, 12], [60, 20], [107, 30], [108, 30], [300, 12], [40, 200]];
+  const views = ['chat', 'files', 'arsenal', 'network', 'modshop', 'terminal'];
+  for (const [columns, rows] of sizes) {
+    const output = new FakeTerminal(columns, rows);
+    const app = new MaskShiftTui(runtime, { workspacePath: project, output, headless: true, theme });
+    await app.bootstrap();
+    for (const view of views) {
+      app.view = view;
+      app.screen.invalidate();
+      const frame = app.snapshot();
+      assert.equal(frame.length, rows, `${view} at ${columns}x${rows}: wrong row count`);
+      for (const [index, line] of frame.entries()) {
+        assert.equal(visibleWidth(stripAnsi(line)), columns, `${view} at ${columns}x${rows}: row ${index} wrong width`);
+      }
+    }
   }
 });
 

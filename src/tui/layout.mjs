@@ -25,6 +25,12 @@ export function vstack(blocks, height = null, width = null) {
 /**
  * Split a total width into weighted columns with minimums.
  * `parts` is [{ weight, min, max }] and the remainder lands on the widest part.
+ *
+ * The result always sums to exactly `total`, even when the declared minimums
+ * don't fit inside it — a caller sized for a 92-column split doesn't stop
+ * being called just because the real terminal is narrower than that. Below
+ * that point minimums are honoured as far as they can be and then given up
+ * on, largest first, rather than the row being left wider than its frame.
  */
 export function split(total, parts) {
   const weights = parts.reduce((sum, part) => sum + (part.weight ?? 1), 0);
@@ -44,6 +50,15 @@ export function split(total, parts) {
       }
       if (direction < 0 && sizes[index] > (part.min ?? 0)) {
         if (target === -1 || sizes[index] > sizes[target]) target = index;
+      }
+    }
+    if (target === -1 && direction < 0) {
+      // Every part is already at its declared minimum and the total still
+      // doesn't fit — the minimums themselves are the problem, so shrink
+      // whichever part is currently largest below its minimum instead of
+      // returning a row wider than the space it has to render into.
+      for (const [index, size] of sizes.entries()) {
+        if (size > 0 && (target === -1 || size > sizes[target])) target = index;
       }
     }
     if (target === -1) break;
