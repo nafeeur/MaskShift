@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.3
+
+- Fixed `browser_launch` crashing on CI runners (GitHub Actions' `ubuntu-latest` included) with "No usable sandbox!": `--no-sandbox` was only added when running as root, but modern runner kernels disable unprivileged user namespaces for every UID, not just non-root ones. Also added `.github/workflows/publish.yml`, which runs `npm run verify` and publishes to npm on every push to `main` whose `package.json` version isn't already on the registry.
+
 ## 1.0.2
 
 - Fixed `.env` in the working directory being silently ignored on every startup path except Docker Compose (which loads it itself for variable substitution). `bin/maskshift.mjs` now calls `process.loadEnvFile()` before the runtime boots, so `OPENROUTER_API_KEY` and the other provider credentials documented in `.env.example` actually reach `process.env`.

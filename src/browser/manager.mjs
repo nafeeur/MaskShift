@@ -108,7 +108,7 @@ export class BrowserManager {
       '--disable-component-update', '--disable-sync', '--disable-features=Translate,OptimizationHints',
       '--window-size=1440,1000',
       ...(headless ? ['--headless=new', '--hide-scrollbars'] : []),
-      ...(process.platform === 'linux' && (typeof process.getuid !== 'function' || process.getuid() === 0) ? ['--no-sandbox'] : []),
+      ...(process.platform === 'linux' && (typeof process.getuid !== 'function' || process.getuid() === 0 || process.env.CI) ? ['--no-sandbox'] : []),
       ...(this.config.get().browser?.args || []), ...(extraArgs || []), url || 'about:blank',
     ];
     const child = spawn(this.executable, args, { stdio: ['ignore', 'ignore', 'pipe'], detached: process.platform !== 'win32' });
