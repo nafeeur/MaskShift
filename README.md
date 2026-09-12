@@ -5,8 +5,9 @@
 <h1 align="center">MaskShift</h1>
 
 <p align="center">
-  <strong>A maximalist, model-agnostic coding harness for the terminal.</strong><br>
-  Every tool at the model's disposal — only the ones it needs in its context.
+  <strong>The full toolbox for any coding model, in one zero-dependency terminal harness.</strong><br>
+  159 tools, 50 skills, persistent code-graph intelligence and worktree-isolated multi-agent
+  orchestration — but only what the current step needs ever touches the model's context.
 </p>
 
 <p align="center">
@@ -29,6 +30,24 @@ are inserted into model context.
 
 It runs on Node.js 22 using only built-in modules — the interface renderer included. No npm
 runtime dependency tree, no HTTP server, no browser, no listening socket.
+
+### How it differs
+
+Most terminal coding agents pick a model vendor and a fixed tool list. MaskShift is built the
+other way around: the model is a config line, and the tool surface is the whole catalog, held
+out of context until a step actually needs it.
+
+| | **MaskShift** | Claude Code | Aider | Codex CLI |
+|---|---|---|---|---|
+| Model support | Any provider, plus a text protocol for models with no tool API | Anthropic-first | Any provider | OpenAI-first |
+| Runtime dependencies | 0 | npm tree | Python + pip tree | npm tree |
+| Native tool surface | 159 tools — shell, LSP, browsers, containers, Kubernetes, SSH, databases, PDFs, images, MCP | Shell, file edits, web, MCP | Shell, file edits, git | Shell, file edits, MCP, sandboxed exec |
+| Codebase intelligence | Persistent file/symbol/call graph with reverse change-impact analysis | Ad hoc search and grep | Ctags-based repo map | Ad hoc search and grep |
+| Multi-agent orchestration | Executable dependency DAGs, worktree-isolated by default, bounded parallel waves | Subagents (Task tool) | Not built in | Subagents |
+| Interface | Full-screen, zero-dependency TUI — six views, mouse and keyboard | Terminal chat interface | Terminal chat interface | Terminal chat interface |
+
+Not a knock on any of them — they make different tradeoffs on purpose. This is where MaskShift
+lands.
 
 ---
 
