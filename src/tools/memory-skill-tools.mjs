@@ -1,3 +1,7 @@
+import fsp from 'node:fs/promises';
+import path from 'node:path';
+import { sha256 } from '../core/utils.mjs';
+
 function decayHalfLifeDays(config) {
   return config.get().memory?.decayHalfLifeDays || 30;
 }
@@ -22,14 +26,27 @@ export function registerMemorySkillTools(registry, { store, skillManager, config
         scope: { type: 'string', enum: ['workspace', 'global', 'session'], default: 'workspace' },
         tags: { type: 'array', items: { type: 'string' } }, importance: { type: 'number', minimum: 0, maximum: 1, default: 0.5 },
         dedupe: { type: 'boolean', default: true },
+        confidence: { type: 'number', minimum: 0, maximum: 1, default: 1 },
+        sources: { type: 'array', maxItems: 50, items: { type: 'string' }, description: 'Workspace-relative source files that support this memory.' },
+        validUntil: { type: 'string', description: 'Optional ISO timestamp or revision boundary.' },
       },
     },
-    execute: async (args, context) => store.saveMemory({
-      id: args.id, workspaceId: args.scope === 'global' ? null : context.workspaceId,
-      scope: args.scope || 'workspace', title: args.title, content: args.content,
-      tags: args.tags || [], importance: args.importance ?? 0.5, dedupe: args.dedupe !== false,
-      meta: { source: 'agent', runId: context.runId, sessionId: context.sessionId },
-    }),
+    execute: async (args, context) => {
+      const root = path.resolve(context.workspacePath || process.cwd());
+      const sources = [];
+      for (const relative of args.sources || []) {
+        const full = path.resolve(root, relative);
+        if (!full.startsWith(`${root}${path.sep}`) && full !== root) throw new Error(`Memory source escapes workspace: ${relative}`);
+        const content = await fsp.readFile(full).catch(() => null);
+        sources.push({ path: path.relative(root, full), hash: content ? sha256(content) : null, observedAt: new Date().toISOString() });
+      }
+      return store.saveMemory({
+        id: args.id, workspaceId: args.scope === 'global' ? null : context.workspaceId,
+        scope: args.scope || 'workspace', title: args.title, content: args.content,
+        tags: args.tags || [], importance: args.importance ?? 0.5, dedupe: args.dedupe !== false,
+        meta: { source: 'agent', runId: context.runId, sessionId: context.sessionId, confidence: args.confidence ?? 1, sources, validUntil: args.validUntil || null },
+      });
+    },
   });
 
   registry.register({

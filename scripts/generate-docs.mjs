@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRuntime } from '../src/runtime.mjs';
+import { VERSION } from '../src/core/utils.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const home = await fsp.mkdtemp(path.join(os.tmpdir(), 'maskshift-docs-'));
@@ -22,7 +23,7 @@ try {
   }
   const toolLines = [
     '# Native Tool Inventory', '',
-    `Generated from the MaskShift 1.0.0 runtime. **${tools.length} native tools** are available before plugins or MCP servers add more capabilities.`, '',
+    `Generated from the MaskShift ${VERSION} runtime. **${tools.length} native tools** are available before plugins or MCP servers add more capabilities.`, '',
     'Only activated descriptors enter a model request; this document is the complete local catalog.', '',
   ];
   for (const [category, values] of [...grouped].sort(([a], [b]) => a.localeCompare(b))) {
@@ -72,7 +73,7 @@ try {
   const mcpServers = portable(runtime.mcpManager.listServers());
   const manifest = {
     generatedAt: new Date().toISOString(),
-    version: '1.0.0',
+    version: VERSION,
     nativeToolCount: tools.length,
     bundledSkillCount: skills.length,
     curatedMcpCount: mcpServers.length,

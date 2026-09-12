@@ -303,6 +303,35 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
     assert.equal((await runtime.engine.waitForRun(run.id)).status, 'cancelled');
   });
 
+  await suite.test('code intelligence, routing, executable DAGs and validated skills', async (t) => {
+    const server = await jsonServer(t, (_req, res) => respondJson(res, 200, { id: 'fixture', output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'DAG_NODE_OK' }] }] }));
+    const { call, runtime, context, project } = await setup(t, {
+      defaultModel: 'fixture:local', indexing: { embeddings: false },
+      providers: [{ id: 'fixture', type: 'openai-responses', baseUrl: server.url, apiKeyEnv: null, enabled: true, models: [{ id: 'local' }], timeoutMs: 5000 }],
+      routing: { autoSelect: true, models: [{ model: 'fixture:local', tags: ['general-coding', 'verification', 'frontend'], priority: 1 }] },
+    });
+    await fsp.mkdir(path.join(project, 'src'));
+    await fsp.mkdir(path.join(project, 'tests'));
+    await fsp.writeFile(path.join(project, 'src', 'math.js'), 'export function add(a, b) { return a + b; }\n');
+    await fsp.writeFile(path.join(project, 'src', 'service.js'), "import { add } from './math.js';\nexport function total(xs) { return add(xs.length, 1); }\n");
+    await fsp.writeFile(path.join(project, 'tests', 'service.test.js'), "import { total } from '../src/service.js';\ntest('total', () => total([]));\n");
+    await runtime.indexer.index(context.workspaceId, { force: true });
+    await call('code_graph_build', {}, r => assert.ok(r.nodes >= 6));
+    await call('code_graph_query', { query: 'add', kind: 'function' }, r => assert.equal(r[0].name, 'add'));
+    await call('change_impact', { targets: ['src/math.js'] }, r => assert.ok(r.files.includes('src/service.js')));
+    await call('context_plan_explain', { prompt: 'change add and verify service' }, r => assert.ok(r.plan.budgets.source > 0));
+    await call('model_route', { task: 'Fix the frontend component' }, r => assert.equal(r.selected, 'fixture:local'));
+    await call('agent_route', { task: 'Review the tests' }, r => assert.ok(r.selected?.type));
+    await call('plan_dag_update', { nodes: [{ id: 'inspect', task: 'Return the fixture marker', mode: 'inspect', model: 'fixture:local' }] }, r => assert.equal(r.dag[0].status, 'pending'));
+    context.runId = null;
+    await call('agent_dag_execute', {}, r => assert.equal(r.plan.dag[0].status, 'completed'), 'local model fixture');
+    await runtime.skillManager.create({ name: 'validated-fixture', description: 'A deterministic skill used by the all-tools verification harness.', body: '# Validated fixture\n\nRun deterministic checks.' });
+    for (let index = 0; index < 3; index += 1) {
+      await call('skill_evaluate', { skillName: 'validated-fixture', taskKey: `case-${index}`, baselinePassed: index === 0, candidatePassed: true });
+    }
+    await call('skill_promote_validated', { skillName: 'validated-fixture', addition: 'Confirm the marker.', minTrials: 3 }, r => assert.equal(r.promoted, true));
+  });
+
   await suite.test('external agent bridges execute a local echo CLI', async (t) => {
     const { call } = await setup(t, { agentBridges: { claude: { enabled: false }, codex: { enabled: false }, opencode: { enabled: false }, copilot: { enabled: false }, hermes: { enabled: false }, aider: { enabled: false }, fixture: { command: 'node', args: ['-e', 'console.log(process.argv[1])', '{prompt}'] } } });
     await call('agent_bridge_discover', {}, r => assert.ok(r.some(b => b.name === 'fixture' && b.available)), 'local CLI fixture');

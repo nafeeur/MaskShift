@@ -5,6 +5,7 @@ import { Store } from './core/store.mjs';
 import { HookManager } from './hooks/manager.mjs';
 import { WorkspaceManager } from './workspace/manager.mjs';
 import { RepositoryIndexer } from './indexer/repository-indexer.mjs';
+import { CodeGraph } from './indexer/code-graph.mjs';
 import { SkillManager } from './agent/skills.mjs';
 import { ProviderManager } from './agent/providers.mjs';
 import { McpManager } from './mcp/manager.mjs';
@@ -17,6 +18,8 @@ import { ToolRegistry } from './tools/registry.mjs';
 import { ProcessManager } from './tools/process-manager.mjs';
 import { CapabilityController } from './agent/capabilities.mjs';
 import { ContextBuilder } from './agent/context.mjs';
+import { ContextPlanner } from './agent/context-planner.mjs';
+import { IntelligenceRouter } from './agent/router.mjs';
 import { PromptBuilder } from './agent/prompt.mjs';
 import { AgentEngine } from './agent/engine.mjs';
 import { registerAllTools } from './tools/register-all.mjs';
@@ -32,6 +35,8 @@ export async function createRuntime({ configPath, configOverrides = {}, workspac
   const hooks = new HookManager({ config, logger, eventBus });
   const workspaceManager = new WorkspaceManager({ store, config, logger, eventBus });
   const indexer = new RepositoryIndexer({ store, workspaceManager, config, logger, eventBus });
+  const codeGraph = new CodeGraph({ store, workspaceManager, indexer, eventBus, logger });
+  const contextPlanner = new ContextPlanner({ config, logger });
   const skillManager = new SkillManager({ config, logger, eventBus });
   await skillManager.setWorkspace(workspacePath);
   const providerManager = new ProviderManager({ config, logger, eventBus });
@@ -43,9 +48,11 @@ export async function createRuntime({ configPath, configOverrides = {}, workspac
   const browserManager = new BrowserManager({ config, logger, eventBus, workspaceManager });
   const toolRegistry = new ToolRegistry({ logger, eventBus, hooks, config });
   const capabilityController = new CapabilityController({ toolRegistry, skillManager, mcpManager, config, eventBus });
+  const intelligenceRouter = new IntelligenceRouter({ config, store, providerManager, bridgeManager });
+  const contextBuilder = new ContextBuilder({ workspaceManager, indexer, codeGraph, contextPlanner, store, config, logger });
   let engine;
   const managerDependencies = {
-    config, store, logger, eventBus, hooks, workspaceManager, indexer, skillManager,
+    config, store, logger, eventBus, hooks, workspaceManager, indexer, codeGraph, contextPlanner, contextBuilder, intelligenceRouter, skillManager,
     providerManager, mcpManager, lspManager, processManager, bridgeManager, browserManager,
     toolRegistry, capabilityController, getEngine: () => engine,
   };
@@ -59,22 +66,21 @@ export async function createRuntime({ configPath, configOverrides = {}, workspac
   managerDependencies.pluginManager = pluginManager;
   managerDependencies.automationScheduler = automationScheduler;
   registerAllTools(toolRegistry, {
-    config, store, logger, eventBus, hooks, workspaceManager, indexer, skillManager,
+    config, store, logger, eventBus, hooks, workspaceManager, indexer, codeGraph, contextPlanner, contextBuilder, intelligenceRouter, skillManager,
     providerManager, mcpManager, lspManager, processManager, bridgeManager, browserManager,
     pluginManager, automationScheduler, capabilityController,
     getEngine: () => engine,
   });
   await pluginManager.init(workspacePath);
-  const contextBuilder = new ContextBuilder({ workspaceManager, indexer, store, config, logger });
   const promptBuilder = new PromptBuilder({ config, capabilityController });
   engine = new AgentEngine({
-    store, config, logger, eventBus, hooks, providerManager, workspaceManager,
+    store, config, logger, eventBus, hooks, providerManager, workspaceManager, intelligenceRouter,
     indexer, toolRegistry, capabilityController, promptBuilder, contextBuilder, mcpManager,
   });
   automationScheduler.start();
 
   const runtime = {
-    config, eventBus, logger, store, hooks, workspaceManager, indexer, skillManager,
+    config, eventBus, logger, store, hooks, workspaceManager, indexer, codeGraph, contextPlanner, intelligenceRouter, skillManager,
     providerManager, mcpManager, lspManager, bridgeManager, browserManager, pluginManager,
     automationScheduler, processManager, toolRegistry, capabilityController,
     contextBuilder, promptBuilder, engine,
