@@ -37,14 +37,16 @@ Most terminal coding agents pick a model vendor and a fixed tool list. MaskShift
 other way around: the model is a config line, and the tool surface is the whole catalog, held
 out of context until a step actually needs it.
 
-| | **MaskShift** | Claude Code | Aider | Codex CLI |
-|---|---|---|---|---|
-| Model support | Any provider, plus a text protocol for models with no tool API | Anthropic-first | Any provider | OpenAI-first |
-| Runtime dependencies | 0 | npm tree | Python + pip tree | npm tree |
-| Native tool surface | 159 tools — shell, LSP, browsers, containers, Kubernetes, SSH, databases, PDFs, images, MCP | Shell, file edits, web, MCP | Shell, file edits, git | Shell, file edits, MCP, sandboxed exec |
-| Codebase intelligence | Persistent file/symbol/call graph with reverse change-impact analysis | Ad hoc search and grep | Ctags-based repo map | Ad hoc search and grep |
-| Multi-agent orchestration | Executable dependency DAGs, worktree-isolated by default, bounded parallel waves | Subagents (Task tool) | Not built in | Subagents |
-| Interface | Full-screen, zero-dependency TUI — six views, mouse and keyboard | Terminal chat interface | Terminal chat interface | Terminal chat interface |
+| | **MaskShift** | Claude Code | OpenCode | Codex CLI | Nous Hermes Agent |
+|---|---|---|---|---|---|
+| Model support | Any provider — Ollama, OpenAI, Anthropic, Gemini, OpenRouter, LM Studio, vLLM — plus a text protocol for models with no tool API | Anthropic's Claude family | Any provider, 75+ models | OpenAI's GPT family, via ChatGPT plan or API key | Any provider — Nous Portal, OpenRouter, OpenAI, custom endpoints |
+| License | GPL-3.0, open source | Proprietary (Commercial Terms of Service) | MIT, open source | Apache-2.0, open source | MIT, open source |
+| Runtime dependencies | 0 — Node.js built-ins only | npm dependency tree | Go binary + provider SDKs | Rust binary, containerized sandbox by default | Python 3.11 + Node.js, ripgrep, ffmpeg |
+| Native tool surface | 159 tools — shell, LSP, browsers, containers, Kubernetes, SSH, databases, PDFs, images, MCP | Built-in file/shell/web tools, plus MCP | File/shell tools plus per-language LSP and MCP | File/shell/sandboxed-exec tools, plus MCP | 40+ tools, plus MCP over the agentskills.io standard |
+| Codebase intelligence | Persistent file/symbol/call graph with reverse change-impact analysis | Ad hoc search and grep | Per-language LSP (go-to-definition, references) | Ad hoc search and grep | General-purpose tool search, not code-graph specific |
+| Multi-agent orchestration | Executable dependency DAGs, worktree-isolated by default, bounded parallel waves | Subagents (Explore, Plan, general-purpose) | Multiple parallel sessions | Native subagents, sandboxed | Isolated subagents, each with its own conversation and terminal |
+| Interface | Full-screen, zero-dependency TUI — six views, mouse and keyboard | Chat-style terminal interface, plus IDE and desktop apps | Terminal-first TUI, plus desktop and IDE extensions | Terminal chat, plus a VS Code extension | Full TUI, plus Telegram, Discord, Slack and other surfaces |
+| Primary focus | A coding harness — any model, the whole tool catalog | Coding agent | Coding agent | Coding agent | General-purpose autonomous assistant; coding is one surface among many |
 
 Not a knock on any of them — they make different tradeoffs on purpose. This is where MaskShift
 lands.
