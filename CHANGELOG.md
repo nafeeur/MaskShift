@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.1
+
+- Fixed `VERSION` (shown by `--version`, the TUI header, and reported to MCP/LSP clients) being a second hardcoded literal that had drifted from `package.json` — 1.4.0 was published still reporting itself as 1.3.0 everywhere. It's now read from `package.json` at startup instead of duplicated.
+
 ## 1.4.0
 
 - Added optional voice prompt capture: `ctrl+v` (or the command palette) records through the system's `ffmpeg` and hands the audio to a configurable speech-to-text command — a local Whisper, whisper.cpp or any other CLI that accepts an `{audio}` path — then inserts the transcript straight into the composer. Off in practice until a transcribe command is set (in Settings, `f2`, or `MASKSHIFT_VOICE_TRANSCRIBE_COMMAND`), and never pulls in an npm runtime dependency.
