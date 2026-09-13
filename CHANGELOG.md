@@ -1,7 +1,11 @@
 # Changelog
 
-## Unreleased
+## 1.4.0
 
+- Added optional voice prompt capture: `ctrl+v` (or the command palette) records through the system's `ffmpeg` and hands the audio to a configurable speech-to-text command — a local Whisper, whisper.cpp or any other CLI that accepts an `{audio}` path — then inserts the transcript straight into the composer. Off in practice until a transcribe command is set (in Settings, `f2`, or `MASKSHIFT_VOICE_TRANSCRIBE_COMMAND`), and never pulls in an npm runtime dependency.
+- Added `maskshift mcp serve`: a standard stdio MCP server (initialize / tools/list / tools/call over NDJSON) backed by the same tool registry the TUI and CLI already use, so any MCP client — Claude Desktop, Claude Code, an IDE extension, another MaskShift instance — can drive one workspace without a bespoke integration. `--read-only` and `--tools a,b,c` narrow the exposed catalog for lower-trust connections.
+- Fixed native tool-call parsing silently ending a run when a model (seen live from `qwen3-coder-30b` over OpenRouter) emitted a Llama-3.1-style `<function=NAME><parameter=...>` call instead of a `tool_calls` response or `<tool_call>{json}</tool_call>`. Both the text protocol and the native-mode salvage path now recognise it and strip stray unmatched tags so they never leak into the visible reply.
+- Replaced the idle-hero mask glyph with a 27-line ASCII raster that actually matches the brand mark (rendering correctly under `MASKSHIFT_ASCII` too, since it's now plain ASCII), gave it a slow idle breath and a faster brighter pulse while a run is in flight, and swapped the bare "Run completed/cancelled/failed/max-steps" toast for in-character outcomes — CLEAN GETAWAY, CALLED OFF, BLOWN COVER, RAN OUT OF TIME.
 - Hardened the TUI trust boundary by stripping terminal control and bidirectional-override sequences from rendered model, tool, file, shell and pasted content while preserving MaskShift's own SGR styling.
 - Made the terminal lifecycle crash- and signal-safe, including raw-mode, mouse, cursor, alternate-screen and title restoration plus suspend/resume handling, and added an honest fallback for terminals below 40×12.
 - Added sequential, visible prompt queuing; workspace-scoped session switching with draft/run guards; correct session telemetry restoration; stale async result suppression; and duplicate-operation locks.
