@@ -17,6 +17,7 @@ import { fit, oneLine, truncate, visibleWidth, wrap } from './text.mjs';
 import { Composer, ListView, Spinner, TextField, Toasts, Viewport } from './widgets.mjs';
 import { columns, gutter, key as typeKey, label as sectionLabel } from './type.mjs';
 import { VERSION, runCommand, safeJsonParse } from '../core/utils.mjs';
+import { VoiceInput } from '../voice/index.mjs';
 import * as chatView from './views/chat.mjs';
 import * as filesView from './views/files.mjs';
 import * as arsenalView from './views/arsenal.mjs';
@@ -104,6 +105,8 @@ export class MaskShiftTui {
 
     // Composer and transcript.
     this.composer = new Composer();
+    this.voice = new VoiceInput(runtime.config.get().voice);
+    this.voiceRecording = false;
     this.transcript = new Viewport();
     this.detail = new Viewport();
     this.railView = new Viewport();
@@ -591,6 +594,7 @@ export class MaskShiftTui {
     if (event.ctrl && event.name === 'b') { this.railVisible = !this.railVisible; this.screen.invalidate(); return true; }
     if (event.ctrl && event.name === 'r') { this.cycleRail(1); return true; }
     if (event.ctrl && event.name === 'y') { this.focus = this.focus === 'rail' ? 'composer' : 'rail'; return true; }
+    if (event.ctrl && event.name === 'v') { void this.startVoiceCapture(); return true; }
     if (event.name === 'f1') { this.openHelp(); return true; }
     if (event.name === 'f2') { this.openSettings(); return true; }
     if (event.name === 'f5') { this.refreshAll(); return true; }
@@ -974,6 +978,31 @@ export class MaskShiftTui {
     if (this.composer.value.includes(reference)) return;
     this.composer.insert(`${this.composer.value && !this.composer.value.endsWith(' ') ? ' ' : ''}${reference} `);
     this.toast(`Attached ${relative}`, 'success');
+  }
+
+  async startVoiceCapture() {
+    return this.withOperation('voice', 'Voice input', async () => {
+      if (!this.voice.enabled) { this.toast('Voice input is disabled — enable it in settings (f2)', 'warn'); return; }
+      if (!this.voice.config.transcribeCommand) {
+        this.toast('No speech-to-text command configured — set one in settings (f2)', 'warn');
+        return;
+      }
+      this.voiceRecording = true;
+      this.toast(`Listening for ${this.voice.durationSeconds}s…`, 'info');
+      this.requestRender();
+      try {
+        const transcript = await this.voice.captureAndTranscribe();
+        if (!transcript) { this.toast('Heard nothing', 'warn'); return; }
+        const needsSpace = this.composer.value && !/\s$/.test(this.composer.value);
+        this.composer.insert(`${needsSpace ? ' ' : ''}${transcript}`);
+        this.focus = 'composer';
+        this.toast('Voice prompt transcribed', 'success');
+      } catch (error) {
+        this.toast(`Voice input failed: ${error.message}`, 'error');
+      } finally {
+        this.voiceRecording = false;
+      }
+    });
   }
 
   toolContext() {
@@ -1414,6 +1443,7 @@ export class MaskShiftTui {
       ['ctrl+b', 'show or hide the right rail'],
       ['ctrl+r', 'cycle rail: plan → loadout → events → git'],
       ['ctrl+y', 'focus the rail'],
+      ['ctrl+v', 'record a voice prompt and transcribe it into the composer'],
       ['1 … 6 / alt+1 … 6', 'jump to a view'],
       ['f1 or ?', 'this reference'],
       ['f2', 'settings'],
@@ -1580,8 +1610,23 @@ export class MaskShiftTui {
             { label: 'OFF (terminal selects)', value: 'off' },
           ],
         },
+        { name: 'voiceEnabled', label: 'voice input (ctrl+v)', type: 'toggle', value: config.voice?.enabled !== false },
+        {
+          name: 'voiceTranscribeCommand', label: 'voice transcribe command', value: config.voice?.transcribeCommand || '',
+          hint: 'whisper-cli -f {audio} -otxt -of {output} (blank disables voice input)',
+        },
+        {
+          name: 'voiceRecordCommand', label: 'voice record command (optional)', value: config.voice?.recordCommand || '',
+          hint: 'blank uses ffmpeg\'s default microphone input for this OS',
+        },
       ],
       onSubmit: async (values) => {
+        const voice = {
+          ...(config.voice || {}),
+          enabled: values.voiceEnabled,
+          transcribeCommand: values.voiceTranscribeCommand?.trim() || null,
+          recordCommand: values.voiceRecordCommand?.trim() || null,
+        };
         await this.runtime.config.update({
           defaultModel: values.defaultModel,
           permissionMode: values.permissionMode,
@@ -1591,9 +1636,11 @@ export class MaskShiftTui {
           autoCheckpoint: values.autoCheckpoint,
           autoLoadCapabilities: values.autoLoadCapabilities,
           ui: { ...(config.ui || {}), mouse: values.mouse },
+          voice,
         });
         this.autoLoad = values.autoLoadCapabilities;
         this.screen.setMouse(values.mouse);
+        this.voice = new VoiceInput(voice);
         this.toast('Settings saved', 'success');
       },
     });
@@ -1609,6 +1656,7 @@ export class MaskShiftTui {
       action('run.cancel', 'heist', 'Retreat from the running heist', 'esc'),
       action('run.rename', 'heist', 'Rename this heist'),
       action('run.delete', 'heist', 'Delete this heist'),
+      action('voice.capture', 'heist', 'Record a voice prompt', 'ctrl+v'),
       action('model.pick', 'persona', 'Change model', 'ctrl+g'),
       action('model.discover', 'persona', 'Re-discover providers and models'),
       action('workspace.open', 'target', 'Open workspace', 'ctrl+o'),
@@ -1657,6 +1705,7 @@ export class MaskShiftTui {
       case 'run.cancel': this.cancelRun(); break;
       case 'run.rename': this.openRenameDialog(); break;
       case 'run.delete': this.confirmDeleteSession(); break;
+      case 'voice.capture': await this.startVoiceCapture(); break;
       case 'model.pick': this.openModelPicker(); break;
       case 'model.discover': await this.discoverProviders(); this.toast('Providers re-discovered', 'success'); break;
       case 'workspace.open': this.openWorkspaceDialog(); break;

@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import fsp from 'node:fs/promises';
+import path from 'node:path';
 import test from 'node:test';
 import { Writable } from 'node:stream';
 import { MaskShiftTui } from '../src/tui/app.mjs';
@@ -17,7 +19,7 @@ import { Composer, ListView, TextField, Viewport, fuzzy } from '../src/tui/widge
 import { Regions } from '../src/tui/regions.mjs';
 import { resolveMouseMode } from '../src/tui/app.mjs';
 import { ConfirmOverlay, FormOverlay } from '../src/tui/overlays.mjs';
-import { createProject, runtimeForTest } from './helpers.mjs';
+import { createProject, runtimeForTest, tempDir } from './helpers.mjs';
 
 const ESC = String.fromCharCode(27);
 const theme = new Theme({ depth: 24, unicode: true });
@@ -552,6 +554,52 @@ test('the interface routes keys, slash commands and view switches', async (t) =>
   assert.equal(app.toasts.items.length, 1);
 });
 
+test('ctrl+v is wired to voice capture and transcribes a prompt into the composer', async (t) => {
+  const project = await createProject(t);
+  const scripts = await tempDir(t, 'maskshift-voice-scripts-');
+  const recordScript = path.join(scripts, 'record.mjs');
+  const transcribeScript = path.join(scripts, 'transcribe.mjs');
+  await fsp.writeFile(recordScript, "import fs from 'node:fs'; fs.writeFileSync(process.argv[2], 'fake-audio');\n");
+  await fsp.writeFile(transcribeScript, "process.stdout.write('open the vault');\n");
+
+  const runtime = await runtimeForTest(t, project, {
+    voice: {
+      recordCommand: `node ${recordScript} {audio}`,
+      transcribeCommand: `node ${transcribeScript} {audio}`,
+      durationSeconds: 1,
+    },
+  });
+  const app = new MaskShiftTui(runtime, { workspacePath: project, output: new FakeTerminal(), headless: true, theme });
+  await app.bootstrap();
+
+  let dispatched = null;
+  const original = app.startVoiceCapture.bind(app);
+  app.startVoiceCapture = (...args) => { dispatched = original(...args); return dispatched; };
+  app.onKey({ name: 'v', ctrl: true });
+  assert.ok(dispatched);
+  await dispatched;
+
+  assert.equal(app.composer.value, 'open the vault');
+  assert.equal(app.focus, 'composer');
+  assert.ok(app.toasts.items.some((toast) => toast.message.includes('transcribed')));
+
+  app.composer.set('draft: ');
+  await app.startVoiceCapture();
+  assert.equal(app.composer.value, 'draft: open the vault');
+});
+
+test('voice capture refuses to record when no speech-to-text command is configured', async (t) => {
+  const project = await createProject(t);
+  const runtime = await runtimeForTest(t, project, { voice: { transcribeCommand: null, recordCommand: null } });
+  const app = new MaskShiftTui(runtime, { workspacePath: project, output: new FakeTerminal(), headless: true, theme });
+  await app.bootstrap();
+
+  app.composer.set('untouched');
+  await app.startVoiceCapture();
+  assert.equal(app.composer.value, 'untouched');
+  assert.ok(app.toasts.items.some((toast) => toast.message.includes('No speech-to-text command configured')));
+});
+
 test('the decoder turns SGR and legacy mouse reports into positioned events', () => {
   const only = (input) => decode(input).events;
 
@@ -684,7 +732,10 @@ test('the interface routes clicks, wheels and drags to what it painted', async (
   // A click outside an overlay dismisses it; one inside does not.
   app.openPalette();
   app.snapshot();
-  at(18, 66);
+  // Row 8 is the palette's own search-input row (above where its list of
+  // actions starts) — inside the overlay's surface, but not one of its rows,
+  // so clicking it can never itself trigger an action and close the palette.
+  at(8, 30);
   assert.ok(app.overlay, 'a click on the overlay should not dismiss it');
   at(0, 0);
   assert.equal(app.overlay, null);

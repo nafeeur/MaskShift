@@ -167,6 +167,16 @@ export function defaultConfig() {
     providers: envProviderDefaults(),
     mcpServers: {},
     hooks: {},
+    // Optional voice prompt capture (ctrl+v in the TUI). Off by default until
+    // a transcription command is configured, so it never becomes a silent
+    // ffmpeg/microphone dependency for people who don't want it.
+    voice: {
+      enabled: true,
+      durationSeconds: Number(process.env.MASKSHIFT_VOICE_SECONDS || 8),
+      recordCommand: process.env.MASKSHIFT_VOICE_RECORD_COMMAND || null,
+      transcribeCommand: process.env.MASKSHIFT_VOICE_TRANSCRIBE_COMMAND || null,
+      transcribeTimeoutMs: Number(process.env.MASKSHIFT_VOICE_TRANSCRIBE_TIMEOUT_MS || 120_000),
+    },
     // Terminal interface preferences.
     ui: {
       density: 'maximal',
@@ -209,6 +219,7 @@ function mergeConfig(base, override) {
     models: override?.routing?.models || base.routing?.models || [],
   };
   merged.memory = { ...base.memory, ...(override?.memory || {}) };
+  merged.voice = { ...base.voice, ...(override?.voice || {}) };
   merged.pricing = {
     ...base.pricing, ...(override?.pricing || {}),
     models: { ...(base.pricing?.models || {}), ...(override?.pricing?.models || {}) },
