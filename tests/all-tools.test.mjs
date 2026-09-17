@@ -70,6 +70,13 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
     await call('fs_read_binary', { path: 'nested/a.txt' }, r => assert.equal(Buffer.from(r.base64, 'base64').toString(), 'alpha\nbeta\n'));
     await call('fs_stat', { path: 'nested/a.txt', hash: true }, r => assert.match(r.sha256, /^[a-f0-9]{64}$/));
     await call('fs_list', { path: 'nested' }, r => assert.ok(r.entries.some(e => e.path.endsWith('a.txt'))));
+    await call('text_stats', { paths: 'nested/a.txt' }, r => assert.deepEqual([r.files[0].lines, r.files[0].words], [2, 2]));
+    await call('fs_write', { path: 'nested/a-copy.txt', content: 'alpha\nbeta\n' });
+    await call('file_diff', { a: 'nested/a.txt', b: 'nested/a-copy.txt' }, r => assert.equal(r.identical, true));
+    await call('fs_write', { path: 'nested/a-copy.txt', content: 'alpha\nBETA\n' });
+    await call('file_diff', { a: 'nested/a.txt', b: 'nested/a-copy.txt' }, r => { assert.equal(r.identical, false); assert.ok(r.addedLines >= 1 && r.removedLines >= 1); });
+    await optional('chmod_set', ['chmod'], { path: 'nested/a.txt', mode: '600' }, r => { assert.equal(r.after, '600'); assert.equal(r.changed, r.before !== '600'); });
+    await call('fs_delete', { path: 'nested/a-copy.txt' }, r => assert.equal(r.deleted, true));
     await call('fs_patch', { path: 'nested/a.txt', edits: [{ oldText: 'beta', newText: 'gamma' }] }, r => assert.equal(r.applied[0].replacements, 1));
     await call('fs_apply_patch', { patch: '--- a/nested/a.txt\n+++ b/nested/a.txt\n@@ -1,2 +1,2 @@\n alpha\n-gamma\n+delta\n' }, r => assert.equal(r.applied, true));
     assert.equal(await fsp.readFile(path.join(project, 'nested/a.txt'), 'utf8'), 'alpha\ndelta\n');
@@ -164,14 +171,22 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
     await call('sqlite_query', { database: 'data.sqlite', sql: 'SELECT * FROM items', readOnly: true }, r => assert.deepEqual(r.rows, [{ id: 7, name: "it's a test" }]));
     await call('sqlite_schema', { database: 'data.sqlite' }, r => assert.equal(r[0].name, 'items'));
     await optional('archive_create', ['tar'], { output: 'bundle.tar.gz', paths: ['index.js'] }, r => { assert.equal(r.code, 0); assert.ok(r.bytes > 0); });
+    await optional('archive_list', ['tar'], { archive: 'bundle.tar.gz' }, r => assert.ok(r.entries.some(e => e.includes('index.js'))));
     const extracted = await optional('archive_extract', ['tar'], { archive: 'bundle.tar.gz', destination: 'extracted' }, r => assert.equal(r.code, 0));
     if (extracted) assert.equal(await fsp.readFile(path.join(project, 'extracted/index.js'), 'utf8'), await fsp.readFile(path.join(project, 'index.js'), 'utf8'));
     await call('file_hash', { path: 'index.js' }, r => assert.match(r.digest, /^[a-f0-9]{64}$/));
+    await call('checksum_verify', { path: 'index.js', expected: 'not-the-right-hash' }, r => assert.equal(r.match, false));
+    const digest = await call('file_hash', { path: 'index.js' });
+    await call('checksum_verify', { path: 'index.js', expected: digest.digest }, r => assert.equal(r.match, true));
+    await optional('ps_list', ['ps'], { limit: 5 }, r => assert.ok(r.processes.length > 0 && r.processes.every(p => p.pid)));
+    await optional('disk_usage', ['df'], {}, r => { assert.equal(r.mode, 'filesystems'); assert.equal(r.code, 0); });
+    await optional('disk_usage', ['du'], { path: '.' }, r => { assert.equal(r.mode, 'directory'); assert.ok(r.entries.length > 0); });
     await optional('python_cell', ['python3'], { code: 'print(6 * 7)' }, r => { assert.equal(r.code, 0); assert.equal(r.stdout.trim(), '42'); });
     await call('node_cell', { code: 'console.log(6 * 7)' }, r => { assert.equal(r.code, 0); assert.equal(r.stdout.trim(), '42'); });
     await call('environment_set', { values: { MASKSHIFT_TEST_MARKER: 'fixture' } });
     try { await call('environment_list', { filter: '^MASKSHIFT_TEST_MARKER$', includeValues: true }, r => assert.deepEqual(r, { MASKSHIFT_TEST_MARKER: 'fixture' })); }
     finally { await call('environment_set', { values: { MASKSHIFT_TEST_MARKER: null } }); }
+    await optional('network_diagnose', ['ping'], { host: '127.0.0.1', count: 1 }, r => { assert.equal(r.mode, 'ping'); assert.equal(r.code, 0); });
     await optional('port_inspect', ['ss', 'lsof', 'netstat'], { port: 1 }, r => assert.equal(r.code, 0));
     const source = path.join(project, 'index.js');
     const transferred = await optional('rsync_transfer', ['rsync'], { source, destination: path.join(project, 'copy.js') }, r => assert.equal(r.code, 0));

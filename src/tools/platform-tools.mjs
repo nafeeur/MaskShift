@@ -32,6 +32,13 @@ function rowObject(row) {
   return Object.fromEntries(Object.entries(row).map(([key, value]) => [key, normalizeSqlValue(value)]));
 }
 
+async function hashFile(file, algorithm) {
+  const hash = crypto.createHash(algorithm || 'sha256');
+  const handle = await fsp.open(file, 'r');
+  try { for await (const chunk of handle.createReadStream()) hash.update(chunk); } finally { await handle.close().catch(() => {}); }
+  return hash.digest('hex');
+}
+
 async function tempScript(language, code) {
   const extension = language === 'python' ? 'py' : 'mjs';
   const directory = await fsp.mkdtemp(path.join(os.tmpdir(), 'maskshift-cell-'));
@@ -220,7 +227,33 @@ export function registerPlatformTools(registry, { config }) {
     name: 'file_hash', title: 'Hash file', description: 'Calculate SHA-256, SHA-512, SHA-1, or MD5 for a file without loading it all into model context.',
     category: 'artifacts', readOnly: true,
     inputSchema: { type: 'object', required: ['path'], properties: { path: { type: 'string' }, algorithm: { type: 'string', enum: ['sha256', 'sha512', 'sha1', 'md5'], default: 'sha256' } } },
-    execute: async (args, context) => { const file = absolutePath(args.path, context.workspacePath || process.cwd()); const hash = crypto.createHash(args.algorithm || 'sha256'); const handle = await fsp.open(file, 'r'); try { for await (const chunk of handle.createReadStream()) hash.update(chunk); } finally { await handle.close().catch(() => {}); } const stat = await fsp.stat(file); return { path: file, algorithm: args.algorithm || 'sha256', digest: hash.digest('hex'), bytes: stat.size }; },
+    execute: async (args, context) => { const file = absolutePath(args.path, context.workspacePath || process.cwd()); const digest = await hashFile(file, args.algorithm); const stat = await fsp.stat(file); return { path: file, algorithm: args.algorithm || 'sha256', digest, bytes: stat.size }; },
+  });
+
+  registry.register({
+    name: 'checksum_verify', title: 'Verify file checksum', description: 'Compute a file\'s hash and compare it against an expected digest, returning a match/mismatch verdict instead of leaving the comparison to the model.',
+    category: 'artifacts', readOnly: true, keywords: ['checksum', 'hash', 'verify', 'integrity'],
+    inputSchema: { type: 'object', required: ['path', 'expected'], properties: { path: { type: 'string' }, expected: { type: 'string' }, algorithm: { type: 'string', enum: ['sha256', 'sha512', 'sha1', 'md5'], default: 'sha256' } } },
+    execute: async (args, context) => {
+      const file = absolutePath(args.path, context.workspacePath || process.cwd());
+      const digest = await hashFile(file, args.algorithm);
+      const expected = String(args.expected).trim().toLowerCase();
+      return { path: file, algorithm: args.algorithm || 'sha256', digest, expected, match: digest.toLowerCase() === expected };
+    },
+  });
+
+  registry.register({
+    name: 'archive_list', title: 'List archive contents', description: 'List the files inside a zip or tar archive without extracting it.',
+    category: 'artifacts', readOnly: true,
+    inputSchema: { type: 'object', required: ['archive'], properties: { archive: { type: 'string' }, cwd: { type: 'string' } } },
+    execute: async (args, context) => {
+      const cwd = cwdFor(args, context);
+      const archive = absolutePath(args.archive, cwd);
+      const command = archive.endsWith('.zip') ? `unzip -l ${shellQuote(archive)}` : `tar -tvf ${shellQuote(archive)}`;
+      const result = await runCommand(command, { cwd, timeoutMs: 60_000, maxOutputChars: 200_000 });
+      const entries = result.stdout.split('\n').map((line) => line.trim()).filter(Boolean);
+      return { archive, ...result, entryCount: entries.length, entries: entries.slice(0, 2000) };
+    },
   });
 
   registry.register({
@@ -263,5 +296,84 @@ export function registerPlatformTools(registry, { config }) {
     category: 'system', risk: 'host-exec',
     inputSchema: { type: 'object', required: ['service'], properties: { service: { type: 'string' }, action: { type: 'string', enum: ['status', 'start', 'stop', 'restart', 'reload', 'enable', 'disable'], default: 'status' }, user: { type: 'boolean', default: false }, sudo: { type: 'boolean', default: false } } },
     execute: async (args) => { const executable = await commandExists('systemctl'); if (!executable) throw new Error('systemctl is not installed'); return runCommand(`${args.sudo ? 'sudo ' : ''}${shellQuote(executable)} ${args.user ? '--user ' : ''}${args.action || 'status'} ${shellQuote(args.service)}`, { timeoutMs: 120_000, maxOutputChars: 80_000 }); },
+  });
+
+  registry.register({
+    name: 'ps_list', title: 'List host processes', description: 'List running processes on the host as structured records (pid, user, cpu%, mem%, command) — parsed, so nothing needs to eyeball raw `ps` output.',
+    category: 'system', readOnly: true, keywords: ['ps', 'top', 'process', 'cpu', 'memory'],
+    inputSchema: { type: 'object', properties: { filter: { type: 'string', description: 'Regex matched against the command or user' }, pid: { type: 'integer' }, sortBy: { type: 'string', enum: ['cpu', 'mem', 'pid'], default: 'cpu' }, limit: { type: 'integer', minimum: 1, maximum: 2000, default: 100 } } },
+    execute: async (args) => {
+      const result = await runCommand('ps aux', { timeoutMs: 15_000, maxOutputChars: 400_000 });
+      const lines = result.stdout.split('\n').filter(Boolean);
+      const header = (lines[0] || '').trim().split(/\s+/).map((key) => key.toLowerCase());
+      const commandColumns = header.length - 1;
+      let rows = lines.slice(1).map((line) => {
+        const parts = line.trim().split(/\s+/);
+        if (parts.length < header.length) return null;
+        const row = {};
+        for (let i = 0; i < commandColumns; i += 1) row[header[i]] = parts[i];
+        row.command = parts.slice(commandColumns).join(' ');
+        return row;
+      }).filter(Boolean);
+      if (args.filter) {
+        const expression = new RegExp(args.filter, 'i');
+        rows = rows.filter((row) => expression.test(row.command) || expression.test(row.user || ''));
+      }
+      if (args.pid) rows = rows.filter((row) => Number(row.pid) === args.pid);
+      const sortKey = args.sortBy === 'mem' ? '%mem' : args.sortBy === 'pid' ? 'pid' : '%cpu';
+      rows.sort((a, b) => Number(b[sortKey] ?? 0) - Number(a[sortKey] ?? 0));
+      return { count: rows.length, processes: rows.slice(0, args.limit || 100) };
+    },
+  });
+
+  registry.register({
+    name: 'disk_usage', title: 'Inspect disk usage', description: 'Report filesystem-level free/used space (df), or a per-directory usage breakdown (du) when a path is given.',
+    category: 'system', readOnly: true, keywords: ['df', 'du', 'disk', 'storage', 'space'],
+    inputSchema: { type: 'object', properties: { path: { type: 'string' }, depth: { type: 'integer', minimum: 0, maximum: 5, default: 1 }, humanReadable: { type: 'boolean', default: true }, cwd: { type: 'string' } } },
+    execute: async (args, context) => {
+      if (args.path) {
+        const cwd = cwdFor(args, context);
+        const target = absolutePath(args.path, cwd);
+        // `-d N` (not GNU's --max-depth) since it's the one flag both GNU and BSD/macOS du accept.
+        const result = await runCommand(`du ${args.humanReadable !== false ? '-h' : ''} -d ${args.depth ?? 1} ${shellQuote(target)}`, { cwd, timeoutMs: 60_000, maxOutputChars: 100_000 });
+        const entries = result.stdout.split('\n').filter(Boolean).map((line) => {
+          const tab = line.indexOf('\t');
+          return tab === -1 ? { raw: line } : { size: line.slice(0, tab).trim(), path: line.slice(tab + 1).trim() };
+        });
+        return { mode: 'directory', target, ...result, entries };
+      }
+      return { mode: 'filesystems', ...(await runCommand(`df ${args.humanReadable !== false ? '-h' : ''}`, { timeoutMs: 20_000, maxOutputChars: 60_000 })) };
+    },
+  });
+
+  registry.register({
+    name: 'network_diagnose', title: 'Diagnose network connectivity', description: 'Run ping, DNS lookup, or traceroute against a host and return structured, parsed results instead of raw command text.',
+    category: 'system', readOnly: true, keywords: ['ping', 'dig', 'nslookup', 'traceroute', 'dns', 'connectivity', 'network'],
+    inputSchema: { type: 'object', required: ['host'], properties: { host: { type: 'string' }, mode: { type: 'string', enum: ['ping', 'dns', 'traceroute'], default: 'ping' }, count: { type: 'integer', minimum: 1, maximum: 20, default: 4 }, timeoutMs: { type: 'integer', maximum: 120000 } } },
+    execute: async (args) => {
+      const host = args.host;
+      if (args.mode === 'dns') {
+        const dig = await commandExists('dig');
+        const nslookup = !dig && await commandExists('nslookup');
+        if (!dig && !nslookup) throw new Error('Neither dig nor nslookup is installed');
+        const command = dig ? `${shellQuote(dig)} +short ${shellQuote(host)}` : `${shellQuote(nslookup)} ${shellQuote(host)}`;
+        const result = await runCommand(command, { timeoutMs: args.timeoutMs || 15_000, maxOutputChars: 20_000 });
+        return { mode: 'dns', host, ...result, addresses: result.stdout.split('\n').map((line) => line.trim()).filter(Boolean) };
+      }
+      if (args.mode === 'traceroute') {
+        const traceroute = await commandExists('traceroute');
+        const tracepath = !traceroute && await commandExists('tracepath');
+        const executable = traceroute || tracepath;
+        if (!executable) throw new Error('Neither traceroute nor tracepath is installed');
+        return { mode: 'traceroute', host, ...(await runCommand(`${shellQuote(executable)} ${shellQuote(host)}`, { timeoutMs: args.timeoutMs || 30_000, maxOutputChars: 40_000 })) };
+      }
+      const executable = await commandExists('ping');
+      if (!executable) throw new Error('ping is not installed');
+      const flag = process.platform === 'win32' ? '-n' : '-c';
+      const result = await runCommand(`${shellQuote(executable)} ${flag} ${args.count || 4} ${shellQuote(host)}`, { timeoutMs: args.timeoutMs || 15_000, maxOutputChars: 20_000 });
+      const loss = result.stdout.match(/([\d.]+)%\s+packet loss/);
+      const rtt = result.stdout.match(/=\s*[\d.]+\/([\d.]+)\/[\d.]+/);
+      return { mode: 'ping', host, ...result, packetLossPercent: loss ? Number(loss[1]) : null, avgRttMs: rtt ? Number(rtt[1]) : null };
+    },
   });
 }
