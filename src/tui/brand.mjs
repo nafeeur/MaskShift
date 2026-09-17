@@ -58,10 +58,12 @@ const MASK = [
 export function wordmark(theme, width) {
   const art = width >= visibleWidth(WORDMARK[0]) ? WORDMARK : COMPACT;
   if (!theme.unicode) return ['M A S K S H I F T'];
+  // Reads from roles rather than the fixed "crimson"/"blood"/"gold"/"ember" palette names, so the
+  // gradient re-tones itself for whichever theme is active instead of always being MaskShift red.
   return art.map((line, index) => theme.gradient(
     fit(line, Math.min(width, visibleWidth(line))),
-    index < art.length / 2 ? theme.palette.crimson : theme.palette.blood,
-    index < art.length / 2 ? theme.palette.gold : theme.palette.ember,
+    index < art.length / 2 ? theme.roles.primary : theme.roles.primaryDeep,
+    index < art.length / 2 ? theme.roles.accent : theme.roles.accentDeep,
     { bold: true },
   ));
 }

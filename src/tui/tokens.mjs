@@ -95,6 +95,11 @@ export const ROLES = {
   dim: NEUTRAL.smoke,
   muted: NEUTRAL.muted,
   faint: NEUTRAL.hairline,
+  // A structural line weight (a scrollbar thumb, anything that needs to read as "present" next
+  // to `border` rather than as a fifth text-ramp step) — distinct from `faint` above despite
+  // sharing its hex value, since the two are drawn from the same neutral swatch by coincidence,
+  // not because they mean the same thing.
+  hairline: NEUTRAL.hairline,
 
   // Surfaces.
   background: NEUTRAL.ink,
@@ -120,6 +125,10 @@ export const ROLES = {
   primaryDeep: BRAND.blood,
   primaryTrack: BRAND.deep,
   accent: BRAND.gold,
+  // A darker sibling of `accent`, the same relationship `primaryDeep` has to `primary` — added
+  // so the wordmark's two-tone gradient (see brand.mjs) can read entirely from roles instead of
+  // reaching for brand-specific palette names that only make sense for this one theme.
+  accentDeep: BRAND.brass,
   onPrimary: NEUTRAL.ink,
 
   // Signals.
