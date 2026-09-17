@@ -1,7 +1,7 @@
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { absolutePath, ensureDir, id, runCommand, sha256, truncate } from '../core/utils.mjs';
+import { absolutePath, ensureDir, id, runCommand, sha256, shellQuote, truncate } from '../core/utils.mjs';
 
 function resolveTarget(input, context) {
   return absolutePath(input || '.', context.workspacePath || process.cwd());
@@ -275,6 +275,104 @@ export function registerFilesystemTools(registry, { workspaceManager, config }) 
       if (stat.isSymbolicLink()) result.target = await fsp.readlink(target);
       if (args.hash && stat.isFile()) result.sha256 = sha256(await fsp.readFile(target));
       return result;
+    },
+  });
+
+  registry.register({
+    name: 'file_diff',
+    title: 'Diff two files or directories',
+    description: 'Show a unified diff between two arbitrary paths (files or directories), independent of Git — for comparing anything on disk, not just a repo working tree.',
+    category: 'filesystem', readOnly: true,
+    keywords: ['diff', 'compare', 'patch', 'unified diff'],
+    inputSchema: {
+      type: 'object', required: ['a', 'b'],
+      properties: {
+        a: { type: 'string' }, b: { type: 'string' },
+        contextLines: { type: 'integer', minimum: 0, maximum: 50, default: 3 },
+        recursive: { type: 'boolean', default: false },
+      },
+    },
+    execute: async (args, context) => {
+      const a = resolveTarget(args.a, context);
+      const b = resolveTarget(args.b, context);
+      const flags = [`--unified=${args.contextLines ?? 3}`, args.recursive ? '--recursive' : ''].filter(Boolean);
+      const result = await runCommand(`diff ${flags.join(' ')} ${shellQuote(a)} ${shellQuote(b)}`, {
+        timeoutMs: 30_000, maxOutputChars: config.get().maxToolOutputChars,
+      });
+      // diff's exit code IS the comparison result (0 identical, 1 differences, 2 error) — not
+      // reported as a tool error, the same way git_diff's non-zero-but-meaningful exits aren't.
+      // Unified-diff body lines only: the `---`/`+++` file headers also start with -/+ and would
+      // otherwise be double-counted as one spurious removed/added line each.
+      const body = result.stdout.split('\n').filter((line) => !line.startsWith('---') && !line.startsWith('+++'));
+      return {
+        a, b, identical: result.code === 0,
+        addedLines: body.filter((line) => line.startsWith('+')).length,
+        removedLines: body.filter((line) => line.startsWith('-')).length,
+        diff: result.stdout, stderr: result.stderr, code: result.code,
+      };
+    },
+  });
+
+  registry.register({
+    name: 'chmod_set',
+    title: 'Change file permissions',
+    description: 'Change a path\'s POSIX mode (chmod) and optionally its owner/group (chown), reporting the mode before and after.',
+    category: 'filesystem', risk: 'write',
+    keywords: ['chmod', 'chown', 'permissions', 'executable', 'mode'],
+    inputSchema: {
+      type: 'object', required: ['path'],
+      properties: {
+        path: { type: 'string' },
+        mode: { type: 'string', description: 'chmod mode, e.g. "755", "+x", "u+rwx"' },
+        owner: { type: 'string' },
+        group: { type: 'string' },
+        recursive: { type: 'boolean', default: false },
+      },
+    },
+    execute: async (args, context) => {
+      if (!args.mode && !args.owner && !args.group) throw new Error('Provide mode, owner, or group to change');
+      const target = resolveTarget(args.path, context);
+      const before = ((await fsp.stat(target)).mode & 0o777).toString(8);
+      const recursiveFlag = args.recursive ? '-R' : '';
+      if (args.mode) {
+        const result = await runCommand(`chmod ${recursiveFlag} ${shellQuote(args.mode)} ${shellQuote(target)}`, { timeoutMs: 30_000, maxOutputChars: 10_000 });
+        if (result.code !== 0) throw new Error(result.stderr.trim() || `chmod exited with code ${result.code}`);
+      }
+      if (args.owner || args.group) {
+        const spec = `${args.owner || ''}${args.group ? `:${args.group}` : ''}`;
+        const result = await runCommand(`chown ${recursiveFlag} ${shellQuote(spec)} ${shellQuote(target)}`, { timeoutMs: 30_000, maxOutputChars: 10_000 });
+        if (result.code !== 0) throw new Error(result.stderr.trim() || `chown exited with code ${result.code}`);
+      }
+      const after = ((await fsp.stat(target)).mode & 0o777).toString(8);
+      return { path: target, before, after, changed: before !== after };
+    },
+  });
+
+  registry.register({
+    name: 'text_stats',
+    title: 'Count lines, words, and bytes',
+    description: 'Report line, word, and byte counts for one or more text files (like wc) without spending context on their contents — use before deciding whether to read a file in full.',
+    category: 'filesystem', readOnly: true,
+    keywords: ['wc', 'count', 'lines', 'size', 'word count'],
+    inputSchema: {
+      type: 'object', required: ['paths'],
+      properties: { paths: { oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }] } },
+    },
+    execute: async (args, context) => {
+      const list = Array.isArray(args.paths) ? args.paths : [args.paths];
+      const files = [];
+      for (const item of list) {
+        const target = resolveTarget(item, context);
+        try {
+          const content = await fsp.readFile(target, 'utf8');
+          const lines = content ? content.split('\n').length - (content.endsWith('\n') ? 1 : 0) : 0;
+          const words = content.trim() ? content.trim().split(/\s+/).length : 0;
+          files.push({ path: target, lines, words, bytes: Buffer.byteLength(content, 'utf8') });
+        } catch (error) {
+          files.push({ path: target, error: error.message });
+        }
+      }
+      return { files };
     },
   });
 }
