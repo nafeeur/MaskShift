@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { commandExists } from '../src/core/utils.mjs';
-import { createProject, jsonServer, runtimeForTest } from './helpers.mjs';
+import { createProject, jsonServer, runtimeForTest, tempDir } from './helpers.mjs';
 
 const repoRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..');
 const bin = path.join(repoRoot, 'bin', 'maskshift.mjs');
@@ -23,6 +23,39 @@ function run(args, options) {
 function contextFor(runtime, workspace, project) {
   return { workspaceId: workspace.id, workspacePath: project, eventBus: runtime.eventBus, scope: { workspaceId: workspace.id } };
 }
+
+test('maskshift daemon stays resident until signalled, instead of exiting immediately', async (t) => {
+  const project = await createProject(t);
+  const home = await tempDir(t, 'maskshift-daemon-home-');
+  const child = spawn('node', ['--no-warnings', bin, 'daemon', '--workspace', project], {
+    env: { ...process.env, MASKSHIFT_HOME: home },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let stdout = '';
+  child.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
+  const exited = new Promise((resolve) => child.once('exit', (code, signal) => resolve({ code, signal })));
+
+  try {
+    // The scheduler's own poll timer is deliberately unref()'d (correct for every other, one-shot
+    // command), which used to mean nothing kept the daemon's event loop open either — it printed
+    // its banner and exited within milliseconds despite claiming to stay resident. Waiting here
+    // and asserting the process is still alive is exactly the regression check for that: on the
+    // old code this would already have exited by the time this fires.
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    assert.equal(child.exitCode, null, 'expected the daemon to still be running, not to have exited already');
+    assert.match(stdout, /Daemon resident/);
+    assert.match(stdout, /Press ctrl\+c to stop/);
+  } finally {
+    child.kill('SIGTERM');
+  }
+
+  const { code, signal } = await Promise.race([
+    exited,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('daemon did not exit within 5s of SIGTERM')), 5000)),
+  ]);
+  assert.equal(signal, null, 'expected a clean voluntary exit, not the process being force-killed');
+  assert.equal(code, 0);
+});
 
 test('shell_exec_parallel accepts plain command strings as well as objects', async (t) => {
   const project = await createProject(t);

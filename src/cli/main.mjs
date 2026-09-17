@@ -209,11 +209,22 @@ async function daemon(runtime, ui) {
   }
   ui.line();
   ui.info('Press ctrl+c to stop.');
-  await new Promise((resolve) => {
-    const stop = () => resolve();
-    process.once('SIGINT', stop);
-    process.once('SIGTERM', stop);
-  });
+  // The scheduler's own poll timer is deliberately unref()'d (correct for every other command,
+  // so a one-shot CLI invocation isn't held open by it) — which meant nothing here kept the
+  // event loop alive either: the process was exiting the instant this command's own call stack
+  // unwound, right after printing the banner, rather than actually staying resident until a
+  // signal arrived. This ref'd interval is the daemon's own keep-alive, live only as long as
+  // this command runs; it does nothing but hold the loop open.
+  const keepAlive = setInterval(() => {}, 1 << 30);
+  try {
+    await new Promise((resolve) => {
+      const stop = () => resolve();
+      process.once('SIGINT', stop);
+      process.once('SIGTERM', stop);
+    });
+  } finally {
+    clearInterval(keepAlive);
+  }
   return 0;
 }
 
