@@ -5,6 +5,7 @@
 
 import path from 'node:path';
 import { headerBand, hintRail, statusRail, tabStrip } from './chrome.mjs';
+import { frameColour, panel } from './box.mjs';
 import { Keyboard } from './input.mjs';
 import { hstack, overlay as paintOverlay, split, vstack } from './layout.mjs';
 import { ConfirmOverlay, FormOverlay, PaletteOverlay, PickerOverlay, TextOverlay } from './overlays.mjs';
@@ -41,6 +42,27 @@ const HEIST_OUTCOME = {
   'run.max-steps': { tone: 'error', label: 'RAN OUT OF TIME' },
 };
 const MIN_ROWS = 12;
+
+// Mirrors the cases in runSlash() below — kept in sync by hand since the
+// switch statement there is the actual source of truth for what runs.
+const SLASH_COMMANDS = [
+  { name: 'new', hint: 'start a fresh session' },
+  { name: 'clear', hint: 'clear the transcript' },
+  { name: 'model', hint: 'switch persona/model' },
+  { name: 'sessions', hint: 'browse sessions' },
+  { name: 'workspace', hint: 'switch workspace' },
+  { name: 'tools', hint: 'browse tools' },
+  { name: 'skills', hint: 'browse skills' },
+  { name: 'mcp', hint: 'manage MCP servers' },
+  { name: 'mods', hint: 'open mod shop' },
+  { name: 'files', hint: 'browse files' },
+  { name: 'terminal', hint: 'open terminal' },
+  { name: 'doctor', hint: 'run diagnostics' },
+  { name: 'logs', hint: 'view logs' },
+  { name: 'settings', hint: 'open settings' },
+  { name: 'help', hint: 'reference & shortcuts' },
+  { name: 'quit', hint: 'exit MaskShift' },
+];
 
 export class MaskShiftTui {
   constructor(runtime, {
@@ -471,6 +493,24 @@ export class MaskShiftTui {
         ? this.lastRegion.row + 1 + this.chatPanes.transcriptHeight
         : rows - 3;
       frame = paintOverlay(frame, toastLines, { row: Math.max(2, toastBottom - toastLines.length), column: columns - Math.min(58, columns - 2) }, columns);
+    }
+
+    if (!this.overlay && this.view === 'chat' && this.focus === 'composer' && !this.busy && this.lastRegion && this.chatPanes) {
+      const typed = this.composer.value;
+      if (/^\/[a-z]*$/i.test(typed)) {
+        const prefix = typed.slice(1).toLowerCase();
+        const matches = SLASH_COMMANDS.filter((entry) => entry.name.startsWith(prefix));
+        if (matches.length) {
+          const width = Math.min(48, columns - 4);
+          const body = matches.slice(0, 12).map((entry) => `/${entry.name}  ${entry.hint}`);
+          const suggestBottom = this.lastRegion.row + 1 + this.chatPanes.transcriptHeight;
+          const lines = panel({
+            theme, width, height: body.length + 2, title: 'COMMANDS', body,
+            colour: frameColour(theme, true), focused: true,
+          });
+          frame = paintOverlay(frame, lines, { row: Math.max(2, suggestBottom - lines.length), column: 2 }, columns);
+        }
+      }
     }
 
     if (this.overlay) {
@@ -1125,8 +1165,8 @@ export class MaskShiftTui {
           name: 'transport', label: 'transport', type: 'select', value: 'stdio',
           options: [{ label: 'STDIO', value: 'stdio' }, { label: 'STREAMABLE HTTP', value: 'http' }],
         },
-        { name: 'command', label: 'command', value: '', hint: 'npx -y @modelcontextprotocol/server-filesystem .' },
-        { name: 'url', label: 'url', value: '', hint: 'https://server.example/mcp' },
+        { name: 'command', label: 'command', value: '', hint: 'npx -y @modelcontextprotocol/server-filesystem .', visible: (values) => values.transport === 'stdio' },
+        { name: 'url', label: 'url', value: '', hint: 'https://server.example/mcp', visible: (values) => values.transport === 'http' },
         { name: 'environment', label: 'env / headers json', type: 'textarea', value: '' },
       ],
       onSubmit: async (values) => {
@@ -1510,6 +1550,7 @@ export class MaskShiftTui {
         detail: `${session.model_id || ''} · ${this.stamp(session.updated_at)}`,
         tone: session.id === this.sessionId ? this.theme.roles.primary : undefined,
       })),
+      selectedId: this.sessionId,
       onSelect: (item) => this.requestSessionLoad(item.id),
     });
   }
@@ -1519,15 +1560,17 @@ export class MaskShiftTui {
     for (const provider of this.providers) {
       for (const model of provider.models || []) {
         const reference = `${provider.id}:${model.id || model}`;
-        items.push({ id: reference, label: reference, detail: provider.status === 'online' ? provider.name : `${provider.name} (offline)` });
+        items.push({ id: reference, label: reference, detail: provider.status === 'online' ? provider.name : `${provider.name} (offline)`, tone: reference === this.modelRef ? this.theme.roles.primary : undefined });
       }
-      items.push({ id: `${provider.id}:auto`, label: `${provider.id}:auto`, detail: `${provider.name} — best available` });
+      const autoId = `${provider.id}:auto`;
+      items.push({ id: autoId, label: autoId, detail: `${provider.name} — best available`, tone: autoId === this.modelRef ? this.theme.roles.primary : undefined });
     }
     this.overlay = new PickerOverlay({
       title: 'PERSONA SELECT',
       placeholder: 'FILTER MODELS…',
       footer: 'Providers are probed at startup; press f5 to re-discover.',
       items,
+      selectedId: this.modelRef,
       onSelect: (item) => {
         this.modelRef = item.id;
         if (this.sessionId) this.runtime.store.updateSession(this.sessionId, { model_id: item.id });
