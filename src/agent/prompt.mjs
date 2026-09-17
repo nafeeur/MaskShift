@@ -25,7 +25,7 @@ export class PromptBuilder {
   system({ workspaceContext, capabilityState, planState, run, session }) {
     const config = this.config.get();
     const active = this.capabilityController.snapshot(capabilityState);
-    const catalog = this.capabilityController.catalogSummary({ workspaceId: run.workspace_id, maxChars: 28_000 });
+    const catalog = this.capabilityController.catalogSummary({ workspaceId: run.workspace_id });
 
     // Stable for the whole run: identical on every turn, so an Anthropic-style prompt cache can
     // reuse it instead of re-billing the (often large) repository context and catalog each turn.

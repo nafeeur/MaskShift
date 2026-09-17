@@ -52,7 +52,15 @@ export class CapabilityController {
     const skillHits = this.skillManager.search(prompt, 3);
     for (const hit of skillHits) {
       try {
-        const skill = await this.skillManager.load(hit.name, { maxChars: 45_000 });
+        // Capped far below capability_activate's full-body load (skills.mjs's default 100k):
+        // this fires on every run's first turn from a lexical `score > 0` match against a broad,
+        // often generic prompt, so it easily grabs skills only loosely related to the task — a
+        // full skill body (some run tens of thousands of characters) blindly spent on a guess
+        // was the single largest source of wasted tokens in the whole system prompt. This still
+        // gives the model enough of the skill to judge relevance and ask for the rest via
+        // capability_activate, which is exactly the lazy-loading contract the rest of the system
+        // prompt already tells it to follow.
+        const skill = await this.skillManager.load(hit.name, { maxChars: 2_000 });
         state.skills.set(hit.name, skill);
       } catch { /* lazy load is best effort */ }
     }
@@ -138,16 +146,25 @@ export class CapabilityController {
     };
   }
 
-  catalogSummary({ workspaceId = null, maxChars = 24_000 } = {}) {
+  /**
+   * Names only, grouped by category — not the full one-line description every entry used to
+   * carry. This renders into the system prompt on *every* turn of *every* run, whether or not
+   * the task touches any of it, so a description per entry was several thousand tokens spent
+   * on text describing tools that were never going to be used. Full descriptions still exist
+   * one call away: capability_search / skill_search return them, and the system prompt's own
+   * operating contract already tells the model to search before activating anything, so nothing
+   * becomes less discoverable — the index just stops being priced like the documentation.
+   */
+  catalogSummary({ workspaceId = null, maxChars = 6_000 } = {}) {
     const grouped = new Map();
     for (const tool of this.toolRegistry.list({ includeSchema: false })) {
       const values = grouped.get(tool.category) || [];
-      values.push(`${tool.name}: ${tool.description}`);
+      values.push(tool.name);
       grouped.set(tool.category, values);
     }
-    const local = [...grouped].map(([category, entries]) => `### ${category}\n${entries.map((entry) => `- ${entry}`).join('\n')}`).join('\n\n');
-    const skills = this.skillManager.list().map((skill) => `- ${skill.name}: ${skill.description}`).join('\n');
-    const mcp = this.mcpManager.listServers(workspaceId).map((server) => `- ${server.name} [${server.status}]: ${server.description || server.title || ''}`).join('\n');
-    return truncate(`## Local tool catalog\n${local}\n\n## Skill catalog (bodies lazy)\n${skills}\n\n## MCP catalog (connections lazy)\n${mcp}`, maxChars);
+    const local = [...grouped].map(([category, names]) => `### ${category}\n${names.join(', ')}`).join('\n\n');
+    const skills = this.skillManager.list().map((skill) => skill.name).join(', ');
+    const mcp = this.mcpManager.listServers(workspaceId).map((server) => `${server.name} [${server.status}]`).join(', ');
+    return truncate(`## Local tool catalog (names only — capability_search for what each does)\n${local}\n\n## Skill catalog (names only, bodies lazy — skill_search for what each does)\n${skills}\n\n## MCP catalog (connections lazy)\n${mcp}`, maxChars);
   }
 }
