@@ -5,7 +5,7 @@ import test from 'node:test';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { commandExists, shellQuote } from '../src/core/utils.mjs';
-import { createProject, runtimeForTest, jsonServer, respondJson, waitFor } from './helpers.mjs';
+import { createProject, runtimeForTest, jsonServer, respondJson, respondOpenAIResponsesSSE, waitFor } from './helpers.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const coverage = new Map();
@@ -292,7 +292,7 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
   });
 
   await suite.test('agent tools with a deterministic local model endpoint', async (t) => {
-    const server = await jsonServer(t, (req, res) => respondJson(res, 200, { id: 'fixture', output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'FIXTURE_AGENT_OK' }] }] }));
+    const server = await jsonServer(t, (req, res) => respondOpenAIResponsesSSE(res, [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'FIXTURE_AGENT_OK' }] }]));
     const { call, runtime, workspace, context } = await setup(t, { defaultModel: 'fixture:local', providers: [{ id: 'fixture', type: 'openai-responses', baseUrl: server.url, apiKeyEnv: null, enabled: true, models: [{ id: 'local' }], timeoutMs: 5000 }] });
     context.runId = null; // Manual CLI tools have no parent run.
     await call('agent_delegate', { task: 'Return marker', model: 'fixture:local' }, r => { assert.equal(r.status, 'completed'); assert.equal(r.final, 'FIXTURE_AGENT_OK'); }, 'local model fixture');
@@ -304,7 +304,7 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
   });
 
   await suite.test('code intelligence, routing, executable DAGs and validated skills', async (t) => {
-    const server = await jsonServer(t, (_req, res) => respondJson(res, 200, { id: 'fixture', output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'DAG_NODE_OK' }] }] }));
+    const server = await jsonServer(t, (_req, res) => respondOpenAIResponsesSSE(res, [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'DAG_NODE_OK' }] }]));
     const { call, runtime, context, project } = await setup(t, {
       defaultModel: 'fixture:local', indexing: { embeddings: false },
       providers: [{ id: 'fixture', type: 'openai-responses', baseUrl: server.url, apiKeyEnv: null, enabled: true, models: [{ id: 'local' }], timeoutMs: 5000 }],

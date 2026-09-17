@@ -51,6 +51,110 @@ async function readBounded(response, maxBytes) {
   return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk))).toString('utf8');
 }
 
+/**
+ * Reads a `text/event-stream` body, calling `onFrame({ event, data })` for each frame as its
+ * blank-line terminator arrives — `data` is the frame's raw payload text (its `data:` lines
+ * joined), left unparsed here since some providers send a non-JSON sentinel (`[DONE]`).
+ */
+async function readSSE(response, maxBytes, onFrame) {
+  if (!response.body) return;
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let total = 0;
+  const emit = (frame) => {
+    if (!frame.trim()) return;
+    let event = 'message';
+    const dataLines = [];
+    for (const line of frame.split('\n')) {
+      if (line.startsWith('event:')) event = line.slice(6).trim();
+      else if (line.startsWith('data:')) dataLines.push(line.slice(5).replace(/^ /, ''));
+    }
+    if (dataLines.length) onFrame({ event, data: dataLines.join('\n') });
+  };
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) throw Object.assign(new Error(`Provider response exceeded ${maxBytes} bytes`), { code: 'HARNESS_RESPONSE_TOO_LARGE' });
+      buffer += decoder.decode(value, { stream: true });
+      let boundary;
+      while ((boundary = buffer.indexOf('\n\n')) >= 0) {
+        emit(buffer.slice(0, boundary));
+        buffer = buffer.slice(boundary + 2);
+      }
+    }
+    // Some servers close the connection without a trailing blank line after the last frame.
+    emit(buffer);
+  } finally {
+    try { reader.releaseLock(); } catch { /* already released on stream error */ }
+  }
+}
+
+/** Newline-delimited JSON (Ollama's streaming format) — one object per line, no `data:` framing. */
+async function readNDJSON(response, maxBytes, onFrame) {
+  if (!response.body) return;
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) throw Object.assign(new Error(`Provider response exceeded ${maxBytes} bytes`), { code: 'HARNESS_RESPONSE_TOO_LARGE' });
+      buffer += decoder.decode(value, { stream: true });
+      let index;
+      while ((index = buffer.indexOf('\n')) >= 0) {
+        const line = buffer.slice(0, index);
+        buffer = buffer.slice(index + 1);
+        if (line.trim()) onFrame({ event: 'message', data: line });
+      }
+    }
+    if (buffer.trim()) onFrame({ event: 'message', data: buffer });
+  } finally {
+    try { reader.releaseLock(); } catch { /* already released on stream error */ }
+  }
+}
+
+/**
+ * Streams a provider response frame-by-frame instead of buffering the whole body, so partial
+ * text can reach the transcript as it's generated. Error responses are still read in full (they
+ * are small, and providers send them as ordinary JSON, not as a stream) so the existing
+ * status/message handling in `fetchJson` keeps working unchanged for the failure path.
+ */
+async function fetchStream(url, options, { signal, timeoutMs = 180_000, maxBytes = 32 * 1024 * 1024, onFrame, ndjson = false }) {
+  const combined = combineSignals(signal, timeoutMs);
+  let response;
+  try {
+    response = await fetch(url, { ...options, signal: combined.signal });
+  } catch (error) {
+    combined.cleanup();
+    throw new Error(`Model request failed: ${error.message}`);
+  }
+  if (!response.ok) {
+    let text;
+    try { text = await readBounded(response, maxBytes); } finally { combined.cleanup(); }
+    const data = safeJsonParse(text, null);
+    const message = data?.error?.message || data?.message || truncate(text, 4000) || `HTTP ${response.status}`;
+    const error = new Error(`${response.status} ${response.statusText}: ${message}`);
+    error.status = response.status;
+    error.data = data;
+    throw error;
+  }
+  try {
+    if (ndjson) await readNDJSON(response, maxBytes, onFrame);
+    else await readSSE(response, maxBytes, onFrame);
+  } catch (error) {
+    if (error.code === 'HARNESS_RESPONSE_TOO_LARGE') throw error;
+    throw new Error(`Model request failed: ${error.message}`);
+  } finally {
+    combined.cleanup();
+  }
+}
+
 async function fetchJson(url, options, { signal, timeoutMs = 180_000, maxBytes = 8 * 1024 * 1024 } = {}) {
   // The abort timer must stay armed through the body read, not just until headers arrive,
   // otherwise a stalled response body can hang the request indefinitely.
@@ -400,14 +504,18 @@ export class ProviderManager {
     const useText = protocol === 'text' && tools.length > 0;
     const outbound = useText ? toTextProtocolMessages(messages, tools) : messages;
     const wireTools = useText ? [] : tools;
-    const { signal, temperature, maxTokens } = options;
+    const { signal, temperature, maxTokens, onDelta } = options;
+    // A text-protocol reply carries the tool-call markup the model was asked to write inline
+    // (parsed out below, after the full content is in) — streaming it to the transcript
+    // un-stripped would show that markup to the operator, so only native-mode deltas forward.
+    const forwardDelta = useText ? undefined : onDelta;
 
     let result;
-    if (resolved.provider.type === 'anthropic') result = await this.#anthropic(resolved, outbound, wireTools, { signal, temperature, maxTokens });
-    else if (resolved.provider.type === 'openai-responses') result = await this.#openAiResponses(resolved, outbound, wireTools, { signal, temperature, maxTokens });
-    else if (resolved.provider.type === 'ollama') result = await this.#ollama(resolved, outbound, wireTools, { signal, temperature, maxTokens });
-    else if (resolved.provider.type === 'gemini') result = await this.#gemini(resolved, outbound, wireTools, { signal, temperature, maxTokens });
-    else result = await this.#openAiCompatible(resolved, outbound, wireTools, { signal, temperature, maxTokens });
+    if (resolved.provider.type === 'anthropic') result = await this.#anthropic(resolved, outbound, wireTools, { signal, temperature, maxTokens, onDelta: forwardDelta });
+    else if (resolved.provider.type === 'openai-responses') result = await this.#openAiResponses(resolved, outbound, wireTools, { signal, temperature, maxTokens, onDelta: forwardDelta });
+    else if (resolved.provider.type === 'ollama') result = await this.#ollama(resolved, outbound, wireTools, { signal, temperature, maxTokens, onDelta: forwardDelta });
+    else if (resolved.provider.type === 'gemini') result = await this.#gemini(resolved, outbound, wireTools, { signal, temperature, maxTokens, onDelta: forwardDelta });
+    else result = await this.#openAiCompatible(resolved, outbound, wireTools, { signal, temperature, maxTokens, onDelta: forwardDelta });
 
     result.toolProtocol = useText ? 'text' : 'native';
     result.parseErrors = [];
@@ -439,7 +547,15 @@ export class ProviderManager {
     return result;
   }
 
-  async complete({ modelRef, messages, tools = [], signal, temperature = 0.1, maxTokens = 16_384 }) {
+  /**
+   * `onDelta`, when given, is called with the assistant's visible text-so-far every time new
+   * content arrives from the provider (cumulative, not just the new fragment, so a caller can
+   * always just replace what it's showing rather than track its own running concatenation).
+   * It is never called in text-tool-protocol mode — see the note in #dispatch — and a provider
+   * that returns nothing until the response is complete will simply call it once, at the end,
+   * which degrades to the old non-streaming behavior rather than breaking anything.
+   */
+  async complete({ modelRef, messages, tools = [], signal, temperature = 0.1, maxTokens = 16_384, onDelta } = {}) {
     const resolved = await this.resolveModel(modelRef);
     const started = Date.now();
     const protocol = this.toolProtocolFor(resolved);
@@ -447,7 +563,7 @@ export class ProviderManager {
     try {
       let result;
       try {
-        result = await this.#dispatch(resolved, messages, tools, { signal, temperature, maxTokens }, protocol);
+        result = await this.#dispatch(resolved, messages, tools, { signal, temperature, maxTokens, onDelta }, protocol);
       } catch (error) {
         // The endpoint rejected the tool schema outright: remember it and re-run in text mode
         // rather than surfacing a dead end to the user.
@@ -459,7 +575,7 @@ export class ProviderManager {
         this.eventBus.emit('model.tool-protocol.downgraded', {
           provider: resolved.provider.id, model: resolved.model, reason: truncate(error.message, 300),
         });
-        result = await this.#dispatch(resolved, messages, tools, { signal, temperature, maxTokens }, 'text');
+        result = await this.#dispatch(resolved, messages, tools, { signal, temperature, maxTokens, onDelta }, 'text');
       }
       result.modelRef = resolved.ref;
       result.providerId = resolved.provider.id;
@@ -477,7 +593,7 @@ export class ProviderManager {
     }
   }
 
-  async #openAiResponses(resolved, messages, tools, { signal, temperature, maxTokens }) {
+  async #openAiResponses(resolved, messages, tools, { signal, temperature, maxTokens, onDelta }) {
     const provider = resolved.provider;
     const headers = { 'Content-Type': 'application/json', ...provider.headers };
     const key = this.apiKey(provider);
@@ -490,24 +606,45 @@ export class ProviderManager {
       temperature,
       max_output_tokens: maxTokens,
       include: ['reasoning.encrypted_content'],
+      stream: true,
       ...(tools.length ? { tools: toResponsesTools(tools), tool_choice: 'auto', parallel_tool_calls: true } : {}),
       ...provider.requestDefaults,
     };
-    const data = await fetchJson(`${provider.baseUrl.replace(/\/$/, '')}/responses`, {
+    // `response.completed` carries the full, structurally-authoritative response (reasoning
+    // items, call ids, everything) — the same shape the non-streaming endpoint used to return —
+    // so deltas are only used to feed the live transcript, never to build the final result.
+    let deltaContent = '';
+    let finalResponse = null;
+    await fetchStream(`${provider.baseUrl.replace(/\/$/, '')}/responses`, {
       method: 'POST', headers, body: JSON.stringify(body),
-    }, { signal, timeoutMs: provider.timeoutMs || 300_000 });
+    }, {
+      signal, timeoutMs: provider.timeoutMs || 300_000,
+      onFrame: ({ event, data }) => {
+        const payload = safeJsonParse(data, null);
+        if (!payload) return;
+        if (event === 'response.output_text.delta' && typeof payload.delta === 'string') {
+          deltaContent += payload.delta;
+          onDelta?.(deltaContent);
+        } else if (event === 'response.completed' || event === 'response.incomplete') {
+          finalResponse = payload.response || payload;
+        } else if (event === 'error' || event === 'response.failed') {
+          throw Object.assign(new Error(payload.message || payload.error?.message || 'Model stream failed'), { data: payload });
+        }
+      },
+    });
+    const data = finalResponse || { output: [], output_text: deltaContent };
     const output = data.output || [];
     const content = output.filter((item) => item.type === 'message')
       .flatMap((item) => item.content || [])
       .filter((item) => item.type === 'output_text' || typeof item.text === 'string')
-      .map((item) => item.text || '').join('\n');
+      .map((item) => item.text || '').join('\n') || data.output_text || deltaContent;
     const toolCalls = output.filter((item) => item.type === 'function_call').map((item, index) => normalizeToolCall({
       id: item.call_id || item.id, name: item.name, arguments: item.arguments,
     }, index)).filter((call) => call.name);
     const reasoning = output.filter((item) => item.type === 'reasoning' && item.encrypted_content)
       .map((item) => ({ id: item.id, type: item.type, summary: item.summary || [], encrypted_content: item.encrypted_content }));
     return {
-      content: content || data.output_text || '',
+      content,
       toolCalls,
       finishReason: data.status || null,
       usage: data.usage || null,
@@ -516,7 +653,7 @@ export class ProviderManager {
     };
   }
 
-  async #openAiCompatible(resolved, messages, tools, { signal, temperature, maxTokens }) {
+  async #openAiCompatible(resolved, messages, tools, { signal, temperature, maxTokens, onDelta }) {
     const provider = resolved.provider;
     const headers = { 'Content-Type': 'application/json', ...provider.headers };
     const key = this.apiKey(provider);
@@ -526,51 +663,102 @@ export class ProviderManager {
       messages: toOpenAiMessages(messages, resolved.ref),
       temperature,
       max_tokens: maxTokens,
+      stream: true,
+      stream_options: { include_usage: true },
       ...(tools.length ? { tools: toOpenAiTools(tools), tool_choice: 'auto', parallel_tool_calls: true } : {}),
       ...provider.requestDefaults,
     };
-    const data = await fetchJson(`${provider.baseUrl.replace(/\/$/, '')}/chat/completions`, {
+    let content = '';
+    let reasoningContent = '';
+    let finishReason = null;
+    let usage = null;
+    const toolCallsByIndex = new Map();
+    await fetchStream(`${provider.baseUrl.replace(/\/$/, '')}/chat/completions`, {
       method: 'POST', headers, body: JSON.stringify(body),
-    }, { signal, timeoutMs: provider.timeoutMs || 300_000 });
-    const choice = data.choices?.[0] || {};
-    const message = choice.message || {};
+    }, {
+      signal, timeoutMs: provider.timeoutMs || 300_000,
+      onFrame: ({ data }) => {
+        if (data === '[DONE]') return;
+        const chunk = safeJsonParse(data, null);
+        if (!chunk) return;
+        if (chunk.usage) usage = chunk.usage;
+        const choice = chunk.choices?.[0];
+        if (!choice) return;
+        const delta = choice.delta || {};
+        if (typeof delta.content === 'string' && delta.content) {
+          content += delta.content;
+          onDelta?.(content);
+        }
+        if (typeof delta.reasoning_content === 'string') reasoningContent += delta.reasoning_content;
+        // Each fragment of a tool call's name and JSON-string arguments arrives as its own tiny
+        // chunk, keyed by the call's position in the response — accumulated here and only
+        // exposed as complete calls once the stream ends, same as before.
+        for (const call of delta.tool_calls || []) {
+          const index = call.index ?? 0;
+          const existing = toolCallsByIndex.get(index) || { id: '', name: '', args: '' };
+          if (call.id) existing.id = call.id;
+          if (call.function?.name) existing.name += call.function.name;
+          if (call.function?.arguments) existing.args += call.function.arguments;
+          toolCallsByIndex.set(index, existing);
+        }
+        if (choice.finish_reason) finishReason = choice.finish_reason;
+      },
+    });
+    const toolCalls = [...toolCallsByIndex.values()]
+      .map((call, index) => normalizeToolCall({ id: call.id, function: { name: call.name, arguments: call.args } }, index))
+      .filter((call) => call.name);
     return {
-      content: typeof message.content === 'string' ? message.content : (message.content || []).map((item) => item.text || '').join(''),
-      toolCalls: (message.tool_calls || []).map(normalizeToolCall).filter((call) => call.name),
-      finishReason: choice.finish_reason || null,
-      usage: data.usage || null,
-      providerState: { type: 'openai-compatible', ref: resolved.ref, reasoningContent: message.reasoning_content },
+      content, toolCalls, finishReason, usage,
+      providerState: { type: 'openai-compatible', ref: resolved.ref, reasoningContent: reasoningContent || undefined },
     };
   }
 
-  async #ollama(resolved, messages, tools, { signal, temperature, maxTokens }) {
+  async #ollama(resolved, messages, tools, { signal, temperature, maxTokens, onDelta }) {
     const provider = resolved.provider;
     const body = {
       model: resolved.model,
       messages: toOllamaMessages(messages, resolved.ref),
-      stream: false,
+      stream: true,
       options: { temperature, ...(provider.options || {}), num_predict: maxTokens },
       ...(tools.length ? { tools: toOpenAiTools(tools) } : {}),
     };
     const headers = { 'Content-Type': 'application/json', ...provider.headers };
-    const data = await fetchJson(`${provider.baseUrl.replace(/\/$/, '')}/api/chat`, {
+    let content = '';
+    let thinking = '';
+    let toolCalls = [];
+    let finishReason = null;
+    let usage = {};
+    await fetchStream(`${provider.baseUrl.replace(/\/$/, '')}/api/chat`, {
       method: 'POST', headers, body: JSON.stringify(body),
-    }, { signal, timeoutMs: provider.timeoutMs || 600_000 });
-    const message = data.message || {};
-    return {
-      content: message.content || '',
-      toolCalls: (message.tool_calls || []).map(normalizeToolCall).filter((call) => call.name),
-      finishReason: data.done_reason || (data.done ? 'stop' : null),
-      usage: {
-        input_tokens: data.prompt_eval_count,
-        output_tokens: data.eval_count,
-        total_duration_ns: data.total_duration,
+    }, {
+      signal, timeoutMs: provider.timeoutMs || 600_000, ndjson: true,
+      onFrame: ({ data }) => {
+        const chunk = safeJsonParse(data, null);
+        if (!chunk) return;
+        const message = chunk.message || {};
+        if (typeof message.content === 'string' && message.content) {
+          content += message.content;
+          onDelta?.(content);
+        }
+        if (typeof message.thinking === 'string' && message.thinking) thinking += message.thinking;
+        if (message.tool_calls?.length) toolCalls = message.tool_calls.map(normalizeToolCall).filter((call) => call.name);
+        if (chunk.done) {
+          finishReason = chunk.done_reason || 'stop';
+          usage = {
+            input_tokens: chunk.prompt_eval_count,
+            output_tokens: chunk.eval_count,
+            total_duration_ns: chunk.total_duration,
+          };
+        }
       },
-      providerState: { type: 'ollama', ref: resolved.ref, thinking: message.thinking },
+    });
+    return {
+      content, toolCalls, finishReason, usage,
+      providerState: { type: 'ollama', ref: resolved.ref, thinking: thinking || undefined },
     };
   }
 
-  async #anthropic(resolved, messages, tools, { signal, temperature, maxTokens }) {
+  async #anthropic(resolved, messages, tools, { signal, temperature, maxTokens, onDelta }) {
     const provider = resolved.provider;
     const cachingEnabled = provider.promptCaching !== false;
     const converted = mergeAnthropicMessages(messages, resolved.ref);
@@ -595,10 +783,18 @@ export class ProviderManager {
       temperature,
       system: systemBlocks.length ? systemBlocks : converted.system,
       messages: converted.messages,
+      stream: true,
       ...(toolDefs.length ? { tools: toolDefs } : {}),
       ...provider.requestDefaults,
     };
-    const data = await fetchJson(`${provider.baseUrl.replace(/\/$/, '')}/messages`, {
+    // Rebuilt block-by-block from `content_block_start`/`_delta`/`_stop` events into the exact
+    // same shape the non-streaming endpoint's `content` array used to have, so everything that
+    // replays `providerState.blocks` on a later turn keeps working unchanged.
+    const blocks = [];
+    let content = '';
+    let stopReason = null;
+    let usage = null;
+    await fetchStream(`${provider.baseUrl.replace(/\/$/, '')}/messages`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -607,18 +803,54 @@ export class ProviderManager {
         ...provider.headers,
       },
       body: JSON.stringify(body),
-    }, { signal, timeoutMs: provider.timeoutMs || 300_000 });
-    const blocks = data.content || [];
+    }, {
+      signal, timeoutMs: provider.timeoutMs || 300_000,
+      onFrame: ({ event, data }) => {
+        const payload = safeJsonParse(data, null);
+        if (!payload) return;
+        if (event === 'message_start') {
+          usage = payload.message?.usage || usage;
+        } else if (event === 'content_block_start') {
+          blocks[payload.index] = { ...payload.content_block };
+        } else if (event === 'content_block_delta') {
+          const block = blocks[payload.index];
+          if (!block) return;
+          const delta = payload.delta || {};
+          if (delta.type === 'text_delta') {
+            block.text = (block.text || '') + delta.text;
+            content = blocks.filter((entry) => entry?.type === 'text').map((entry) => entry.text || '').join('\n');
+            onDelta?.(content);
+          } else if (delta.type === 'input_json_delta') {
+            block._argText = (block._argText || '') + (delta.partial_json || '');
+          } else if (delta.type === 'thinking_delta') {
+            block.thinking = (block.thinking || '') + delta.thinking;
+          } else if (delta.type === 'signature_delta') {
+            block.signature = (block.signature || '') + delta.signature;
+          }
+        } else if (event === 'content_block_stop') {
+          const block = blocks[payload.index];
+          if (block?.type === 'tool_use') {
+            block.input = safeJsonParse(block._argText || '{}', {});
+            delete block._argText;
+          }
+        } else if (event === 'message_delta') {
+          if (payload.delta?.stop_reason) stopReason = payload.delta.stop_reason;
+          if (payload.usage) usage = { ...usage, ...payload.usage };
+        } else if (event === 'error') {
+          throw Object.assign(new Error(payload.error?.message || 'Model stream failed'), { data: payload });
+        }
+      },
+    });
     return {
-      content: blocks.filter((block) => block.type === 'text').map((block) => block.text).join('\n'),
-      toolCalls: blocks.filter((block) => block.type === 'tool_use').map((block, index) => normalizeToolCall(block, index)),
-      finishReason: data.stop_reason || null,
-      usage: data.usage || null,
+      content: content || blocks.filter((block) => block?.type === 'text').map((block) => block.text || '').join('\n'),
+      toolCalls: blocks.filter((block) => block?.type === 'tool_use').map((block, index) => normalizeToolCall(block, index)),
+      finishReason: stopReason,
+      usage,
       providerState: { type: 'anthropic', ref: resolved.ref, blocks },
     };
   }
 
-  async #gemini(resolved, messages, tools, { signal, temperature, maxTokens }) {
+  async #gemini(resolved, messages, tools, { signal, temperature, maxTokens, onDelta }) {
     const provider = resolved.provider;
     const converted = toGemini(messages, resolved.ref);
     const body = {
@@ -631,17 +863,37 @@ export class ProviderManager {
         parameters: tool.inputSchema || { type: 'object', properties: {} },
       })) }] } : {}),
     };
-    const data = await fetchJson(`${provider.baseUrl.replace(/\/$/, '')}/models/${encodeURIComponent(resolved.model)}:generateContent?key=${encodeURIComponent(this.apiKey(provider))}`, {
+    // Each SSE frame here is a full GenerateContentResponse, but its parts are the *new* text
+    // generated since the previous frame, not the whole answer so far — so parts accumulate
+    // across frames the same way the non-streaming endpoint's single response did.
+    const parts = [];
+    let content = '';
+    let finishReason = null;
+    let usage = null;
+    await fetchStream(`${provider.baseUrl.replace(/\/$/, '')}/models/${encodeURIComponent(resolved.model)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(this.apiKey(provider))}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', ...provider.headers }, body: JSON.stringify(body),
-    }, { signal, timeoutMs: provider.timeoutMs || 300_000 });
-    const candidate = data.candidates?.[0] || {};
-    const parts = candidate.content?.parts || [];
+    }, {
+      signal, timeoutMs: provider.timeoutMs || 300_000,
+      onFrame: ({ data }) => {
+        const chunk = safeJsonParse(data, null);
+        if (!chunk) return;
+        const candidate = chunk.candidates?.[0];
+        if (candidate?.finishReason) finishReason = candidate.finishReason;
+        if (chunk.usageMetadata) usage = chunk.usageMetadata;
+        for (const part of candidate?.content?.parts || []) {
+          parts.push(part);
+          // Gemini's "thought" parts are internal reasoning, not visible answer text.
+          if (typeof part.text === 'string' && !part.thought) {
+            content += part.text;
+            onDelta?.(content);
+          }
+        }
+      },
+    });
     return {
-      // Gemini's "thought" parts are internal reasoning, not visible answer text.
-      content: parts.filter((part) => typeof part.text === 'string' && !part.thought).map((part) => part.text).join('\n'),
+      content,
       toolCalls: parts.filter((part) => part.functionCall).map((part, index) => normalizeToolCall(part, index)),
-      finishReason: candidate.finishReason || null,
-      usage: data.usageMetadata || null,
+      finishReason, usage,
       providerState: { type: 'gemini', ref: resolved.ref, parts },
     };
   }

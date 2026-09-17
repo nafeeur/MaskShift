@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createProject, jsonServer, readJsonBody, respondJson, runtimeForTest, waitFor } from './helpers.mjs';
+import { createProject, jsonServer, readJsonBody, respondOpenAIChatSSE, runtimeForTest, waitFor } from './helpers.mjs';
 
-function textResponse(content = 'Done.') {
-  return { id: 'resp_1', choices: [{ message: { role: 'assistant', content }, finish_reason: 'stop' }], usage: { prompt_tokens: 5, completion_tokens: 5 } };
+function textResponse(response, content = 'Done.') {
+  return respondOpenAIChatSSE(response, { content, finishReason: 'stop', usage: { prompt_tokens: 5, completion_tokens: 5 } });
 }
 
 test('starting a second run on a session that already has one active is refused', async (t) => {
@@ -11,7 +11,7 @@ test('starting a second run on a session that already has one active is refused'
   const gate = new Promise((resolve) => { releaseFirst = resolve; });
   const modelServer = await jsonServer(t, async (request, response) => {
     await gate;
-    return respondJson(response, 200, textResponse());
+    return textResponse(response);
   });
   const project = await createProject(t);
   const runtime = await runtimeForTest(t, project, {
@@ -41,7 +41,7 @@ test('cancelling a run cancels its active delegated subagents too', async (t) =>
   const modelServer = await jsonServer(t, async (request, response) => {
     requests.push(await readJsonBody(request));
     await gate;
-    return respondJson(response, 200, textResponse());
+    return textResponse(response);
   });
   const project = await createProject(t);
   const runtime = await runtimeForTest(t, project, {
@@ -79,7 +79,7 @@ test('a parent run refuses to delegate beyond its configured concurrent-subagent
   const modelServer = await jsonServer(t, async (request, response) => {
     requests.push(await readJsonBody(request));
     await gate;
-    return respondJson(response, 200, textResponse());
+    return textResponse(response);
   });
   const project = await createProject(t);
   const runtime = await runtimeForTest(t, project, {
@@ -111,7 +111,7 @@ test('a run is aborted once it exceeds its configured wall-clock deadline', asyn
   const modelServer = await jsonServer(t, async (request, response) => {
     // The engine floors any configured deadline at 1000ms, so this response must outlast that.
     await new Promise((resolve) => setTimeout(resolve, 1500));
-    return respondJson(response, 200, textResponse('too late'));
+    return textResponse(response, 'too late');
   });
   const project = await createProject(t);
   const runtime = await runtimeForTest(t, project, {
@@ -134,13 +134,13 @@ test('a run is stopped once it exceeds its configured token budget', async (t) =
   const modelServer = await jsonServer(t, async (request, response) => {
     turn += 1;
     if (turn === 1) {
-      return respondJson(response, 200, {
-        id: 'resp_1',
-        choices: [{ message: { role: 'assistant', content: '', tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'fs_write', arguments: JSON.stringify({ path: 'a.txt', content: 'x' }) } }] }, finish_reason: 'tool_calls' }],
+      return respondOpenAIChatSSE(response, {
+        toolCalls: [{ id: 'call_1', name: 'fs_write', args: { path: 'a.txt', content: 'x' } }],
+        finishReason: 'tool_calls',
         usage: { prompt_tokens: 1000, completion_tokens: 1000 },
       });
     }
-    return respondJson(response, 200, textResponse('finishing up'));
+    return textResponse(response, 'finishing up');
   });
   const project = await createProject(t);
   const runtime = await runtimeForTest(t, project, {

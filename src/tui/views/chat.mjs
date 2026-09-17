@@ -133,6 +133,26 @@ export function transcriptLines(app, width) {
     }
   }
 
+  // The turn in progress: not a message yet (it becomes one, and this block simply stops
+  // rendering, the instant `run.assistant` lands and `app.messages` reloads with it), but shown
+  // exactly like one — same speaker row, same markdown — with a caret standing in for the
+  // timestamp a finished message would carry, to read as "still being written" rather than done.
+  if (app.streamingText) {
+    openBlock('assistant');
+    const colour = theme.roles.primary;
+    const mark = glyphs(theme);
+    lines.push(rail(theme, colour, { lead: true })
+      + speakerRow(theme, 'MASKSHIFT', colour, text, { qualifier: app.modelRef || '' }));
+    const body = renderMarkdown(theme, app.streamingText, text);
+    const cursor = theme.paint(mark.spineRight, { fg: colour });
+    body.forEach((piece, index) => {
+      const isLast = index === body.length - 1;
+      lines.push(rail(theme, colour, { weight: 0.14 }) + (isLast && visibleWidth(piece) < text ? piece + cursor : piece));
+      if (isLast && visibleWidth(piece) >= text) lines.push(rail(theme, colour, { weight: 0.14 }) + cursor);
+    });
+    if (!body.length) lines.push(rail(theme, colour, { weight: 0.14 }) + cursor);
+  }
+
   for (const entry of app.liveTrail) {
     if (lines.length) lines.push('');
     previousKind = 'live';

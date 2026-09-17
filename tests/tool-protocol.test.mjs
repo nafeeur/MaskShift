@@ -3,7 +3,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 import { parseToolCalls, renderToolInstructions, toTextProtocolMessages } from '../src/agent/tool-protocol.mjs';
-import { createProject, jsonServer, readJsonBody, respondJson, runtimeForTest } from './helpers.mjs';
+import { createProject, jsonServer, readJsonBody, respondJson, respondOpenAIChatSSE, runtimeForTest } from './helpers.mjs';
 
 const TOOLS = [{
   name: 'fs_read', description: 'Read a file',
@@ -22,9 +22,8 @@ function scriptedModel(t, script, { failOnTools = false } = {}) {
     }
     const content = script[Math.min(seen.turn, script.length - 1)];
     seen.turn += 1;
-    respondJson(response, 200, {
-      id: 'chatcmpl-test', object: 'chat.completion', model: 'small-model',
-      choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }],
+    respondOpenAIChatSSE(response, {
+      content, finishReason: 'stop',
       usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
     });
   });

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createProject, jsonServer, readJsonBody, respondJson, runtimeForTest, waitFor } from './helpers.mjs';
+import { createProject, jsonServer, readJsonBody, respondAnthropicSSE, runtimeForTest, waitFor } from './helpers.mjs';
 
 function contextFor(runtime, workspace, project) {
   return { workspaceId: workspace.id, workspacePath: project, eventBus: runtime.eventBus, scope: { workspaceId: workspace.id } };
@@ -14,14 +14,14 @@ test('Anthropic provider marks prompt-cache breakpoints and usage feeds run cost
     requests.push(body);
     turn += 1;
     if (turn === 1) {
-      return respondJson(response, 200, {
-        id: 'msg_1', stop_reason: 'tool_use',
+      return respondAnthropicSSE(response, {
+        id: 'msg_1', stopReason: 'tool_use',
         content: [{ type: 'tool_use', id: 'call_1', name: 'fs_write', input: { path: 'cache-test.txt', content: 'ok\n' } }],
         usage: { input_tokens: 500, output_tokens: 20 },
       });
     }
-    return respondJson(response, 200, {
-      id: 'msg_2', stop_reason: 'end_turn',
+    return respondAnthropicSSE(response, {
+      id: 'msg_2', stopReason: 'end_turn',
       content: [{ type: 'text', text: 'Done.' }],
       usage: { input_tokens: 50, output_tokens: 10, cache_read_input_tokens: 480 },
     });

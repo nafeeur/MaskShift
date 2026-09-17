@@ -40,6 +40,16 @@ function json(response, status, body) {
   response.writeHead(status, { 'Content-Type': 'application/json', 'Content-Length': data.length });
   response.end(data);
 }
+// Mirrors a real provider's streaming endpoint, so this smoke test exercises the same
+// SSE-parsing path production traffic does rather than a shortcut that only looks similar.
+function sse(response, frames) {
+  response.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
+  for (const frame of frames) {
+    if (frame.event) response.write(`event: ${frame.event}\n`);
+    response.write(`data: ${typeof frame.data === 'string' ? frame.data : JSON.stringify(frame.data)}\n\n`);
+  }
+  response.end();
+}
 async function body(request) {
   const chunks = [];
   for await (const chunk of request) chunks.push(chunk);
@@ -55,15 +65,30 @@ const modelServer = http.createServer(async (req, res) => {
     assert.equal(input.model, 'smoke-coder');
     assert.ok(input.tools.some((tool) => tool.name === 'fs_write'));
     if (!input.input.some((item) => item.type === 'function_call_output')) {
-      return json(res, 200, {
-        id: 'smoke_tool', status: 'completed',
-        output: [{ type: 'function_call', id: 'fc_smoke', call_id: 'call_smoke', name: 'fs_write', arguments: JSON.stringify({ path: 'smoke-agent.txt', content: 'MASKSHIFT_SMOKE_OK\n' }) }],
-      });
+      return sse(res, [{
+        event: 'response.completed',
+        data: {
+          response: {
+            id: 'smoke_tool', status: 'completed',
+            output: [{ type: 'function_call', id: 'fc_smoke', call_id: 'call_smoke', name: 'fs_write', arguments: JSON.stringify({ path: 'smoke-agent.txt', content: 'MASKSHIFT_SMOKE_OK\n' }) }],
+          },
+        },
+      }]);
     }
-    return json(res, 200, {
-      id: 'smoke_final', status: 'completed',
-      output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'Smoke artifact created and verified.' }] }],
-    });
+    const text = 'Smoke artifact created and verified.';
+    return sse(res, [
+      { event: 'response.output_text.delta', data: { delta: text.slice(0, 12) } },
+      { event: 'response.output_text.delta', data: { delta: text.slice(12) } },
+      {
+        event: 'response.completed',
+        data: {
+          response: {
+            id: 'smoke_final', status: 'completed',
+            output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text }] }],
+          },
+        },
+      },
+    ]);
   }
   json(res, 404, { error: { message: 'not found' } });
 });

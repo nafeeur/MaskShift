@@ -4,7 +4,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 import { main } from '../src/cli/main.mjs';
-import { createProject, jsonServer, readJsonBody, respondJson, runtimeForTest, waitFor } from './helpers.mjs';
+import { createProject, jsonServer, readJsonBody, respondOpenAIChatSSE, runtimeForTest, waitFor } from './helpers.mjs';
 
 function captureStdout() {
   const chunks = [];
@@ -116,12 +116,11 @@ test('a real run records its owner pid and pairs tool intents with results', asy
   const modelServer = await jsonServer(t, async (request, response) => {
     const body = await readJsonBody(request);
     if (body.messages.some((m) => Array.isArray(m.tool_calls))) {
-      return respondJson(response, 200, { id: 'r2', choices: [{ message: { role: 'assistant', content: 'done' }, finish_reason: 'stop' }], usage: {} });
+      return respondOpenAIChatSSE(response, { content: 'done', finishReason: 'stop' });
     }
-    return respondJson(response, 200, {
-      id: 'r1',
-      choices: [{ message: { role: 'assistant', content: '', tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'fs_write', arguments: JSON.stringify({ path: 'note.txt', content: 'hi' }) } }] }, finish_reason: 'tool_calls' }],
-      usage: {},
+    return respondOpenAIChatSSE(response, {
+      toolCalls: [{ id: 'call_1', name: 'fs_write', args: { path: 'note.txt', content: 'hi' } }],
+      finishReason: 'tool_calls',
     });
   });
   const project = await createProject(t);
