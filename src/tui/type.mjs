@@ -111,9 +111,12 @@ export function columns(theme, cells, total, { gap = SPACE.columnGap } = {}) {
   for (const cell of cells) {
     const width = cell.width === undefined ? share : cell.width;
     if (width <= 0) { parts.push(''); continue; }
+    // A cut-off name should read as "trimmed on purpose", not as stray
+    // punctuation the same weight as the text it interrupts.
+    const ellipsis = cell.dim ? theme.paint('…', { fg: theme.roles.faint }) : undefined;
     const painted = cell.tone || cell.bold
-      ? theme.paint(truncate(cell.text ?? '', width), { fg: cell.tone, bold: cell.bold })
-      : truncate(cell.text ?? '', width);
+      ? theme.paint(truncate(cell.text ?? '', width, ellipsis), { fg: cell.tone, bold: cell.bold })
+      : truncate(cell.text ?? '', width, ellipsis);
     parts.push(cell.align === 'right' ? padStart(painted, width) : padEnd(painted, width));
   }
   return fit(parts.join(' '.repeat(gap)), total);

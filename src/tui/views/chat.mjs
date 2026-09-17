@@ -52,7 +52,10 @@ function speakerRow(theme, name, colour, width, { qualifier = '', stamp = '' } =
       ? theme.paint(` ${mark.dot} ${truncate(qualifier, Math.max(0, width - name.length - 12))}`, { fg: theme.roles.muted })
       : '');
   const tail = stamp ? theme.paint(stamp, { fg: theme.roles.faint }) : '';
-  return spread(head, tail, width);
+  // The left edge keeps a gutter's worth of margin before OPERATOR/MASKSHIFT;
+  // the timestamp got none on the right, sitting one column off the frame
+  // where every other line kept its full margin. Reserve the same column here.
+  return fit(spread(head, tail, Math.max(0, width - 1)), width);
 }
 
 /**
