@@ -25,19 +25,24 @@ export class ContextBuilder {
       return { workspace: null, text: `No workspace is open. Host current directory: ${process.cwd()}` };
     }
     const workspace = this.workspaceManager.get(workspaceId);
-    let indexStats = this.indexer.stats(workspaceId);
+    const indexStats = this.indexer.stats(workspaceId);
+    // Building either of these from scratch — chunking and embedding every file, or parsing the
+    // whole repo into an AST graph — can take a long time on a real codebase, and used to block
+    // the very first turn of every new workspace on it in full. Kick them off in the background
+    // instead: the indexer and code graph both dedupe their own concurrent calls per workspace,
+    // so firing this on every turn until it lands is safe, not wasted work, and later turns pick
+    // up the finished index/graph for free (the `indexStats?.chunks` / `.stats().nodes` checks
+    // below just stop seeing them as missing once the background job completes).
     if (this.config.get().autoIndex && !indexStats?.chunks) {
-      try {
-        await this.indexer.index(workspaceId);
-        indexStats = this.indexer.stats(workspaceId);
-      } catch (error) {
-        this.logger.warn('Initial repository indexing failed', { workspaceId, error: error.message });
-      }
+      void this.indexer.index(workspaceId).catch((error) => {
+        this.logger.warn('Background repository indexing failed', { workspaceId, error: error.message });
+      });
     }
     const graphEnabled = this.config.get().codeGraph?.enabled !== false;
     if (graphEnabled && !this.codeGraph?.stats(workspaceId)?.nodes) {
-      try { await this.codeGraph?.build(workspaceId); }
-      catch (error) { this.logger.warn('Initial code graph build failed', { workspaceId, error: error.message }); }
+      void this.codeGraph?.build(workspaceId).catch((error) => {
+        this.logger.warn('Background code graph build failed', { workspaceId, error: error.message });
+      });
     }
 
     const budgets = this.contextPlanner.budgets();
