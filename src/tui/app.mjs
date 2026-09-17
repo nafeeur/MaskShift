@@ -496,20 +496,18 @@ export class MaskShiftTui {
     }
 
     if (!this.overlay && this.view === 'chat' && this.focus === 'composer' && !this.busy && this.lastRegion && this.chatPanes) {
-      const typed = this.composer.value;
-      if (/^\/[a-z]*$/i.test(typed)) {
-        const prefix = typed.slice(1).toLowerCase();
-        const matches = SLASH_COMMANDS.filter((entry) => entry.name.startsWith(prefix));
-        if (matches.length) {
-          const width = Math.min(48, columns - 4);
-          const body = matches.slice(0, 12).map((entry) => `/${entry.name}  ${entry.hint}`);
-          const suggestBottom = this.lastRegion.row + 1 + this.chatPanes.transcriptHeight;
-          const lines = panel({
-            theme, width, height: body.length + 2, title: 'COMMANDS', body,
-            colour: frameColour(theme, true), focused: true,
-          });
-          frame = paintOverlay(frame, lines, { row: Math.max(2, suggestBottom - lines.length), column: 2 }, columns);
-        }
+      const matches = this.matchingSlashCommands();
+      if (matches?.length) {
+        // Capped to the chat panel's own width (not the full screen) so the
+        // panel never bleeds into the rail that sits to its right.
+        const width = Math.min(48, this.lastRegion.width - 4);
+        const body = matches.slice(0, 12).map((entry) => `/${entry.name}  ${entry.hint}`);
+        const suggestBottom = this.lastRegion.row + 1 + this.chatPanes.transcriptHeight;
+        const lines = panel({
+          theme, width, height: body.length + 2, title: 'COMMANDS', body,
+          colour: frameColour(theme, true), focused: true,
+        });
+        frame = paintOverlay(frame, lines, { row: Math.max(2, suggestBottom - lines.length), column: 2 }, columns);
       }
     }
 
@@ -1977,6 +1975,17 @@ export class MaskShiftTui {
   }
 
   // ----------------------------------------------------------- slash commands
+
+  // The list of slash commands matching what's currently typed in the composer,
+  // or null when the composer isn't in "typing a bare command" shape (a slash
+  // followed by nothing but letters). Shared by the suggestion panel in paint()
+  // and by tab-completion in the chat view's key handler, so the two stay in sync.
+  matchingSlashCommands() {
+    const typed = this.composer.value;
+    if (!/^\/[a-z]*$/i.test(typed)) return null;
+    const prefix = typed.slice(1).toLowerCase();
+    return SLASH_COMMANDS.filter((entry) => entry.name.startsWith(prefix));
+  }
 
   async runSlash(input) {
     const [command, ...rest] = input.slice(1).split(/\s+/);
