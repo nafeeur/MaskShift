@@ -1,6 +1,7 @@
 import { nowIso, runCommand, truncate } from '../core/utils.mjs';
 import { estimateUsageCost, summarizeCosts } from '../core/pricing.mjs';
 import { repairPrompt } from './tool-protocol.mjs';
+import { fitHistory } from './context-budget.mjs';
 
 // Bounded so a model that cannot produce valid syntax ends the run instead of looping on it.
 const MAX_TOOL_CALL_REPAIRS = 2;
@@ -222,13 +223,30 @@ export class AgentEngine {
         const system = this.promptBuilder.system({ workspaceContext, capabilityState, planState: entry.planState, run: currentRun, session: currentSession });
         const tools = await this.capabilityController.descriptors(capabilityState);
         this.#event(run.id, 'model-turn', { step, tools: tools.map((tool) => tool.name), skillCount: capabilityState.skills.size }, scope);
+        const maxTokens = entry.options.maxTokens || 16_384;
+        // Only trims when the model declares a smaller-than-default context window (e.g. a
+        // small local model); otherwise the full history goes out exactly as before. The system
+        // message (with its cache-boundary blocks) and tool list are never touched here.
+        let outboundHistory = history;
+        const contextTokens = await this.providerManager.contextWindowFor(currentRun.model_id).catch(() => null);
+        if (contextTokens) {
+          const fitted = fitHistory({
+            history,
+            contextTokens,
+            outputTokens: maxTokens,
+            systemTokens: Math.ceil(Buffer.byteLength(system.text, 'utf8') / 4),
+            toolTokens: Math.ceil(Buffer.byteLength(JSON.stringify(tools), 'utf8') / 4),
+          });
+          outboundHistory = fitted.history;
+          if (fitted.omitted) this.#event(run.id, 'context-trimmed', { omittedTurns: fitted.omitted, contextTokens }, scope);
+        }
         const response = await this.providerManager.complete({
           modelRef: currentRun.model_id,
-          messages: [{ role: 'system', content: system.text, blocks: system.blocks }, ...history],
+          messages: [{ role: 'system', content: system.text, blocks: system.blocks }, ...outboundHistory],
           tools,
           signal,
           temperature: entry.options.temperature ?? 0.1,
-          maxTokens: entry.options.maxTokens || 16_384,
+          maxTokens,
         });
         usage.push(response.usage);
         costs.push(estimateUsageCost(this.config.get(), response.providerId, response.providerType, response.model, response.usage));

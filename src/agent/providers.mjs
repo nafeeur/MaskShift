@@ -367,6 +367,24 @@ export class ProviderManager {
     return { provider, model, ref: `${provider.id}:${model}` };
   }
 
+  /**
+   * A model's declared context window, in tokens — from explicit per-model config
+   * (`provider.models[].contextWindow`), a per-ref override (`config.harness.models[ref]`),
+   * or Ollama's `num_ctx` option. Returns null when nothing is declared, so callers can leave
+   * their existing (generous) default behavior untouched rather than guessing a model's limit
+   * from its name.
+   */
+  async contextWindowFor(modelRef) {
+    const resolved = await this.resolveModel(modelRef);
+    const configured = (resolved.provider.models || []).find((item) => item?.id === resolved.model);
+    const override = this.config.get().harness?.models?.[resolved.ref];
+    const declared = Number(override?.contextWindow) || Number(configured?.contextWindow);
+    if (Number.isFinite(declared) && declared >= 512) return Math.floor(declared);
+    const numCtx = resolved.provider.type === 'ollama' ? Number(resolved.provider.options?.num_ctx) : null;
+    if (Number.isFinite(numCtx) && numCtx >= 512) return Math.floor(numCtx);
+    return null;
+  }
+
   /** Cache of models proven to lack native tool calling, so the fallback costs one request once. */
   #textProtocolModels = new Set();
 
