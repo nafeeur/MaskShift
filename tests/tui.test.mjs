@@ -273,6 +273,41 @@ test('colour degrades cleanly for NO_COLOR and dumb terminals', () => {
   assert.equal(detectDepth({ isTTY: false }), 0);
 });
 
+test('colour depth detection trusts tmux/screen as truecolor-capable, not 256-colour', () => {
+  const saved = { TERM: process.env.TERM, TMUX: process.env.TMUX, COLORTERM: process.env.COLORTERM, TERM_PROGRAM: process.env.TERM_PROGRAM, FORCE_COLOR: process.env.FORCE_COLOR, MASKSHIFT_COLOR: process.env.MASKSHIFT_COLOR, NO_COLOR: process.env.NO_COLOR };
+  const reset = () => {
+    for (const [key, value] of Object.entries(saved)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+  };
+  try {
+    for (const key of Object.keys(saved)) delete process.env[key];
+    // Plain xterm-256color outside tmux still degrades — nothing here claims truecolor for it.
+    process.env.TERM = 'xterm-256color';
+    assert.equal(detectDepth({ isTTY: true }), 8);
+
+    // tmux reporting a 256-colour TERM, with $TMUX confirming we're actually inside a session,
+    // is trusted as truecolor — that's the whole point of this detection path.
+    process.env.TERM = 'tmux-256color';
+    process.env.TMUX = '/tmp/tmux-0/default,1234,0';
+    assert.equal(detectDepth({ isTTY: true }), 24);
+
+    process.env.TERM = 'screen-256color';
+    assert.equal(detectDepth({ isTTY: true }), 24);
+
+    // The same TERM value without $TMUX set (e.g. someone exported it by hand outside tmux)
+    // gets no special treatment.
+    delete process.env.TMUX;
+    process.env.TERM = 'tmux-256color';
+    assert.equal(detectDepth({ isTTY: true }), 8);
+
+    // The explicit override still wins over the heuristic either way.
+    process.env.TMUX = '/tmp/tmux-0/default,1234,0';
+    process.env.MASKSHIFT_COLOR = 'basic';
+    assert.equal(detectDepth({ isTTY: true }), 4);
+  } finally {
+    reset();
+  }
+});
+
 test('the screen only rewrites rows that changed', () => {
   const output = new FakeTerminal(20, 4);
   const screen = new Screen({ theme, output });

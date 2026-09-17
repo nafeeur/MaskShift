@@ -21,6 +21,14 @@ export const ANSI = {
   reset: `${CSI}0m`,
   bracketedPasteOn: `${CSI}?2004h`,
   bracketedPasteOff: `${CSI}?2004l`,
+  // DEC 2026 "synchronized output": tells a supporting terminal to buffer everything between
+  // these two and present it as one atomic screen update, instead of painting each rewritten row
+  // as its write arrives. Without it, a multi-row repaint over a slow link (SSH, tmux) or during
+  // a burst of streaming deltas can show a half-updated frame for a moment — the "jaggedy" tear
+  // this exists to prevent. It's a DEC private-mode escape: a terminal that doesn't recognize it
+  // just ignores the bytes, so this is safe everywhere, not just on terminals that support it.
+  syncOutputOn: `${CSI}?2026h`,
+  syncOutputOff: `${CSI}?2026l`,
   saveTitle: `${CSI}22;0t`,
   restoreTitle: `${CSI}23;0t`,
   // ?1000 button reports, ?1002 adds drag, ?1003 adds bare hover motion, and
@@ -114,8 +122,10 @@ export class Screen {
       frame.push(fit(sanitizeTerminalLine(lines[row] ?? ''), columns));
     }
     let out = '';
+    let changedRows = 0;
     for (let row = 0; row < rows; row += 1) {
       if (this.previous[row] === frame[row]) continue;
+      changedRows += 1;
       out += `${ANSI.moveTo(row, 0)}${ANSI.clearLine}${frame[row]}${ANSI.reset}`;
     }
     if (cursor) out += `${ANSI.moveTo(cursor.row, cursor.column)}${ANSI.showCursor}`;
@@ -123,7 +133,10 @@ export class Screen {
     this.cursor = cursor;
     this.previous = frame;
     this.frame = frame;
-    if (out) this.write(out);
+    // A single-row touch-up (the common case: a spinner frame, a cursor blink) is already
+    // atomic as far as the terminal's own line-buffering is concerned — synchronized output
+    // earns its keep on a real multi-row repaint.
+    if (out) this.write(changedRows > 1 ? `${ANSI.syncOutputOn}${out}${ANSI.syncOutputOff}` : out);
   }
 
   // Drop the cached frame so the next render repaints everything.
