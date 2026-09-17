@@ -31,22 +31,46 @@ function combineSignals(signal, timeoutMs) {
   };
 }
 
-async function fetchJson(url, options, { signal, timeoutMs = 180_000 } = {}) {
-  const combined = combineSignals(signal, timeoutMs);
-  let response;
+/** Reads a response body under a byte cap so a runaway/huge response cannot exhaust memory. */
+async function readBounded(response, maxBytes) {
+  if (!response.body) return response.text();
+  const reader = response.body.getReader();
+  const chunks = [];
+  let total = 0;
   try {
-    response = await fetch(url, { ...options, signal: combined.signal });
-  } catch (error) {
-    combined.cleanup();
-    throw new Error(`Model request failed: ${error.message}`);
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) throw Object.assign(new Error(`Provider response exceeded ${maxBytes} bytes`), { code: 'HARNESS_RESPONSE_TOO_LARGE' });
+      chunks.push(value);
+    }
+  } finally {
+    try { reader.releaseLock(); } catch { /* already released on stream error */ }
   }
-  combined.cleanup();
-  const text = await response.text();
+  return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk))).toString('utf8');
+}
+
+async function fetchJson(url, options, { signal, timeoutMs = 180_000, maxBytes = 8 * 1024 * 1024 } = {}) {
+  // The abort timer must stay armed through the body read, not just until headers arrive,
+  // otherwise a stalled response body can hang the request indefinitely.
+  const combined = combineSignals(signal, timeoutMs);
+  let text, status, statusText, ok;
+  try {
+    const response = await fetch(url, { ...options, signal: combined.signal });
+    ({ status, statusText, ok } = response);
+    text = await readBounded(response, maxBytes);
+  } catch (error) {
+    if (error.code === 'HARNESS_RESPONSE_TOO_LARGE') throw error;
+    throw new Error(`Model request failed: ${error.message}`);
+  } finally {
+    combined.cleanup();
+  }
   const data = safeJsonParse(text, null);
-  if (!response.ok) {
-    const message = data?.error?.message || data?.message || truncate(text, 4000) || `HTTP ${response.status}`;
-    const error = new Error(`${response.status} ${response.statusText}: ${message}`);
-    error.status = response.status;
+  if (!ok) {
+    const message = data?.error?.message || data?.message || truncate(text, 4000) || `HTTP ${status}`;
+    const error = new Error(`${status} ${statusText}: ${message}`);
+    error.status = status;
     error.data = data;
     throw error;
   }
@@ -57,30 +81,57 @@ async function fetchJson(url, options, { signal, timeoutMs = 180_000 } = {}) {
 function normalizeToolCall(call, index = 0) {
   const name = call?.function?.name || call?.name || call?.functionCall?.name;
   const rawArgs = call?.function?.arguments ?? call?.arguments ?? call?.functionCall?.args ?? call?.input ?? {};
+  // The provider's own call id (when it has one) is preserved separately so it can be echoed
+  // back verbatim on the next turn; providers without one (e.g. Gemini) fall back silently.
+  const providerCallId = call.id || call.tool_call_id || call.functionCall?.id || null;
   return {
-    id: call.id || call.tool_call_id || `call_${Date.now()}_${index}`,
+    id: providerCallId || `call_${Date.now()}_${index}`,
     name,
     args: typeof rawArgs === 'string' ? safeJsonParse(rawArgs, { _raw: rawArgs }) : (rawArgs || {}),
+    ...(providerCallId ? { providerCallId } : {}),
   };
 }
 
-function toOpenAiMessages(messages) {
+// Provider-specific state (reasoning traces, thinking blocks) is opaque and only meaningful
+// when replayed back to the exact same model; a model switch mid-run must not resurface it.
+function opaqueState(message, type, ref) {
+  const value = message.providerState;
+  return value?.type === type && value.ref === ref ? value : null;
+}
+
+function toOpenAiMessages(messages, ref = null) {
   return messages.map((message) => {
     if (message.role === 'tool') {
       return { role: 'tool', tool_call_id: message.toolCallId, content: String(message.content || '') };
     }
-    if (message.role === 'assistant' && message.toolCalls?.length) {
-      return {
-        role: 'assistant',
-        content: message.content || null,
-        tool_calls: message.toolCalls.map((call) => ({
+    if (message.role === 'assistant') {
+      const opaque = opaqueState(message, 'openai-compatible', ref);
+      const value = { role: 'assistant', content: message.content || null };
+      if (opaque?.reasoningContent !== undefined) value.reasoning_content = opaque.reasoningContent;
+      if (message.toolCalls?.length) {
+        value.tool_calls = message.toolCalls.map((call) => ({
           id: call.id,
           type: 'function',
           function: { name: call.name, arguments: JSON.stringify(call.args || {}) },
-        })),
-      };
+        }));
+      }
+      return value;
     }
     return { role: message.role, content: String(message.content || '') };
+  });
+}
+
+// Ollama's chat API expects tool-call arguments as an object, unlike OpenAI's JSON-string form.
+function toOllamaMessages(messages, ref = null) {
+  return messages.map((message) => {
+    if (message.role === 'tool') return { role: 'tool', tool_name: message.toolName || 'tool', content: String(message.content || '') };
+    const value = { role: message.role, content: String(message.content || '') };
+    if (message.role === 'assistant') {
+      const opaque = opaqueState(message, 'ollama', ref);
+      if (opaque?.thinking) value.thinking = opaque.thinking;
+      if (message.toolCalls?.length) value.tool_calls = message.toolCalls.map((call, index) => ({ type: 'function', function: { index, name: call.name, arguments: call.args || {} } }));
+    }
+    return value;
   });
 }
 
@@ -96,7 +147,7 @@ function toOpenAiTools(tools) {
 }
 
 
-function toResponsesInput(messages) {
+function toResponsesInput(messages, ref = null) {
   const instructions = messages.filter((message) => message.role === 'system').map((message) => message.content).join('\n\n');
   const input = [];
   for (const message of messages.filter((item) => item.role !== 'system')) {
@@ -104,6 +155,10 @@ function toResponsesInput(messages) {
       input.push({ type: 'function_call_output', call_id: message.toolCallId, output: String(message.content || '') });
       continue;
     }
+    const opaque = opaqueState(message, 'openai-responses', ref);
+    // Encrypted reasoning items must be replayed verbatim, ahead of the visible turn content,
+    // or the Responses API rejects the follow-up request.
+    if (message.role === 'assistant' && opaque?.reasoning?.length) input.push(...structuredClone(opaque.reasoning));
     if (message.content) input.push({ role: message.role === 'assistant' ? 'assistant' : 'user', content: String(message.content) });
     if (message.role === 'assistant') {
       for (const call of message.toolCalls || []) {
@@ -135,14 +190,18 @@ function anthropicSystemBlocks(messages) {
   return joined ? [{ type: 'text', text: joined }] : [];
 }
 
-function mergeAnthropicMessages(messages) {
+function mergeAnthropicMessages(messages, ref = null) {
   const system = messages.filter((message) => message.role === 'system').map((message) => message.content).join('\n\n');
   const converted = [];
   for (const message of messages.filter((item) => item.role !== 'system')) {
     if (message.role === 'assistant') {
-      const content = [];
-      if (message.content) content.push({ type: 'text', text: message.content });
-      for (const call of message.toolCalls || []) content.push({ type: 'tool_use', id: call.id, name: call.name, input: call.args || {} });
+      // Thinking blocks carry a signature Anthropic must see again verbatim; replaying the
+      // original raw blocks (when this history was produced by the same model) preserves it.
+      const opaque = opaqueState(message, 'anthropic', ref);
+      const content = opaque?.blocks ? structuredClone(opaque.blocks) : [
+        ...(message.content ? [{ type: 'text', text: message.content }] : []),
+        ...(message.toolCalls || []).map((call) => ({ type: 'tool_use', id: call.id, name: call.name, input: call.args || {} })),
+      ];
       converted.push({ role: 'assistant', content: content.length ? content : [{ type: 'text', text: '' }] });
     } else if (message.role === 'tool') {
       converted.push({
@@ -162,16 +221,18 @@ function mergeAnthropicMessages(messages) {
   return { system, messages: merged };
 }
 
-function toGemini(messages) {
+function toGemini(messages, ref = null) {
   const system = messages.filter((message) => message.role === 'system').map((message) => message.content).join('\n\n');
   const contents = [];
   for (const message of messages.filter((item) => item.role !== 'system')) {
     if (message.role === 'tool') {
       contents.push({ role: 'user', parts: [{ functionResponse: { name: message.toolName || 'tool', response: { content: String(message.content || '') } } }] });
     } else if (message.role === 'assistant') {
-      const parts = [];
-      if (message.content) parts.push({ text: message.content });
-      for (const call of message.toolCalls || []) parts.push({ functionCall: { name: call.name, args: call.args || {} } });
+      const opaque = opaqueState(message, 'gemini', ref);
+      const parts = opaque?.parts ? structuredClone(opaque.parts) : [
+        ...(message.content ? [{ text: message.content }] : []),
+        ...(message.toolCalls || []).map((call) => ({ functionCall: { name: call.name, args: call.args || {} } })),
+      ];
       contents.push({ role: 'model', parts });
     } else contents.push({ role: 'user', parts: [{ text: String(message.content || '') }] });
   }
@@ -292,7 +353,7 @@ export class ProviderManager {
       for (const provider of this.config.get().providers) {
         const discovered = await this.discover(provider.id);
         const match = discovered.models.find((item) => (item.id || item) === model);
-        if (match) return { provider, model };
+        if (match) return { provider, model, ref: `${provider.id}:${model}` };
       }
       providerId = 'ollama';
     }
@@ -304,6 +365,24 @@ export class ProviderManager {
     }
     if (!model) throw new Error(`No models are available from ${provider.name || provider.id}`);
     return { provider, model, ref: `${provider.id}:${model}` };
+  }
+
+  /**
+   * A model's declared context window, in tokens — from explicit per-model config
+   * (`provider.models[].contextWindow`), a per-ref override (`config.harness.models[ref]`),
+   * or Ollama's `num_ctx` option. Returns null when nothing is declared, so callers can leave
+   * their existing (generous) default behavior untouched rather than guessing a model's limit
+   * from its name.
+   */
+  async contextWindowFor(modelRef) {
+    const resolved = await this.resolveModel(modelRef);
+    const configured = (resolved.provider.models || []).find((item) => item?.id === resolved.model);
+    const override = this.config.get().harness?.models?.[resolved.ref];
+    const declared = Number(override?.contextWindow) || Number(configured?.contextWindow);
+    if (Number.isFinite(declared) && declared >= 512) return Math.floor(declared);
+    const numCtx = resolved.provider.type === 'ollama' ? Number(resolved.provider.options?.num_ctx) : null;
+    if (Number.isFinite(numCtx) && numCtx >= 512) return Math.floor(numCtx);
+    return null;
   }
 
   /** Cache of models proven to lack native tool calling, so the fallback costs one request once. */
@@ -326,7 +405,7 @@ export class ProviderManager {
     let result;
     if (resolved.provider.type === 'anthropic') result = await this.#anthropic(resolved, outbound, wireTools, { signal, temperature, maxTokens });
     else if (resolved.provider.type === 'openai-responses') result = await this.#openAiResponses(resolved, outbound, wireTools, { signal, temperature, maxTokens });
-    else if (resolved.provider.type === 'ollama') result = await this.#ollama(resolved, outbound, wireTools, { signal, temperature });
+    else if (resolved.provider.type === 'ollama') result = await this.#ollama(resolved, outbound, wireTools, { signal, temperature, maxTokens });
     else if (resolved.provider.type === 'gemini') result = await this.#gemini(resolved, outbound, wireTools, { signal, temperature, maxTokens });
     else result = await this.#openAiCompatible(resolved, outbound, wireTools, { signal, temperature, maxTokens });
 
@@ -403,13 +482,14 @@ export class ProviderManager {
     const headers = { 'Content-Type': 'application/json', ...provider.headers };
     const key = this.apiKey(provider);
     if (key) headers.Authorization = `Bearer ${key}`;
-    const converted = toResponsesInput(messages);
+    const converted = toResponsesInput(messages, resolved.ref);
     const body = {
       model: resolved.model,
       instructions: converted.instructions || undefined,
       input: converted.input,
       temperature,
       max_output_tokens: maxTokens,
+      include: ['reasoning.encrypted_content'],
       ...(tools.length ? { tools: toResponsesTools(tools), tool_choice: 'auto', parallel_tool_calls: true } : {}),
       ...provider.requestDefaults,
     };
@@ -424,12 +504,15 @@ export class ProviderManager {
     const toolCalls = output.filter((item) => item.type === 'function_call').map((item, index) => normalizeToolCall({
       id: item.call_id || item.id, name: item.name, arguments: item.arguments,
     }, index)).filter((call) => call.name);
+    const reasoning = output.filter((item) => item.type === 'reasoning' && item.encrypted_content)
+      .map((item) => ({ id: item.id, type: item.type, summary: item.summary || [], encrypted_content: item.encrypted_content }));
     return {
       content: content || data.output_text || '',
       toolCalls,
       finishReason: data.status || null,
       usage: data.usage || null,
       responseId: data.id || null,
+      providerState: { type: 'openai-responses', ref: resolved.ref, reasoning },
     };
   }
 
@@ -440,7 +523,7 @@ export class ProviderManager {
     if (key) headers.Authorization = `Bearer ${key}`;
     const body = {
       model: resolved.model,
-      messages: toOpenAiMessages(messages),
+      messages: toOpenAiMessages(messages, resolved.ref),
       temperature,
       max_tokens: maxTokens,
       ...(tools.length ? { tools: toOpenAiTools(tools), tool_choice: 'auto', parallel_tool_calls: true } : {}),
@@ -456,20 +539,17 @@ export class ProviderManager {
       toolCalls: (message.tool_calls || []).map(normalizeToolCall).filter((call) => call.name),
       finishReason: choice.finish_reason || null,
       usage: data.usage || null,
+      providerState: { type: 'openai-compatible', ref: resolved.ref, reasoningContent: message.reasoning_content },
     };
   }
 
-  async #ollama(resolved, messages, tools, { signal, temperature }) {
+  async #ollama(resolved, messages, tools, { signal, temperature, maxTokens }) {
     const provider = resolved.provider;
     const body = {
       model: resolved.model,
-      messages: toOpenAiMessages(messages).map((message) => ({
-        role: message.role,
-        content: message.content || '',
-        ...(message.tool_calls ? { tool_calls: message.tool_calls } : {}),
-      })),
+      messages: toOllamaMessages(messages, resolved.ref),
       stream: false,
-      options: { temperature, ...(provider.options || {}) },
+      options: { temperature, ...(provider.options || {}), num_predict: maxTokens },
       ...(tools.length ? { tools: toOpenAiTools(tools) } : {}),
     };
     const headers = { 'Content-Type': 'application/json', ...provider.headers };
@@ -486,13 +566,14 @@ export class ProviderManager {
         output_tokens: data.eval_count,
         total_duration_ns: data.total_duration,
       },
+      providerState: { type: 'ollama', ref: resolved.ref, thinking: message.thinking },
     };
   }
 
   async #anthropic(resolved, messages, tools, { signal, temperature, maxTokens }) {
     const provider = resolved.provider;
     const cachingEnabled = provider.promptCaching !== false;
-    const converted = mergeAnthropicMessages(messages);
+    const converted = mergeAnthropicMessages(messages, resolved.ref);
 
     // Mark the conversation-so-far boundary as cacheable: everything before the newest turn is
     // byte-identical to the previous request in this run, so Anthropic can reuse it from cache.
@@ -533,12 +614,13 @@ export class ProviderManager {
       toolCalls: blocks.filter((block) => block.type === 'tool_use').map((block, index) => normalizeToolCall(block, index)),
       finishReason: data.stop_reason || null,
       usage: data.usage || null,
+      providerState: { type: 'anthropic', ref: resolved.ref, blocks },
     };
   }
 
   async #gemini(resolved, messages, tools, { signal, temperature, maxTokens }) {
     const provider = resolved.provider;
-    const converted = toGemini(messages);
+    const converted = toGemini(messages, resolved.ref);
     const body = {
       contents: converted.contents,
       systemInstruction: converted.system ? { parts: [{ text: converted.system }] } : undefined,
@@ -555,10 +637,12 @@ export class ProviderManager {
     const candidate = data.candidates?.[0] || {};
     const parts = candidate.content?.parts || [];
     return {
-      content: parts.filter((part) => typeof part.text === 'string').map((part) => part.text).join('\n'),
+      // Gemini's "thought" parts are internal reasoning, not visible answer text.
+      content: parts.filter((part) => typeof part.text === 'string' && !part.thought).map((part) => part.text).join('\n'),
       toolCalls: parts.filter((part) => part.functionCall).map((part, index) => normalizeToolCall(part, index)),
       finishReason: candidate.finishReason || null,
       usage: data.usageMetadata || null,
+      providerState: { type: 'gemini', ref: resolved.ref, parts },
     };
   }
 }
