@@ -7,6 +7,8 @@
   "maxAgentSteps": 96,
   "maxSubagentDepth": 3,
   "maxParallelSubagents": 6,
+  "maxRunDurationMs": 28800000,
+  "maxRunTokens": 5000000,
   "maxToolOutputChars": 60000,
   "maxContextChars": 420000,
   "maxFileReadChars": 240000,
