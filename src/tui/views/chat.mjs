@@ -382,7 +382,15 @@ export function handle(app, event) {
     return false;
   }
 
-  if (event.name === 'tab' && !event.ctrl) { app.focus = 'transcript'; return true; }
+  if (event.name === 'tab' && !event.ctrl) {
+    // Complete to the top suggestion instead of leaving the composer, so the
+    // command the suggestion panel is already showing is one keystroke away
+    // rather than something the operator has to keep typing out by hand.
+    const matches = app.matchingSlashCommands();
+    if (matches?.length) { app.composer.set(`/${matches[0].name} `); return true; }
+    app.focus = 'transcript';
+    return true;
+  }
   if (event.name === 'enter' && !event.alt && !event.ctrl) { void app.submitPrompt(); return true; }
   if (event.ctrl && event.name === 's') { void app.submitPrompt(); return true; }
   if (event.ctrl && event.name === 'j') { app.composer.insert('\n'); return true; }

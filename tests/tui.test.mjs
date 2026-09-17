@@ -652,6 +652,51 @@ test('typing a slash in the composer shows matching command suggestions, and onl
   assert.ok(!frame.some((line) => line.includes('COMMANDS')), 'expected the panel to disappear once focus leaves the composer');
 });
 
+test('the slash-command suggestion panel stays inside the chat panel and never bleeds into the rail', async (t) => {
+  const project = await createProject(t);
+  const runtime = await runtimeForTest(t, project);
+  // Wide enough (>=108) that the side rail is shown alongside the chat panel.
+  const app = new MaskShiftTui(runtime, {
+    workspacePath: project, output: new FakeTerminal(140, 32), headless: true, theme,
+  });
+  await app.bootstrap();
+  app.view = 'chat';
+  app.focus = 'composer';
+  app.railVisible = true;
+
+  app.composer.set('/');
+  const frame = app.snapshot().map(stripAnsi);
+  const railStart = app.lastRegion.width;
+  const suggestionRow = frame.find((line) => line.includes('┏━ COMMANDS'));
+  assert.ok(suggestionRow, 'expected the suggestion panel to be visible');
+  // The panel's own right border must land at or before the chat panel's
+  // right edge, not spill into the columns the rail owns.
+  const rightBorder = suggestionRow.lastIndexOf('┓');
+  assert.ok(rightBorder > 0 && rightBorder < railStart, `suggestion panel border at column ${rightBorder} should stay left of the rail at ${railStart}`);
+});
+
+test('tab completes to the top slash-command suggestion instead of just leaving the composer', async (t) => {
+  const project = await createProject(t);
+  const runtime = await runtimeForTest(t, project);
+  const app = new MaskShiftTui(runtime, {
+    workspacePath: project, output: new FakeTerminal(120, 32), headless: true, theme,
+  });
+  await app.bootstrap();
+  app.view = 'chat';
+  app.focus = 'composer';
+
+  app.composer.set('/mo');
+  app.onKey({ name: 'tab' });
+  assert.equal(app.composer.value, '/model ', 'expected tab to complete to the single matching command');
+  assert.equal(app.focus, 'composer', 'tab-completing should keep focus in the composer');
+
+  // With no suggestions active, tab keeps its old behaviour of moving focus
+  // to the transcript instead of being swallowed.
+  app.composer.set('hello there');
+  app.onKey({ name: 'tab' });
+  assert.equal(app.focus, 'transcript', 'expected tab to fall back to switching focus when nothing is suggested');
+});
+
 test('the interface routes keys, slash commands and view switches', async (t) => {
   const project = await createProject(t);
   const runtime = await runtimeForTest(t, project);
