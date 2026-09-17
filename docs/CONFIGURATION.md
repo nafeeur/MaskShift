@@ -13,7 +13,9 @@ The full example is [`maskshift.config.example.json`](../maskshift.config.exampl
 | `networkAccess` | `unrestricted` | Declares network intent for prompts and telemetry. |
 | `maxAgentSteps` | `96` | Maximum model/tool turns in a run. |
 | `maxSubagentDepth` | `3` | Maximum delegation nesting depth. |
-| `maxParallelSubagents` | `6` | Concurrent delegated runs. |
+| `maxParallelSubagents` | `6` | Concurrent delegated runs sharing the same parent. |
+| `maxRunDurationMs` | `28800000` | Wall-clock deadline for a single run (8 hours); it is aborted past this. |
+| `maxRunTokens` | `5000000` | Total accounted input+output tokens a single run may use before it is aborted. |
 | `maxToolOutputChars` | `60000` | Bounded tool output inserted into model history. |
 | `maxContextChars` | `420000` | Maximum constructed repository context. |
 | `maxFileReadChars` | `240000` | Maximum text returned by a single file read. |

@@ -67,6 +67,11 @@ export class AgentEngine {
     else if (!session.workspace_id && workspaceId) session = this.store.updateSession(session.id, { workspace_id: workspaceId });
     if (/^new run$/i.test(session.title || '')) session = this.store.updateSession(session.id, { title: titleFromPrompt(prompt) });
 
+    // A session processes one run at a time; a fresh session (the common subagent case, which
+    // always creates its own) never collides here.
+    const collision = [...this.active.values()].find((entry) => entry.sessionId === session.id);
+    if (collision) throw new Error(`Session ${session.id} already has an active run (${collision.runId}); wait for it to finish or cancel it first`);
+
     let selectedModel = modelRef || session.model_id || this.config.get().defaultModel;
     let route = null;
     if (selectedModel === 'router:auto' || (this.config.get().routing?.autoSelect && !modelRef)) {
@@ -109,6 +114,9 @@ export class AgentEngine {
     const entry = this.active.get(runId);
     if (!entry) return { runId, cancelled: false, reason: 'not-active' };
     entry.controller.abort(new Error('Cancelled by user or parent agent'));
+    // Cancelling a parent must reach its delegated subagents too, or they keep running (and
+    // spending budget) unsupervised after the run that requested them has already stopped.
+    for (const child of this.active.values()) if (child.options?.parentRunId === runId) this.cancel(child.runId);
     this.eventBus.emit('run.cancelling', { runId }, { runId, sessionId: entry.sessionId, workspaceId: entry.workspaceId });
     return { runId, cancelled: true };
   }
@@ -141,6 +149,9 @@ export class AgentEngine {
     const parent = this.store.getRun(parentContext.runId);
     const depth = Number(parent?.meta?.depth || 0) + 1;
     if (depth > this.config.get().maxSubagentDepth) throw new Error(`Subagent depth ${depth} exceeds configured maximum`);
+    const siblings = [...this.active.values()].filter((entry) => entry.options?.parentRunId === parentContext.runId).length;
+    const maxParallel = this.config.get().maxParallelSubagents;
+    if (siblings >= maxParallel) throw new Error(`This run already has ${siblings} active subagent(s), at the configured maximum of ${maxParallel}`);
     let workspaceId = args.workspaceId || parentContext.workspaceId;
     let isolation = null;
     if (args.isolated) {
@@ -186,6 +197,13 @@ export class AgentEngine {
     this.store.updateRun(run.id, { status: 'running' });
     this.store.updateSession(session.id, { status: 'running', model_id: run.model_id });
     this.#event(run.id, 'started', { model: run.model_id, workspacePath, parentRunId: run.meta?.parentRunId }, scope);
+
+    const deadlineMs = Math.max(1000, Number(this.config.get().maxRunDurationMs) || 8 * 60 * 60 * 1000);
+    const deadlineTimer = setTimeout(
+      () => entry.controller.abort(Object.assign(new Error(`Run exceeded its configured ${deadlineMs} ms wall-clock deadline`), { code: 'RUN_DEADLINE_EXCEEDED' })),
+      deadlineMs,
+    );
+    deadlineTimer.unref?.();
 
     try {
       await this.hooks?.run('SessionStart', { ...scope, workspacePath, prompt: run.prompt });
@@ -250,6 +268,11 @@ export class AgentEngine {
         });
         usage.push(response.usage);
         costs.push(estimateUsageCost(this.config.get(), response.providerId, response.providerType, response.model, response.usage));
+        const maxRunTokens = Number(this.config.get().maxRunTokens) || 5_000_000;
+        const tokensSoFar = summarizeCosts(costs);
+        if (tokensSoFar.inputTokens + tokensSoFar.outputTokens > maxRunTokens) {
+          throw Object.assign(new Error(`Run exceeded its configured ${maxRunTokens}-token budget`), { code: 'RUN_TOKEN_BUDGET_EXCEEDED' });
+        }
         const assistantMessage = {
           role: 'assistant', content: response.content || '', toolCalls: response.toolCalls || [], providerState: response.providerState,
         };
@@ -337,6 +360,8 @@ export class AgentEngine {
       this.#event(run.id, status, { error: error.message, stack: this.config.get().permissionMode === 'overdrive' ? error.stack : undefined }, scope);
       await this.hooks?.run('Stop', { ...scope, workspacePath, status, error: error.message }).catch(() => {});
       return failed;
+    } finally {
+      clearTimeout(deadlineTimer);
     }
   }
 

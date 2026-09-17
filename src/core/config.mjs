@@ -96,6 +96,8 @@ export function defaultConfig() {
     maxAgentSteps: 96,
     maxSubagentDepth: 3,
     maxParallelSubagents: 6,
+    maxRunDurationMs: 8 * 60 * 60 * 1000,
+    maxRunTokens: 5_000_000,
     maxToolOutputChars: 60_000,
     maxContextChars: 420_000,
     maxFileReadChars: 240_000,
