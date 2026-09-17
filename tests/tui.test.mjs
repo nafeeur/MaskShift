@@ -18,7 +18,7 @@ import { fit, sanitizeTerminalLine, sliceAnsi, stripAnsi, truncate, visibleWidth
 import { Composer, ListView, TextField, Viewport, fuzzy } from '../src/tui/widgets.mjs';
 import { Regions } from '../src/tui/regions.mjs';
 import { resolveMouseMode } from '../src/tui/app.mjs';
-import { ConfirmOverlay, FormOverlay } from '../src/tui/overlays.mjs';
+import { ConfirmOverlay, FormOverlay, TextOverlay } from '../src/tui/overlays.mjs';
 import { createProject, runtimeForTest, tempDir } from './helpers.mjs';
 
 const ESC = String.fromCharCode(27);
@@ -424,6 +424,82 @@ test('session switching is workspace-scoped and guarded when work is active', as
   assert.equal(app.overlay?.constructor.name, 'ConfirmOverlay');
 });
 
+test('opening the model or session picker starts on the currently active choice, not the top of the list', async (t) => {
+  const project = await createProject(t);
+  const runtime = await runtimeForTest(t, project);
+  const app = new MaskShiftTui(runtime, { workspacePath: project, output: new FakeTerminal(), headless: true, theme });
+  await app.bootstrap();
+
+  app.providers = [
+    { id: 'alpha', name: 'Alpha', status: 'online', models: [{ id: 'one' }] },
+    { id: 'beta', name: 'Beta', status: 'online', models: [{ id: 'two' }, { id: 'three' }] },
+  ];
+  app.modelRef = 'beta:three';
+  app.openModelPicker();
+  assert.equal(app.overlay.list.current.id, 'beta:three', 'the picker should open with the active model already highlighted');
+
+  app.closeOverlay();
+  // The session currently in view stays as-is; a newer one is created afterward with an
+  // unambiguously later updated_at so it — not the active session — sorts first, regardless
+  // of how coarse the clock is between the two creations.
+  const current = app.sessionId;
+  const later = runtime.store.createSession({ workspaceId: app.workspaceId, title: 'second heist' });
+  runtime.store.db.prepare('UPDATE sessions SET updated_at = ? WHERE id = ?')
+    .run(new Date(Date.now() + 60_000).toISOString(), later.id);
+  app.openSessionPicker();
+  assert.equal(app.overlay.list.current.id, current, 'the picker should open on the session currently in view');
+  assert.notEqual(current, app.overlay.items[0]?.id, 'sanity: the active session is not already first in the list');
+});
+
+test('a form field can hide itself based on another field, and navigation skips it', () => {
+  const submitted = [];
+  const form = new FormOverlay({
+    title: 'TEST FORM',
+    fields: [
+      { name: 'mode', label: 'mode', type: 'select', value: 'a', options: [{ label: 'A', value: 'a' }, { label: 'B', value: 'b' }] },
+      { name: 'onlyA', label: 'only for a', value: '', visible: (values) => values.mode === 'a' },
+      { name: 'onlyB', label: 'only for b', value: '', visible: (values) => values.mode === 'b' },
+    ],
+    onSubmit: (values) => submitted.push(values),
+  });
+
+  const rendered = () => form.render({ theme }, { columns: 100, rows: 30 }).lines.map(stripAnsi).join('\n');
+  assert.ok(rendered().includes('ONLY FOR A'));
+  assert.ok(!rendered().includes('ONLY FOR B'));
+  assert.equal(form.visibleFields().length, 2, 'the hidden field should not count toward the visible total');
+
+  // Tab from the mode field should skip the hidden "only for b" field entirely and land
+  // on "only for a", not get stuck cycling through an invisible one.
+  form.handle(null, { name: 'tab' });
+  assert.equal(form.fields[form.index].name, 'onlyA');
+  form.handle(null, { name: 'tab' });
+  assert.equal(form.fields[form.index].name, 'mode', 'wrapping back around should also skip the hidden field');
+
+  // Switch mode to "b": the visibility should flip live.
+  form.fields[0].optionIndex = 1;
+  assert.ok(rendered().includes('ONLY FOR B'));
+  assert.ok(!rendered().includes('ONLY FOR A'));
+});
+
+test('the Add MCP Server dialog shows COMMAND for stdio and URL for streamable HTTP, never both', async (t) => {
+  const project = await createProject(t);
+  const runtime = await runtimeForTest(t, project);
+  const app = new MaskShiftTui(runtime, { workspacePath: project, output: new FakeTerminal(), headless: true, theme });
+  await app.bootstrap();
+
+  app.openMcpDialog();
+  let frame = app.snapshot().map(stripAnsi).join('\n');
+  assert.ok(frame.includes('COMMAND'), 'stdio (the default transport) should show COMMAND');
+  assert.ok(!frame.includes('URL'), 'stdio should not show URL');
+
+  const transportField = app.overlay.fields.find((field) => field.name === 'transport');
+  transportField.optionIndex = 1; // streamable http
+  app.screen.invalidate();
+  frame = app.snapshot().map(stripAnsi).join('\n');
+  assert.ok(frame.includes('URL'), 'streamable http should show URL');
+  assert.ok(!frame.includes('COMMAND'), 'streamable http should not show COMMAND');
+});
+
 test('stale file previews and duplicate operations cannot replace current state', async (t) => {
   const project = await createProject(t);
   const runtime = await runtimeForTest(t, project);
@@ -505,6 +581,75 @@ test('the interface paints every view and overlay at the terminal size', async (
   const narrow = app.snapshot();
   assert.equal(narrow.length, 20);
   for (const line of narrow) assert.equal(visibleWidth(line), 72);
+});
+
+test('a scrollable TextOverlay (e.g. the help reference) shows a live position marker', async (t) => {
+  const project = await createProject(t);
+  const runtime = await runtimeForTest(t, project);
+  // Short enough that the real help reference content cannot possibly fit.
+  const app = new MaskShiftTui(runtime, { workspacePath: project, output: new FakeTerminal(100, 18), headless: true, theme });
+  await app.bootstrap();
+
+  app.openHelp();
+  assert.equal(app.overlay?.constructor.name, 'TextOverlay');
+  const frame = app.snapshot().map(stripAnsi);
+  assert.ok(frame.some((line) => /\d+%/.test(line)), 'expected a scroll percentage in the overlay title rail');
+
+  // Scrolling to the very end should still show a live indicator, not silently drop it.
+  app.overlay.offset = 10_000;
+  app.screen.invalidate();
+  const scrolled = app.snapshot().map(stripAnsi);
+  assert.ok(scrolled.some((line) => /100%/.test(line)), 'expected the marker to reach 100% at the bottom');
+
+  // A short overlay that already fits entirely should not show a meaningless "0%".
+  const tiny = new TextOverlay({ title: 'TINY', lines: ['one line'] });
+  app.overlay = tiny;
+  app.screen.invalidate();
+  const tinyFrame = app.snapshot().map(stripAnsi);
+  assert.ok(!tinyFrame.some((line) => line.includes('%')), 'a fully visible overlay should not show a scroll percentage');
+});
+
+test('typing a slash in the composer shows matching command suggestions, and only there', async (t) => {
+  const project = await createProject(t);
+  const runtime = await runtimeForTest(t, project);
+  const app = new MaskShiftTui(runtime, {
+    workspacePath: project, output: new FakeTerminal(120, 32), headless: true, theme,
+  });
+  await app.bootstrap();
+  app.view = 'chat';
+  app.focus = 'composer';
+
+  app.composer.set('/');
+  let frame = app.snapshot().map(stripAnsi);
+  assert.ok(frame.some((line) => line.includes('COMMANDS')), 'expected a suggestion panel for a bare slash');
+  assert.ok(frame.some((line) => line.includes('/model')), 'expected /model among the suggestions');
+
+  app.composer.set('/h');
+  frame = app.snapshot().map(stripAnsi);
+  assert.ok(frame.some((line) => line.includes('/help')), 'expected /help to match the "h" prefix');
+
+  // Narrowing the prefix should narrow the list to matching commands only.
+  app.composer.set('/mo');
+  frame = app.snapshot().map(stripAnsi);
+  assert.ok(frame.some((line) => line.includes('/model')), 'expected /model to still match the "mo" prefix');
+  assert.ok(!frame.some((line) => line.includes('/mcp')), '/mcp should not match the "mo" prefix');
+
+  // A prefix matching nothing shows no suggestion panel at all.
+  app.composer.set('/zzz');
+  frame = app.snapshot().map(stripAnsi);
+  assert.ok(!frame.some((line) => line.includes('COMMANDS')), 'expected no suggestion panel when nothing matches');
+
+  // Ordinary prose (not starting with a bare slash-word) never triggers it.
+  app.composer.set('hello /model');
+  frame = app.snapshot().map(stripAnsi);
+  assert.ok(!frame.some((line) => line.includes('COMMANDS')), 'expected no suggestion panel mid-sentence');
+
+  // Leaving the composer (e.g. focus moves to the transcript) hides it even
+  // though the composer text is untouched.
+  app.composer.set('/mo');
+  app.focus = 'transcript';
+  frame = app.snapshot().map(stripAnsi);
+  assert.ok(!frame.some((line) => line.includes('COMMANDS')), 'expected the panel to disappear once focus leaves the composer');
 });
 
 test('the interface routes keys, slash commands and view switches', async (t) => {

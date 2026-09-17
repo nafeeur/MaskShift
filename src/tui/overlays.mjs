@@ -182,12 +182,16 @@ export class PaletteOverlay extends Overlay {
 
 /** A generic single-choice picker (sessions, models, workspaces, providers). */
 export class PickerOverlay extends Overlay {
-  constructor({ title, items, onSelect, placeholder = 'Filter…', renderRow = null, footer = '' }) {
+  constructor({ title, items, onSelect, placeholder = 'Filter…', renderRow = null, footer = '', selectedId = null }) {
     super({ title });
     this.items = items;
     this.onSelect = onSelect;
     this.field = new TextField({ placeholder });
-    this.list = new ListView();
+    // Opening on whatever happens to sort first makes the operator hunt for their current
+    // choice before they can even see it; starting the cursor there instead means the list
+    // opens already showing "you are here".
+    const initial = selectedId === null ? 0 : Math.max(0, items.findIndex((item) => item.id === selectedId));
+    this.list = new ListView({ selected: initial });
     this.renderRow = renderRow;
     this.footer = footer;
     this.list.setItems(this.matches(), { keepSelection: false });
@@ -298,7 +302,7 @@ export class FormOverlay extends Overlay {
   }
 
   size(viewport) {
-    const rows = this.fields.reduce((sum, field) => sum + field.rows + 1, 0) + 7;
+    const rows = this.visibleFields().reduce((sum, field) => sum + field.rows + 1, 0) + 7;
     return {
       columns: Math.min(viewport.columns - 4, 86),
       rows: Math.min(viewport.rows - 2, rows + (this.note ? 2 : 0)),
@@ -315,6 +319,38 @@ export class FormOverlay extends Overlay {
     return out;
   }
 
+  // A field can declare `visible: (values) => boolean` to hide itself when it would not
+  // apply to the current choices elsewhere in the form (e.g. a URL field when the transport
+  // is stdio) — dead/irrelevant fields left showing just make a form more confusing.
+  isFieldVisible(field) {
+    return !field.visible || field.visible(this.values());
+  }
+
+  visibleFields() {
+    return this.fields.filter((field) => this.isFieldVisible(field));
+  }
+
+  visibleIndices() {
+    const indices = [];
+    this.fields.forEach((field, position) => { if (this.isFieldVisible(field)) indices.push(position); });
+    return indices;
+  }
+
+  /** Moves the focused field among only the currently visible ones, clamping or wrapping. */
+  moveIndex(delta, { wrap = false } = {}) {
+    const indices = this.visibleIndices();
+    if (!indices.length) return;
+    const at = Math.max(0, indices.indexOf(this.index));
+    let next = at + delta;
+    next = wrap ? (next + indices.length) % indices.length : Math.max(0, Math.min(indices.length - 1, next));
+    this.index = indices[next];
+  }
+
+  isLastVisibleField() {
+    const indices = this.visibleIndices();
+    return indices.at(-1) === this.index;
+  }
+
   render(app, viewport) {
     const { theme } = app;
     const mark = glyphs(theme);
@@ -325,6 +361,7 @@ export class FormOverlay extends Overlay {
     const spans = [];
     let cursor = null;
     for (const [index, field] of this.fields.entries()) {
+      if (!this.isFieldVisible(field)) continue;
       const active = index === this.index;
       spans.push({ index, field, start: body.length });
       body.push(theme.paint(field.label.toUpperCase(), { fg: active ? theme.roles.borderActive : theme.roles.muted, bold: active })
@@ -368,7 +405,7 @@ export class FormOverlay extends Overlay {
 
     const lines = panel({
       theme, width, height: Math.min(viewport.rows - 2, body.length + 2), title: this.title,
-      stamp: `${this.fields.length} FIELDS`, focused: true, body,
+      stamp: `${this.visibleFields().length} FIELDS`, focused: true, body,
       colour: this.enter(theme, frameColour(theme, true)),
     });
     const offset = centreOffset(viewport, { columns: width, rows: lines.length });
@@ -444,40 +481,40 @@ export class FormOverlay extends Overlay {
     if (event.name === 'escape') { app.closeOverlay(); return true; }
     if (event.ctrl && event.name === 's') { void this.submit(app); return true; }
     if (event.name === 'tab') {
-      this.index = (this.index + (event.shift ? -1 : 1) + this.fields.length) % this.fields.length;
+      this.moveIndex(event.shift ? -1 : 1, { wrap: true });
       return true;
     }
     if (field.type === 'toggle') {
       if (event.name === 'space' || event.name === 'enter') { field.toggled = !field.toggled; return true; }
-      if (event.name === 'up') { this.index = Math.max(0, this.index - 1); return true; }
-      if (event.name === 'down') { this.index = Math.min(this.fields.length - 1, this.index + 1); return true; }
+      if (event.name === 'up') { this.moveIndex(-1); return true; }
+      if (event.name === 'down') { this.moveIndex(1); return true; }
       return true;
     }
     if (field.type === 'select') {
       if (event.name === 'left') { field.optionIndex = (field.optionIndex - 1 + field.options.length) % field.options.length; return true; }
       if (event.name === 'right') { field.optionIndex = (field.optionIndex + 1) % field.options.length; return true; }
-      if (event.name === 'up') { this.index = Math.max(0, this.index - 1); return true; }
-      if (event.name === 'down' || event.name === 'enter') { this.index = Math.min(this.fields.length - 1, this.index + 1); return true; }
+      if (event.name === 'up') { this.moveIndex(-1); return true; }
+      if (event.name === 'down' || event.name === 'enter') { this.moveIndex(1); return true; }
       return true;
     }
     if (field.type === 'textarea') {
       if (event.name === 'enter') { field.editor.insert('\n'); return true; }
-      if (event.name === 'up' && field.editor.cursor === 0) { this.index = Math.max(0, this.index - 1); return true; }
+      if (event.name === 'up' && field.editor.cursor === 0) { this.moveIndex(-1); return true; }
       if (event.name === 'down' && field.editor.cursor === field.editor.value.length) {
-        this.index = Math.min(this.fields.length - 1, this.index + 1);
+        this.moveIndex(1);
         return true;
       }
       field.editor.handle(event);
       return true;
     }
     if (event.name === 'enter') {
-      if (this.index === this.fields.length - 1) void this.submit(app);
-      else this.index += 1;
+      if (this.isLastVisibleField()) void this.submit(app);
+      else this.moveIndex(1);
       return true;
     }
-    if (event.name === 'up' && field.editor.cursor === 0) { this.index = Math.max(0, this.index - 1); return true; }
+    if (event.name === 'up' && field.editor.cursor === 0) { this.moveIndex(-1); return true; }
     if (event.name === 'down' && field.editor.cursor === field.editor.value.length) {
-      this.index = Math.min(this.fields.length - 1, this.index + 1);
+      this.moveIndex(1);
       return true;
     }
     field.editor.handle(event);
@@ -584,13 +621,18 @@ export class TextOverlay extends Overlay {
 
   render(app, viewport) {
     const { theme } = app;
+    const mark = glyphs(theme);
     const width = Math.min(viewport.columns - 4, 96);
     const height = Math.min(viewport.rows - 2, this.body.length + 2);
     const inner = height - 2;
     this.offset = Math.max(0, Math.min(this.offset, Math.max(0, this.body.length - inner)));
+    // A scrollable overlay with no live position marker reads as "that's everything" —
+    // this is the only signal a reader gets that there is more below the fold.
+    const scrollable = this.body.length > inner;
+    const note = scrollable ? `${mark.arrowUp} ${Math.round((this.offset / Math.max(1, this.body.length - inner)) * 100)}%` : '';
     const lines = panel({
       theme, width, height, title: this.title,
-      stamp: this.stamp || `${this.body.length} LINES`, focused: true,
+      stamp: this.stamp || `${this.body.length} LINES`, note, focused: true,
       body: this.body.slice(this.offset, this.offset + inner),
       colour: this.enter(theme, frameColour(theme, true)),
     });
