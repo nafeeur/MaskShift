@@ -17,6 +17,7 @@ import { fit, oneLine, truncate, visibleWidth, wrap } from './text.mjs';
 import { Composer, ListView, Spinner, TextField, Toasts, Viewport } from './widgets.mjs';
 import { columns, gutter, key as typeKey, label as sectionLabel } from './type.mjs';
 import { VERSION, runCommand, safeJsonParse } from '../core/utils.mjs';
+import { tokenCounts } from '../core/pricing.mjs';
 import { VoiceInput } from '../voice/index.mjs';
 import * as chatView from './views/chat.mjs';
 import * as filesView from './views/files.mjs';
@@ -462,7 +463,14 @@ export class MaskShiftTui {
 
     const toastLines = this.toasts.render(theme, Math.min(56, columns - 4));
     if (toastLines.length) {
-      frame = paintOverlay(frame, toastLines, { row: rows - 3 - toastLines.length, column: columns - Math.min(58, columns - 2) }, columns);
+      // On the chat view, anchor above the composer's own seam row (the "COMPOSER" divider)
+      // rather than a fixed distance from the bottom of the screen: the composer can be more
+      // than one row tall (a multi-line draft), and a fixed offset drew the toast straight over
+      // its border and clipped its placeholder/input text.
+      const toastBottom = this.view === 'chat' && this.lastRegion && this.chatPanes
+        ? this.lastRegion.row + 1 + this.chatPanes.transcriptHeight
+        : rows - 3;
+      frame = paintOverlay(frame, toastLines, { row: Math.max(2, toastBottom - toastLines.length), column: columns - Math.min(58, columns - 2) }, columns);
     }
 
     if (this.overlay) {
@@ -607,7 +615,15 @@ export class MaskShiftTui {
       if (this.busy && this.view === 'chat') { this.cancelRun(); return true; }
       if (this.focus === 'rail') { this.focus = this.defaultFocus(); return true; }
       if (typing && this.focus !== 'composer' && this.focus !== 'terminal') { this.focus = this.defaultFocus(); return true; }
-      if (this.view !== 'chat') { this.switchView(0); return true; }
+      if (this.view !== 'chat') {
+        this.switchView(0);
+        // Land on the transcript, not the composer: a digit pressed right after landing (the
+        // natural next move for someone who was just navigating by view number) should still
+        // switch views instead of being silently typed as a literal character. Typing anything
+        // else still drops straight into the composer via the transcript's own key handling.
+        this.focus = 'transcript';
+        return true;
+      }
       this.openPalette();
       return true;
     }
@@ -698,15 +714,14 @@ export class MaskShiftTui {
     this.activeCapabilities = new Set(this.capabilitySnapshot?.tools || []);
     this.pendingCalls.clear();
     this.tokenHistory = [];
-    this.totals = { input: 0, output: 0, cost: latest?.meta?.costEstimate?.total || 0 };
+    this.totals = { input: 0, output: 0, cost: latest?.meta?.costEstimate?.cost || 0 };
     for (const message of this.messages) {
       const usage = message.meta?.usage;
       if (!usage) continue;
-      const input = usage.inputTokens || usage.input_tokens || 0;
-      const output = usage.outputTokens || usage.output_tokens || 0;
-      this.totals.input += input;
-      this.totals.output += output;
-      if (output) this.tokenHistory.push(output);
+      const { inputTokens, outputTokens } = tokenCounts(usage);
+      this.totals.input += inputTokens;
+      this.totals.output += outputTokens;
+      if (outputTokens) this.tokenHistory.push(outputTokens);
     }
     this.step = latest?.step_count || 0;
     this.startedAt = latest?.started_at ? new Date(latest.started_at).getTime() : null;
@@ -871,9 +886,10 @@ export class MaskShiftTui {
         break;
       case 'run.assistant': {
         if (payload.usage) {
-          this.totals.input += payload.usage.inputTokens || payload.usage.input_tokens || 0;
-          this.totals.output += payload.usage.outputTokens || payload.usage.output_tokens || 0;
-          this.tokenHistory.push((payload.usage.outputTokens || payload.usage.output_tokens || 0));
+          const { inputTokens, outputTokens } = tokenCounts(payload.usage);
+          this.totals.input += inputTokens;
+          this.totals.output += outputTokens;
+          this.tokenHistory.push(outputTokens);
           if (this.tokenHistory.length > 120) this.tokenHistory.shift();
         }
         for (const call of payload.toolCalls || []) this.pendingCalls.set(call.id, { name: call.name, args: call.args });
@@ -901,7 +917,7 @@ export class MaskShiftTui {
         this.endedAt = run?.ended_at ? new Date(run.ended_at).getTime() : Date.now();
         this.plan = run?.meta?.plan || this.plan;
         this.capabilitySnapshot = run?.meta?.capabilities || this.capabilitySnapshot;
-        if (run?.meta?.costEstimate?.total) this.totals.cost = run.meta.costEstimate.total;
+        if (run?.meta?.costEstimate?.cost) this.totals.cost = run.meta.costEstimate.cost;
         const session = this.runtime.store.getSession(this.sessionId);
         this.sessionTitle = session?.title || this.sessionTitle;
         const outcome = HEIST_OUTCOME[event.type] || { tone: 'error', label: event.type.replace('run.', '').toUpperCase() };

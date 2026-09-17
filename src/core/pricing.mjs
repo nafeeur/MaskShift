@@ -1,6 +1,6 @@
 const FREE_PROVIDER_TYPES = new Set(['ollama']);
 
-function tokenCounts(usage) {
+export function tokenCounts(usage) {
   return {
     inputTokens: Number(usage?.input_tokens ?? usage?.prompt_tokens ?? usage?.promptTokenCount ?? 0) || 0,
     outputTokens: Number(usage?.output_tokens ?? usage?.completion_tokens ?? usage?.candidatesTokenCount ?? 0) || 0,
