@@ -15,6 +15,7 @@ function messageForProvider(message) {
     role: message.role,
     content: truncate(message.content || '', 180_000),
     ...(meta.toolCalls ? { toolCalls: meta.toolCalls } : {}),
+    ...(meta.providerState ? { providerState: meta.providerState } : {}),
     ...(meta.toolCallId ? { toolCallId: meta.toolCallId, toolName: meta.toolName, isError: meta.isError } : {}),
   };
 }
@@ -232,12 +233,12 @@ export class AgentEngine {
         usage.push(response.usage);
         costs.push(estimateUsageCost(this.config.get(), response.providerId, response.providerType, response.model, response.usage));
         const assistantMessage = {
-          role: 'assistant', content: response.content || '', toolCalls: response.toolCalls || [],
+          role: 'assistant', content: response.content || '', toolCalls: response.toolCalls || [], providerState: response.providerState,
         };
         history.push(assistantMessage);
         this.store.addMessage({
           sessionId: session.id, role: 'assistant', content: response.content || '',
-          meta: { runId: run.id, modelRef: response.modelRef, toolCalls: response.toolCalls || [], finishReason: response.finishReason, usage: response.usage },
+          meta: { runId: run.id, modelRef: response.modelRef, toolCalls: response.toolCalls || [], finishReason: response.finishReason, usage: response.usage, providerState: response.providerState },
         });
         this.#event(run.id, 'assistant', { content: response.content || '', toolCalls: response.toolCalls || [], modelRef: response.modelRef, usage: response.usage }, scope);
         if (response.content) finalContent = response.content;
