@@ -66,7 +66,7 @@ export const THEMES = {
   'solarized-light': theme('Solarized Light', {
     bg: '#fdf6e3', surface: '#eee8d5', surfaceRaised: '#e3dcc4', selection: '#dedbc4',
     border: '#e3dcc4', borderStrong: '#93a1a1', borderActive: '#6c71c4',
-    heading: '#002b36', text: '#657b83', label: '#586e75', dim: '#839496', muted: '#93a1a1', faint: '#ded9c0', hairline: '#c2bc9f',
+    heading: '#002b36', text: '#435156', label: '#485a60', dim: '#616e6f', muted: '#768181', faint: '#ded9c0', hairline: '#c2bc9f',
     primary: '#6c71c4', primaryDeep: '#4d4f96', primaryTrack: '#dcdaf0', accent: '#b58900', accentDeep: '#8a6800', onPrimary: '#fdf6e3',
     success: '#859900', warning: '#cb4b16', danger: '#dc322f', info: '#268bd2',
     tool: '#2aa198', skill: '#d33682', user: '#b58900',
@@ -102,7 +102,7 @@ export const THEMES = {
   'one-light': theme('One Light', {
     bg: '#fafafa', surface: '#eaeaeb', surfaceRaised: '#dedee0', selection: '#e5e5e6',
     border: '#dedee0', borderStrong: '#a0a1a7', borderActive: '#4078f2',
-    heading: '#282c34', text: '#383a42', label: '#4f525c', dim: '#696c77', muted: '#a0a1a7', faint: '#e5e5e6', hairline: '#cccdd1',
+    heading: '#282c34', text: '#383a42', label: '#4f525c', dim: '#696c77', muted: '#808186', faint: '#e5e5e6', hairline: '#cccdd1',
     primary: '#4078f2', primaryDeep: '#2955ad', primaryTrack: '#c9d8fb', accent: '#c18401', accentDeep: '#8c5f00', onPrimary: '#fafafa',
     success: '#50a14f', warning: '#c18401', danger: '#e45649', info: '#0184bc',
     tool: '#0184bc', skill: '#a626a4', user: '#c18401',
@@ -138,7 +138,7 @@ export const THEMES = {
   'catppuccin-latte': theme('Catppuccin Latte', {
     bg: '#eff1f5', surface: '#ccd0da', surfaceRaised: '#bcc0cc', selection: '#dce0e8',
     border: '#ccd0da', borderStrong: '#9ca0b0', borderActive: '#8839ef',
-    heading: '#4c4f69', text: '#4c4f69', label: '#5c5f77', dim: '#6c6f85', muted: '#8c8fa1', faint: '#e6e9ef', hairline: '#acb0be',
+    heading: '#4c4f69', text: '#474a63', label: '#515469', dim: '#66687d', muted: '#787b8a', faint: '#e6e9ef', hairline: '#acb0be',
     primary: '#8839ef', primaryDeep: '#6929b8', primaryTrack: '#e0cbfa', accent: '#df8e1d', accentDeep: '#9c6414', onPrimary: '#eff1f5',
     success: '#40a02b', warning: '#df8e1d', danger: '#d20f39', info: '#1e66f5',
     tool: '#179299', skill: '#ea76cb', user: '#df8e1d',
@@ -183,7 +183,7 @@ export const THEMES = {
   'rose-pine-dawn': theme('Rosé Pine Dawn', {
     bg: '#faf4ed', surface: '#fffaf3', surfaceRaised: '#f2e9e1', selection: '#dfdad9',
     border: '#f2e9e1', borderStrong: '#cecacd', borderActive: '#907aa9',
-    heading: '#575279', text: '#575279', label: '#797593', dim: '#797593', muted: '#9893a5', faint: '#f4ede8', hairline: '#cecacd',
+    heading: '#575279', text: '#4e4a6d', label: '#57546a', dim: '#6d6984', muted: '#837e8e', faint: '#f4ede8', hairline: '#cecacd',
     primary: '#907aa9', primaryDeep: '#6b5b7f', primaryTrack: '#e6def0', accent: '#ea9d34', accentDeep: '#a66f24', onPrimary: '#faf4ed',
     success: '#56949f', warning: '#ea9d34', danger: '#b4637a', info: '#286983',
     tool: '#56949f', skill: '#d7827e', user: '#ea9d34',
@@ -201,7 +201,7 @@ export const THEMES = {
   'ayu-light': theme('Ayu Light', {
     bg: '#fafafa', surface: '#f0f0f0', surfaceRaised: '#e7e8e9', selection: '#e0e7f1',
     border: '#e7e8e9', borderStrong: '#abb0b6', borderActive: '#399ee6',
-    heading: '#5c6166', text: '#5c6166', label: '#6c7278', dim: '#828c99', muted: '#abb0b6', faint: '#eeeeee', hairline: '#d5d6d7',
+    heading: '#5c6166', text: '#4d5156', label: '#565b60', dim: '#68707a', muted: '#7f8287', faint: '#eeeeee', hairline: '#d5d6d7',
     primary: '#399ee6', primaryDeep: '#2872ac', primaryTrack: '#cde5fa', accent: '#fa8d3e', accentDeep: '#b06327', onPrimary: '#fafafa',
     success: '#86b300', warning: '#f2ae49', danger: '#f51818', info: '#399ee6',
     tool: '#4cbf99', skill: '#a37acc', user: '#fa8d3e',
