@@ -87,5 +87,9 @@ export function fitHistory({ history, contextTokens, outputTokens = 4096, system
     };
     flattened = [digest, ...flattened];
   }
-  return { history: flattened, omitted };
+  // Additive: droppedTurns is the full set of turn-groups being omitted this call, always from
+  // index 0 since dropping only ever grows from the oldest end. A caller that wants to replace
+  // the generic digest above with a real summary (see compaction.mjs) can diff this against what
+  // it already summarized last time, rather than re-deriving the drop set itself.
+  return { history: flattened, omitted, droppedTurns: turns.slice(0, omitted) };
 }

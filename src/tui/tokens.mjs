@@ -37,8 +37,13 @@ export const NEUTRAL = {
   line: '#24242f',
   edge: '#33333f',
   hairline: '#43434f',
-  muted: '#61616f',
-  smoke: '#8a8a99',
+  // Lighter than the original #61616f/#8a8a99: these two carry almost every hint, placeholder,
+  // stamp and unfocused label in the interface, so their own contrast against the near-black
+  // background sets the tone for the whole screen far more than any accent colour does. Left as
+  // dark as they were, the accents read as rare sparks against a flat grey field; a touch more
+  // lift here is what actually makes the screen feel alive, not another hue.
+  muted: '#6f6f83',
+  smoke: '#9696a8',
   silver: '#b8b8c4',
   bone: '#e7e6ea',
   chalk: '#ffffff',
@@ -52,6 +57,10 @@ export const BRAND = {
   ember: '#ff7a45',
   gold: '#f0b429',
   brass: '#8a6414',
+  // A lighter, warmer sibling of crimson — same family, so it never competes with the identity
+  // colour for meaning, used where something wants to read as "touched by the brand" (a hover,
+  // a selected row) without claiming the "this is focused/active" role crimson itself owns.
+  rose: '#ff6b81',
 };
 
 /** Semantic hues. Deliberately distinct from the brand hues above. */
@@ -96,7 +105,10 @@ export const ROLES = {
   // from `background` than surfaceRaised gives it — that value reads fine
   // behind a short inline-code chip, where the eye is judging it against the
   // text sitting on it, but nearly vanishes as a wide band against the void.
-  selection: NEUTRAL.edge,
+  // Tinted toward crimson (NEUTRAL.edge mixed ~28% toward BRAND.crimson) rather than left flatly
+  // neutral, so "this row is selected" reads as a small dose of the same identity colour
+  // everything else on screen answers to, not a plain grey band that could belong to any app.
+  selection: '#653443',
 
   // Structure.
   border: NEUTRAL.line,

@@ -2,6 +2,7 @@ import { nowIso, runCommand, sha256, truncate } from '../core/utils.mjs';
 import { estimateUsageCost, summarizeCosts } from '../core/pricing.mjs';
 import { repairPrompt } from './tool-protocol.mjs';
 import { fitHistory } from './context-budget.mjs';
+import { compactTurns } from './compaction.mjs';
 
 // Bounded so a model that cannot produce valid syntax ends the run instead of looping on it.
 const MAX_TOOL_CALL_REPAIRS = 2;
@@ -282,6 +283,10 @@ export class AgentEngine {
       let usage = [];
       let costs = [];
       let repairAttempts = 0;
+      // Persists across this run's turns: once some of the oldest turns have been folded into a
+      // summary, later turns extend that same summary with only what's newly been dropped since,
+      // rather than re-summarizing the whole drop set from scratch every time it grows.
+      const compaction = { summary: null, coveredTurns: 0 };
 
       while (step < maxSteps) {
         if (signal.aborted) throw signal.reason || new Error('Run cancelled');
@@ -307,7 +312,31 @@ export class AgentEngine {
             toolTokens: Math.ceil(Buffer.byteLength(JSON.stringify(tools), 'utf8') / 4),
           });
           outboundHistory = fitted.history;
-          if (fitted.omitted) this.#event(run.id, 'context-trimmed', { omittedTurns: fitted.omitted, contextTokens }, scope);
+          if (fitted.omitted) {
+            this.#event(run.id, 'context-trimmed', { omittedTurns: fitted.omitted, contextTokens }, scope);
+            const newlyDropped = fitted.droppedTurns.slice(compaction.coveredTurns);
+            if (newlyDropped.length) {
+              const compacted = await compactTurns(this.providerManager, {
+                modelRef: currentRun.model_id, newlyDropped, previousSummary: compaction.summary, signal,
+              });
+              compaction.summary = compacted.summary;
+              compaction.coveredTurns = fitted.omitted;
+              if (compacted.usage) {
+                usage.push(compacted.usage);
+                costs.push(estimateUsageCost(this.config.get(), compacted.providerId, compacted.providerType, compacted.model, compacted.usage));
+              }
+              this.#event(run.id, 'context-compacted', { omittedTurns: fitted.omitted, summarized: Boolean(compacted.summary) }, scope);
+            }
+            // fitted.history[0] is fitHistory's own generic "(N turns omitted)" placeholder —
+            // replaced with the real summary when compaction produced one, so the model keeps
+            // the concrete facts from those turns instead of just being told they existed.
+            if (compaction.summary) {
+              outboundHistory = [
+                { role: 'user', content: `[Compacted summary of ${fitted.omitted} earlier turn${fitted.omitted === 1 ? '' : 's'}, dropped to fit this model's context window]\n\n${compaction.summary}` },
+                ...fitted.history.slice(1),
+              ];
+            }
+          }
         }
         // Throttled rather than forwarded 1:1: a fast provider can emit dozens of fragments a
         // second, and every one of those would otherwise (a) push into the event bus's shared,

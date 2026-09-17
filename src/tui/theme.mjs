@@ -35,6 +35,14 @@ export function detectDepth(stream = process.stdout) {
   const colorterm = (process.env.COLORTERM || '').toLowerCase();
   if (colorterm.includes('truecolor') || colorterm.includes('24bit')) return 24;
   if (['iTerm.app', 'WezTerm', 'ghostty', 'vscode'].includes(process.env.TERM_PROGRAM)) return 24;
+  // Inside tmux/screen, TERM reports a 256-colour terminal regardless of what the outer
+  // terminal actually supports — COLORTERM, the usual signal, doesn't reliably survive tmux's
+  // own environment filtering to tell us otherwise. $TMUX itself does survive (tmux sets it
+  // directly on every pane it spawns), so seeing it alongside tmux's own "-256color" TERM is
+  // treated as truecolor-capable: virtually every terminal emulator modern enough to run tmux
+  // at all supports and passes through 24-bit colour. MASKSHIFT_COLOR=basic overrides this for
+  // the rare setup where that assumption is wrong.
+  if (process.env.TMUX && /^(tmux|screen)-256color$/.test(term)) return 24;
   if (/-256(color)?$/.test(term)) return 8;
   if (/^(screen|xterm|vt100|rxvt|linux|ansi|tmux)/.test(term)) return 4;
   return stream?.isTTY ? 8 : 0;

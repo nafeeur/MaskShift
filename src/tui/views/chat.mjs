@@ -84,16 +84,17 @@ function toolLines(app, message, width, expanded) {
   return lines;
 }
 
-export function transcriptLines(app, width) {
-  const { theme } = app;
-  const text = Math.max(8, width - SPACE.gutter);
+// Rendering a whole transcript — every persisted message's markdown, freshly parsed — is not
+// cheap, and transcriptLines() runs on every repaint. During a streaming reply that can be over
+// a dozen times a second, and until now it meant re-rendering the *entire* history behind a
+// growing bubble on every single one of those, even though nothing about it had changed. This
+// caches the persisted-message portion, keyed on `app.messages`'s own identity (reassigned, not
+// mutated, whenever it actually changes — see onRunEvent) and the render width, so a repaint
+// triggered by nothing but a new streaming delta reuses that work and only builds the small,
+// genuinely-changing tail (the in-progress bubble and any live tool-call rows).
+function buildMessageLines(app, theme, text) {
   const lines = [];
   let previousKind = null;
-
-  // One blank line *before* each block rather than after, so the transcript
-  // never ends on trailing whitespace and every gap is the same height. Two
-  // adjacent tool calls are a single block: they belong to one another, and
-  // padding between them turned a six-step run into a page of whitespace.
   const openBlock = (kind) => {
     if (lines.length && !(kind === 'tool' && previousKind === 'tool')) lines.push('');
     previousKind = kind;
@@ -132,6 +133,28 @@ export function transcriptLines(app, width) {
       continue;
     }
   }
+  return { lines, lastKind: previousKind };
+}
+
+export function transcriptLines(app, width) {
+  const { theme } = app;
+  const text = Math.max(8, width - SPACE.gutter);
+
+  const cache = (app._transcriptCache ||= { messages: null, text: null, lines: null, lastKind: null });
+  if (cache.messages !== app.messages || cache.text !== text) {
+    const built = buildMessageLines(app, theme, text);
+    cache.messages = app.messages;
+    cache.text = text;
+    cache.lines = built.lines;
+    cache.lastKind = built.lastKind;
+  }
+  const lines = cache.lines.slice();
+  let previousKind = cache.lastKind;
+
+  const openBlock = (kind) => {
+    if (lines.length && !(kind === 'tool' && previousKind === 'tool')) lines.push('');
+    previousKind = kind;
+  };
 
   // The turn in progress: not a message yet (it becomes one, and this block simply stops
   // rendering, the instant `run.assistant` lands and `app.messages` reloads with it), but shown

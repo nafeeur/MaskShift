@@ -955,6 +955,9 @@ export class MaskShiftTui {
       case 'run.checkpoint':
         this.toast(`Checkpoint ${payload.kind || 'saved'}`, 'info');
         break;
+      case 'run.context-compacted':
+        this.toast(payload.summarized ? `Compacted ${payload.omittedTurns} earlier turn${payload.omittedTurns === 1 ? '' : 's'}` : 'Context trimmed (compaction unavailable)', payload.summarized ? 'info' : 'warn');
+        break;
       case 'run.completed':
       case 'run.failed':
       case 'run.cancelled':

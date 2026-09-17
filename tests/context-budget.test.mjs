@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { ContextBudgetError, fitHistory } from '../src/agent/context-budget.mjs';
-import { createProject, jsonServer, readJsonBody, respondJson, runtimeForTest, waitFor } from './helpers.mjs';
+import { createProject, jsonServer, readJsonBody, respondOpenAIChatSSE, runtimeForTest, waitFor } from './helpers.mjs';
 
 function longMessage(role, label) {
   return { role, content: `${label} `.repeat(80) };
@@ -50,14 +50,17 @@ test('fitHistory throws when the system prompt and tools alone exceed the budget
   );
 });
 
-test('adaptive context budgeting trims old session history for a model with a small declared context window', async (t) => {
+test('adaptive context budgeting trims old session history for a model with a small declared context window, compacting what it drops', async (t) => {
   const requests = [];
   const modelServer = await jsonServer(t, async (request, response) => {
     const body = await readJsonBody(request);
     requests.push(body);
-    return respondJson(response, 200, {
-      id: 'chatcmpl_1',
-      choices: [{ message: { role: 'assistant', content: 'Done.' }, finish_reason: 'stop' }],
+    // The compaction summarization call has no system message (see compaction.mjs) — the real
+    // per-turn call always does, so the two are distinguishable without any extra fixture state.
+    const isCompactionCall = body.messages[0]?.role !== 'system';
+    return respondOpenAIChatSSE(response, {
+      content: isCompactionCall ? 'SUMMARY: earlier turns discussed old messages 0 through 149.' : 'Done.',
+      finishReason: 'stop',
       usage: { prompt_tokens: 10, completion_tokens: 2 },
     });
   });
@@ -91,13 +94,25 @@ test('adaptive context budgeting trims old session history for a model with a sm
   }, { timeoutMs: 15_000, message: 'tiny-context run completion' });
 
   assert.equal(completed.status, 'completed', completed.error || 'run should complete');
-  assert.equal(requests.length, 1);
+  // One compaction summarization call, and one real turn.
+  assert.equal(requests.length, 2);
+  const turnRequest = requests.find((body) => body.messages[0]?.role === 'system');
+  assert.ok(turnRequest, 'expected the real per-turn request to have a system message');
   // The 300 seeded messages plus the new prompt must not all have gone out untrimmed.
-  assert.ok(requests[0].messages.length < seededMessages, `expected history to be trimmed, saw ${requests[0].messages.length} messages`);
+  assert.ok(turnRequest.messages.length < seededMessages, `expected history to be trimmed, saw ${turnRequest.messages.length} messages`);
   const events = runtime.store.listRunEvents(run.id, 2000);
   const trimmed = events.find((event) => event.type === 'context-trimmed');
   assert.ok(trimmed, 'expected a context-trimmed run event to have been recorded');
   assert.ok(trimmed.payload.omittedTurns > 0);
+  const compacted = events.find((event) => event.type === 'context-compacted');
+  assert.ok(compacted, 'expected a context-compacted run event to have been recorded');
+  assert.equal(compacted.payload.summarized, true);
+  // The real turn's history should carry the compaction summary, not the generic
+  // "(N turns omitted)" placeholder fitHistory falls back to when compaction is unavailable.
+  const compactedMessage = turnRequest.messages.find((message) => typeof message.content === 'string' && message.content.includes('Compacted summary'));
+  assert.ok(compactedMessage, 'expected the compacted summary to replace the generic omission digest');
+  assert.match(compactedMessage.content, /SUMMARY: earlier turns discussed/);
+  assert.ok(!turnRequest.messages.some((message) => typeof message.content === 'string' && message.content.includes('omitted from this request')));
 });
 
 test('a model with no declared context window sends full history untouched, as before', async (t) => {
@@ -105,11 +120,7 @@ test('a model with no declared context window sends full history untouched, as b
   const modelServer = await jsonServer(t, async (request, response) => {
     const body = await readJsonBody(request);
     requests.push(body);
-    return respondJson(response, 200, {
-      id: 'chatcmpl_1',
-      choices: [{ message: { role: 'assistant', content: 'Done.' }, finish_reason: 'stop' }],
-      usage: { prompt_tokens: 10, completion_tokens: 2 },
-    });
+    return respondOpenAIChatSSE(response, { content: 'Done.', finishReason: 'stop', usage: { prompt_tokens: 10, completion_tokens: 2 } });
   });
   const project = await createProject(t);
   const runtime = await runtimeForTest(t, project, {
