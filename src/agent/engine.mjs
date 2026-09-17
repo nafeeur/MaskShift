@@ -1,4 +1,4 @@
-import { nowIso, runCommand, truncate } from '../core/utils.mjs';
+import { nowIso, runCommand, sha256, truncate } from '../core/utils.mjs';
 import { estimateUsageCost, summarizeCosts } from '../core/pricing.mjs';
 import { repairPrompt } from './tool-protocol.mjs';
 import { fitHistory } from './context-budget.mjs';
@@ -145,6 +145,55 @@ export class AgentEngine {
     };
   }
 
+  #unresolvedIntents(runId) {
+    const events = this.store.listRunEvents(runId, 5000);
+    const resolved = new Set(events.filter((event) => event.type === 'tool-result' || event.type === 'tool-error').map((event) => event.payload?.toolCallId));
+    return events.filter((event) => event.type === 'tool-intent' && !resolved.has(event.payload?.toolCallId)).map((event) => event.payload);
+  }
+
+  /** True when a pid is neither this process nor confirmed alive. Not a distributed lease: a
+   *  reused OS pid can produce a false "alive", which is why reconcile() is still a manual step. */
+  #ownerGone(pid) {
+    if (!Number.isSafeInteger(pid) || pid <= 0) return true;
+    if (pid === process.pid) return false;
+    try { process.kill(pid, 0); return false; }
+    catch (error) { return error.code === 'ESRCH'; }
+  }
+
+  /**
+   * Runs left marked "running" whose owning process is gone — most likely a crash or a killed
+   * host process, not this process's own in-flight work. Each includes any tool-call intents
+   * that were recorded but never got a matching tool-result/tool-error, i.e. effects that may or
+   * may not have actually happened and were never confirmed either way.
+   */
+  recoverableRuns() {
+    return this.store.listRuns({ limit: 500 })
+      .filter((run) => run.status === 'running' && !this.active.has(run.id) && this.#ownerGone(run.meta?.ownerPid))
+      .map((run) => ({ ...run, pendingIntents: this.#unresolvedIntents(run.id) }));
+  }
+
+  /**
+   * Records that a stale "running" run has been manually inspected, and moves it to a terminal
+   * "interrupted" status. This never executes or replays anything — it only updates the journal
+   * so the run stops showing as unresolved. Refuses a run that is still active in this process,
+   * or whose owning process might still be alive.
+   */
+  reconcile(runId, note) {
+    if (!String(note || '').trim()) throw new Error('A reconciliation note describing what was inspected and repaired is required');
+    const run = this.store.getRun(runId);
+    if (!run) throw new Error(`Unknown run: ${runId}`);
+    if (this.active.has(runId)) throw new Error(`Run ${runId} is still active in this process; cancel it instead of reconciling`);
+    if (run.status !== 'running') throw new Error(`Run ${runId} is not in an interrupted state (status: ${run.status})`);
+    if (!this.#ownerGone(run.meta?.ownerPid)) throw new Error(`Run ${runId}'s owning process (pid ${run.meta.ownerPid}) may still be alive; refusing to reconcile`);
+    const updated = this.store.updateRun(runId, {
+      status: 'interrupted', ended_at: nowIso(), error: run.error || 'Process ended without completing this run',
+      meta: { ...run.meta, recovery: { reviewedAt: nowIso(), note: String(note) } },
+    });
+    this.store.updateSession(run.session_id, { status: 'idle' });
+    this.#event(runId, 'reconciled', { note }, { runId, sessionId: run.session_id, workspaceId: run.workspace_id });
+    return updated;
+  }
+
   async delegate(args, parentContext) {
     const parent = this.store.getRun(parentContext.runId);
     const depth = Number(parent?.meta?.depth || 0) + 1;
@@ -194,7 +243,9 @@ export class AgentEngine {
     const scope = { runId: run.id, sessionId: session.id, workspaceId: run.workspace_id };
     const workspacePath = run.workspace_id ? this.workspaceManager.get(run.workspace_id).path : process.cwd();
     entry.status = 'running';
-    this.store.updateRun(run.id, { status: 'running' });
+    // Recorded so a later process (after a crash/restart) can tell whether a run left marked
+    // "running" belonged to a process that is actually gone, rather than guessing or replaying it.
+    this.store.updateRun(run.id, { status: 'running', meta: { ...run.meta, ownerPid: process.pid } });
     this.store.updateSession(session.id, { status: 'running', model_id: run.model_id });
     this.#event(run.id, 'started', { model: run.model_id, workspacePath, parentRunId: run.meta?.parentRunId }, scope);
 
@@ -383,6 +434,12 @@ export class AgentEngine {
       signal, scope, eventBus: this.eventBus, store: this.store,
       capabilityState, planState: entry.planState, engine: this,
     };
+    // Record the intent to run an effectful tool before it executes. If the process dies before
+    // the matching tool-result/tool-error event lands, this is what makes that interruption
+    // visible on restart instead of silently unresolved.
+    if (this.toolRegistry.descriptor(call.name)?.readOnly !== true) {
+      this.#event(run.id, 'tool-intent', { toolCallId: call.id, tool: call.name, argsHash: sha256(JSON.stringify(call.args || {})) }, scope);
+    }
     try {
       let value;
       if (this.toolRegistry.has(call.name)) value = await this.toolRegistry.execute(call.name, call.args || {}, toolContext);

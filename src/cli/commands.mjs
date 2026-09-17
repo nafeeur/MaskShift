@@ -15,6 +15,7 @@ const STATUS_TONE = (theme, status) => ({
   failed: theme.roles.danger, error: theme.roles.danger, running: theme.roles.success,
   completed: theme.roles.success, cancelled: theme.roles.muted, queued: theme.roles.warning,
   max_steps: theme.roles.warning, online: theme.roles.success, offline: theme.roles.muted,
+  interrupted: theme.roles.warning,
 }[status] || theme.roles.text);
 
 async function resolveWorkspace(context) {
@@ -916,6 +917,38 @@ function fitType(type) {
   return String(type).padEnd(22).slice(0, 22);
 }
 
+// ------------------------------------------------------------------- recovery
+
+const recoveryCommands = {
+  pending: {
+    usage: 'recovery pending',
+    summary: 'List runs left "running" by a process that is no longer alive',
+    run(context) {
+      const runs = context.runtime.engine.recoverableRuns();
+      if (context.ui.emit(runs)) return;
+      if (!runs.length) { context.ui.ok('No interrupted runs pending recovery.'); return; }
+      context.ui.table([
+        { key: 'id', label: 'run' },
+        { key: 'session_id', label: 'session', max: 26 },
+        { key: 'started_at', label: 'started' },
+        { key: 'unresolved', label: 'unresolved', value: (row) => String(row.pendingIntents.length) },
+      ], runs);
+    },
+  },
+  reconcile: {
+    usage: 'recovery reconcile RUN_ID --note "What was inspected and repaired"',
+    summary: 'Record a manual review of an interrupted run without replaying it',
+    run(context) {
+      const runId = requirePositional(context, 0, 'RUN_ID');
+      const note = context.args.note;
+      if (!note) throw new Error('Missing required flag: --note "What was inspected and repaired"');
+      const updated = context.runtime.engine.reconcile(runId, String(note));
+      if (context.ui.emit(updated)) return;
+      context.ui.ok(`Run ${runId} reconciled`);
+    },
+  },
+};
+
 // ------------------------------------------------------------------- settings
 
 const configCommands = {
@@ -982,6 +1015,7 @@ export const GROUPS = {
   automation: { title: 'Automations', commands: automationCommands, defaultCommand: 'list' },
   browser: { title: 'Browser', commands: browserCommands, defaultCommand: 'list' },
   config: { title: 'Configuration', commands: configCommands, defaultCommand: 'show' },
+  recovery: { title: 'Recovery', commands: recoveryCommands, defaultCommand: 'pending' },
 };
 
 export const SINGLE = inventoryCommands;

@@ -125,6 +125,8 @@ message. With `--json` it emits a single object:
 | `logs [--limit N]` | Tail the MaskShift log. |
 | `events [--limit N] [--follow]` | Recent runtime events, optionally following the live bus. |
 | `config show` / `get KEY` / `set KEY VALUE` / `path` | Read and write configuration. Dotted keys work: `config set indexing.embeddings false`. |
+| `recovery pending` | Runs left "running" by a process that is no longer alive, with any tool-call intents that were never resolved by a matching result. |
+| `recovery reconcile RUN_ID --note "…"` | Record that a stale run has been manually inspected and move it to `interrupted`. Never replays or executes anything — refuses a run still active in this process or whose owning process might still be alive. |
 
 ## Scripting
 
