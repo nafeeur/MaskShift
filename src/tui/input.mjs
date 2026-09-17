@@ -216,6 +216,7 @@ export class Keyboard extends EventEmitter {
     this.attached = true;
     this.wasRaw = Boolean(this.input.isRaw);
     this.wasPaused = Boolean(this.input.isPaused?.());
+    this.input.ref?.();
     if (this.input.isTTY) this.input.setRawMode(true);
     this.input.setEncoding('utf8');
     this.input.resume();
@@ -229,6 +230,10 @@ export class Keyboard extends EventEmitter {
     this.input.off('data', this.handleData);
     if (this.input.isTTY) this.input.setRawMode(this.wasRaw);
     if (this.wasPaused) this.input.pause();
+    // Pausing alone leaves the underlying handle referenced, which keeps the process alive
+    // forever after quitting: stdin is a long-lived singleton, not something this class owns
+    // the lifetime of, so it must be released rather than just silenced.
+    this.input.unref?.();
   }
 }
 

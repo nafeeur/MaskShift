@@ -64,6 +64,7 @@ export class Screen {
     if (this.active) return;
     this.active = true;
     this.previous = [];
+    this.output.ref?.();
     this.write(`${ANSI.saveTitle}${ANSI.altScreenOn}${ANSI.hideCursor}${ANSI.clear}`);
     this.applyMouse();
     this.output.on('resize', this.handleResize);
@@ -75,6 +76,9 @@ export class Screen {
     this.output.off('resize', this.handleResize);
     if (this.mouseActive) { this.write(ANSI.mouseOff); this.mouseActive = false; }
     this.write(`${ANSI.reset}${ANSI.showCursor}${ANSI.altScreenOff}${ANSI.restoreTitle}`);
+    // Writing is synchronous for a TTY, but the handle itself stays referenced until told
+    // otherwise, which is what kept the process alive after quitting.
+    this.output.unref?.();
   }
 
   /**
