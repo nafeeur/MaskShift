@@ -302,7 +302,10 @@ export class FormOverlay extends Overlay {
   }
 
   size(viewport) {
-    const rows = this.visibleFields().reduce((sum, field) => sum + field.rows + 1, 0) + 7;
+    const visible = this.visibleFields();
+    // A blank row between each field, not after the last one — the gap
+    // that lets the form read as separate questions instead of one block.
+    const rows = visible.reduce((sum, field) => sum + field.rows + 1, 0) + Math.max(0, visible.length - 1) + 7;
     return {
       columns: Math.min(viewport.columns - 4, 86),
       rows: Math.min(viewport.rows - 2, rows + (this.note ? 2 : 0)),
@@ -360,15 +363,21 @@ export class FormOverlay extends Overlay {
     const body = [];
     const spans = [];
     let cursor = null;
+    let firstField = true;
     for (const [index, field] of this.fields.entries()) {
       if (!this.isFieldVisible(field)) continue;
+      // A blank row between fields so the form reads as separate questions
+      // rather than one dense block — none before the first field.
+      if (!firstField) body.push('');
+      firstField = false;
       const active = index === this.index;
       spans.push({ index, field, start: body.length });
       body.push(theme.paint(field.label.toUpperCase(), { fg: active ? theme.roles.borderActive : theme.roles.muted, bold: active })
         + (field.hint ? theme.paint(`   e.g. ${field.hint}`, { fg: theme.roles.faint, italic: true }) : ''));
       if (field.type === 'toggle') {
         const box = field.toggled ? `[${mark.check}]` : '[ ]';
-        body.push(gutter(theme) + theme.paint(`${box} ${field.toggled ? 'ON' : 'OFF'}`, { fg: field.toggled ? theme.roles.success : theme.roles.muted }));
+        body.push(gutter(theme, field.toggled ? mark.lamp : mark.ring, { tone: field.toggled ? theme.roles.success : theme.roles.muted })
+          + theme.paint(`${box} ${field.toggled ? 'ON' : 'OFF'}`, { fg: field.toggled ? theme.roles.success : theme.roles.muted }));
       } else if (field.type === 'select') {
         const option = field.options[field.optionIndex];
         body.push(gutter(theme, mark.arrowRight, { tone: theme.roles.muted })

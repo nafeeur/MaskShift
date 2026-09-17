@@ -7,7 +7,7 @@ import { split } from '../layout.mjs';
 import { LAYER, listZone, viewportZone } from '../regions.mjs';
 import { expandTabs, fit, truncate } from '../text.mjs';
 import { SPACE } from '../tokens.mjs';
-import { gutter } from '../type.mjs';
+import { columns, gutter } from '../type.mjs';
 import { filterRow, listRow, sidePane } from './catalog.mjs';
 
 const ICONS = {
@@ -50,7 +50,7 @@ function treeRow(app, item, selected, width) {
   return listRow(app, {
     selected, width,
     cells: [
-      { text: name },
+      { text: name, dim: true },
       { text: item.type === 'file' ? sizeLabel(item.size) : '', width: SIZE_WIDTH, align: 'right', tone: theme.roles.faint },
     ],
   });
@@ -75,10 +75,16 @@ export function render(app, region) {
   const filter = filterRow(app, app.fileFilter, app.focus === 'file-filter', treeWidth - 4, 'Filter paths');
 
   const rows = app.fileList.render(theme, treeWidth - 4, listHeight, (item, selected, itemWidth) => treeRow(app, item, selected, itemWidth));
+  // Labels the right-aligned size column so a bare "40.4K" beside a filename
+  // reads as a column, not a stray number.
+  const sizeHeader = gutter(theme) + columns(theme, [
+    { text: '' },
+    { text: 'SIZE', width: SIZE_WIDTH, align: 'right', tone: theme.roles.faint },
+  ], Math.max(0, treeWidth - 4 - SPACE.gutter));
   const tree = panel({
     theme, width: treeWidth, height, title: 'WORKSPACE',
     stamp: `${entries.length} NODES`, focused: app.focus === 'files',
-    body: [filter, '', ...rows],
+    body: [filter, sizeHeader, ...rows],
   });
 
   const current = app.fileList.current;
