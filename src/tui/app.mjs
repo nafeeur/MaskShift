@@ -13,7 +13,7 @@ import * as rail from './rail.mjs';
 import { RAIL_TABS } from './rail.mjs';
 import { LAYER, Regions } from './regions.mjs';
 import { Screen } from './screen.mjs';
-import { Theme } from './theme.mjs';
+import { Theme, listThemes } from './theme.mjs';
 import { fit, oneLine, truncate, visibleWidth, wrap } from './text.mjs';
 import { Composer, ListView, Spinner, TextField, Toasts, Viewport } from './widgets.mjs';
 import { columns, gutter, key as typeKey, label as sectionLabel } from './type.mjs';
@@ -55,6 +55,7 @@ const SLASH_COMMANDS = [
   { name: 'skills', hint: 'browse skills' },
   { name: 'mcp', hint: 'manage MCP servers' },
   { name: 'mods', hint: 'open mod shop' },
+  { name: 'themes', hint: 'switch colour theme' },
   { name: 'files', hint: 'browse files' },
   { name: 'terminal', hint: 'open terminal' },
   { name: 'doctor', hint: 'run diagnostics' },
@@ -77,6 +78,7 @@ export class MaskShiftTui {
       ...(headless ? { depth: 24, unicode: true } : {}),
       ...(preferences.colorDepth === null || preferences.colorDepth === undefined ? {} : { depth: Number(preferences.colorDepth) }),
       ...(preferences.unicode === null || preferences.unicode === undefined ? {} : { unicode: Boolean(preferences.unicode) }),
+      ...(preferences.themeId ? { themeId: preferences.themeId } : {}),
     });
     // A headless render is a still: every clock-driven part of the interface
     // freezes together so a captured frame is reproducible byte for byte.
@@ -1593,6 +1595,29 @@ export class MaskShiftTui {
     });
   }
 
+  openThemePicker() {
+    const items = listThemes().map((entry) => ({
+      id: entry.id,
+      label: entry.name,
+      tone: entry.id === this.theme.themeId ? this.theme.roles.primary : undefined,
+    }));
+    this.overlay = new PickerOverlay({
+      title: 'THEME SELECT',
+      placeholder: 'FILTER THEMES…',
+      items,
+      selectedId: this.theme.themeId,
+      onSelect: (item) => void this.setTheme(item.id, item.label),
+    });
+  }
+
+  async setTheme(themeId, name) {
+    this.theme.setTheme(themeId);
+    const ui = { ...(this.runtime.config.get().ui || {}), themeId };
+    await this.runtime.config.update({ ui });
+    this.toast(`Theme: ${name || themeId}`, 'success');
+    this.requestRender();
+  }
+
   openWorkspaceDialog({ force = false } = {}) {
     if (!force && (this.busy || this.composer.value || this.promptQueue.length)) {
       this.overlay = new ConfirmOverlay({
@@ -1760,6 +1785,7 @@ export class MaskShiftTui {
       action('skills.search', 'arsenal', 'Search skills'),
       action('capabilities.toggleTools', 'arsenal', 'Expand or collapse tool output', 't'),
       action('mouse.cycle', 'system', 'Mouse: click / click + hover / off'),
+      action('theme.pick', 'system', 'Change colour theme'),
       action('permission.cycle', 'system', 'Cycle the permission mode'),
       action('doctor', 'system', 'Run diagnostics'),
       action('settings', 'system', 'Settings', 'f2'),
@@ -1780,6 +1806,7 @@ export class MaskShiftTui {
       case 'run.delete': this.confirmDeleteSession(); break;
       case 'voice.capture': await this.startVoiceCapture(); break;
       case 'model.pick': this.openModelPicker(); break;
+      case 'theme.pick': this.openThemePicker(); break;
       case 'model.discover': await this.discoverProviders(); this.toast('Providers re-discovered', 'success'); break;
       case 'workspace.open': this.openWorkspaceDialog(); break;
       case 'workspace.index': void this.reindex(); break;
@@ -2019,6 +2046,7 @@ export class MaskShiftTui {
       case 'skills': this.switchView(2); this.arsenalTab = 'skills'; if (argument) this.arsenalFilter.set(argument); break;
       case 'mcp': this.switchView(3); if (argument) this.mcpFilter.set(argument); break;
       case 'mods': this.switchView(4); break;
+      case 'themes': case 'theme': this.openThemePicker(); break;
       case 'files': this.switchView(1); break;
       case 'terminal': this.switchView(5); break;
       case 'doctor': await this.showDoctor(); break;

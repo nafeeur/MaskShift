@@ -6,8 +6,10 @@
 
 import { Motion } from './motion.mjs';
 import { NEUTRAL, PALETTE, ROLES, SIGNAL, BRAND } from './tokens.mjs';
+import { DEFAULT_THEME_ID, resolveTheme, resolveThemeId } from './themes.mjs';
 
 export { PALETTE, ROLES, NEUTRAL, BRAND, SIGNAL };
+export { DEFAULT_THEME_ID, listThemes, resolveThemeId } from './themes.mjs';
 
 export const ESC = String.fromCharCode(27);
 const CSI = `${ESC}[`;
@@ -90,15 +92,26 @@ export function supportsUnicode() {
 }
 
 export class Theme {
-  constructor({ depth = detectDepth(), unicode = supportsUnicode(), motion = null, frozen = false } = {}) {
+  constructor({ depth = detectDepth(), unicode = supportsUnicode(), motion = null, frozen = false, themeId = DEFAULT_THEME_ID } = {}) {
     this.depth = depth;
     this.unicode = unicode;
+    // Always the original MaskShift brand palette, regardless of the selected theme — a handful
+    // of call sites (and one test) reach for a plain, known-good hex value off it rather than a
+    // themed role, and have no reason to change colour when the operator switches themes.
     this.palette = PALETTE;
-    this.roles = ROLES;
+    this.themeId = resolveThemeId(themeId);
+    this.roles = resolveTheme(this.themeId).roles;
     // Animations read the clock through the theme so a headless render can
     // freeze every moving part at once.
     this.motion = motion || new Motion({ frozen });
     this.mixCache = new Map();
+  }
+
+  /** Swaps the active role palette in place — every existing reference to this Theme instance
+   *  (the screen, every widget, every view) picks it up on its next paint with no other wiring. */
+  setTheme(themeId) {
+    this.themeId = resolveThemeId(themeId);
+    this.roles = resolveTheme(this.themeId).roles;
   }
 
   get enabled() { return this.depth > 0; }
