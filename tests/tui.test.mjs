@@ -4,7 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { Writable } from 'node:stream';
 import { MaskShiftTui } from '../src/tui/app.mjs';
-import { decode, matches } from '../src/tui/input.mjs';
+import { Keyboard, decode, matches } from '../src/tui/input.mjs';
 import { panel } from '../src/tui/box.mjs';
 import { sweepLine, spin } from '../src/tui/motion.mjs';
 import { statusGlyph, statusOf } from '../src/tui/status.mjs';
@@ -554,6 +554,32 @@ test('the interface routes keys, slash commands and view switches', async (t) =>
   assert.equal(app.toasts.items.length, 1);
 });
 
+test('escaping back to chat from another view lands on the transcript, not the composer', async (t) => {
+  const project = await createProject(t);
+  const runtime = await runtimeForTest(t, project);
+  const app = new MaskShiftTui(runtime, {
+    workspacePath: project, output: new FakeTerminal(120, 32), headless: true, theme,
+  });
+  await app.bootstrap();
+
+  // Land on a non-chat view with a non-typing focus, the state a user is in right
+  // before pressing Escape to go back — matching how the number-key navigation itself lands.
+  app.onKey({ name: '3', alt: true });
+  assert.equal(app.view, 'arsenal');
+  assert.equal(app.focus, 'arsenal');
+
+  app.onKey({ name: 'escape' });
+  assert.equal(app.view, 'chat');
+  // If this were 'composer', the very next digit key below would be typed as a literal
+  // character instead of switching views — silently corrupting whatever the user types next.
+  assert.equal(app.focus, 'transcript');
+  assert.equal(app.composer.value, '');
+
+  app.onKey({ name: '3' });
+  assert.equal(app.view, 'arsenal', 'a digit right after Escape should still switch views');
+  assert.equal(app.composer.value, '', 'the digit must not leak into the composer');
+});
+
 test('ctrl+v is wired to voice capture and transcribes a prompt into the composer', async (t) => {
   const project = await createProject(t);
   const scripts = await tempDir(t, 'maskshift-voice-scripts-');
@@ -598,6 +624,51 @@ test('voice capture refuses to record when no speech-to-text command is configur
   await app.startVoiceCapture();
   assert.equal(app.composer.value, 'untouched');
   assert.ok(app.toasts.items.some((toast) => toast.message.includes('No speech-to-text command configured')));
+});
+
+test('Keyboard.stop() releases the input handle instead of just pausing it', () => {
+  // A paused stream still keeps the underlying handle referenced; only unref() lets the
+  // process exit naturally once nothing else needs it. Without this, quitting the TUI left
+  // stdin (and stdout, via Screen.leave()) referenced forever, so the process never exited.
+  const calls = [];
+  const fakeInput = {
+    isTTY: true, isRaw: false, isPaused: () => true,
+    setRawMode(value) { calls.push(['setRawMode', value]); },
+    setEncoding() { calls.push(['setEncoding']); },
+    resume() { calls.push(['resume']); },
+    pause() { calls.push(['pause']); },
+    on() { calls.push(['on']); },
+    off() { calls.push(['off']); },
+    ref() { calls.push(['ref']); },
+    unref() { calls.push(['unref']); },
+  };
+  const keyboard = new Keyboard({ input: fakeInput });
+  keyboard.start();
+  assert.ok(calls.some(([name]) => name === 'ref'), 'start() should ref the handle');
+  keyboard.stop();
+  assert.ok(calls.some(([name]) => name === 'pause'), 'stop() should still pause the stream');
+  assert.ok(calls.some(([name]) => name === 'unref'), 'stop() should release the handle, not just pause it');
+  // unref must be the last thing done to the handle — refing it again afterward would
+  // silently undo the release.
+  assert.equal(calls.at(-1)[0], 'unref');
+});
+
+test('Screen.leave() releases the output handle instead of just leaving it referenced', () => {
+  const calls = [];
+  const fakeOutput = {
+    columns: 80, rows: 24, isTTY: true,
+    write() { calls.push(['write']); return true; },
+    on() { calls.push(['on']); },
+    off() { calls.push(['off']); },
+    ref() { calls.push(['ref']); },
+    unref() { calls.push(['unref']); },
+  };
+  const screen = new Screen({ theme, output: fakeOutput });
+  screen.enter();
+  assert.ok(calls.some(([name]) => name === 'ref'), 'enter() should ref the handle');
+  screen.leave();
+  assert.ok(calls.some(([name]) => name === 'unref'), 'leave() should release the handle');
+  assert.equal(calls.at(-1)[0], 'unref');
 });
 
 test('the decoder turns SGR and legacy mouse reports into positioned events', () => {
@@ -768,6 +839,37 @@ test('the heist view keeps the composer inside one unclipped frame', async (t) =
     assert.equal(body.filter((line) => line.startsWith('┏')).length, 1, 'exactly one frame opens');
     for (const line of frame) assert.equal(visibleWidth(line), 120);
   }
+});
+
+test('a toast never overlaps the composer\'s own border or input row', async (t) => {
+  const project = await createProject(t);
+  const runtime = await runtimeForTest(t, project);
+  const app = new MaskShiftTui(runtime, {
+    workspacePath: project, output: new FakeTerminal(90, 26), headless: true, theme,
+  });
+  await app.bootstrap();
+  app.view = 'chat';
+  app.composer.set('');
+  app.screen.invalidate();
+  app.snapshot(); // populate app.lastRegion/app.chatPanes for this frame size
+
+  // A two-line toast is tall enough to have previously reached past the seam and into the
+  // composer row when anchored a fixed distance from the bottom of the screen.
+  app.toast('Checkpoint git-ref checkpoint_deadbeef', 'info');
+  app.screen.invalidate();
+  const frame = app.snapshot().map(stripAnsi);
+
+  const seamIndex = frame.findIndex((line) => line.includes('COMPOSER'));
+  assert.ok(seamIndex >= 0, 'composer seam row should be present');
+  assert.ok(seamIndex >= 1, 'sanity: the seam is not the very first row');
+  assert.ok(frame[seamIndex].includes('━━ COMPOSER'), 'the seam divider must render intact, not be cut by a toast');
+
+  const inputRow = frame[seamIndex + 1];
+  assert.ok(inputRow.trimEnd().endsWith('┃'), `composer input row should keep its right border, got "${inputRow}"`);
+  assert.ok(inputRow.includes('❯'), 'composer prompt marker should still be visible');
+
+  const bottomBorder = frame[seamIndex + 2];
+  assert.ok(bottomBorder.trimEnd().endsWith('┛'), `composer bottom border should be intact, got "${bottomBorder}"`);
 });
 
 test('markdown tables line their separators up with their columns', () => {
