@@ -66,6 +66,79 @@ export function respondJson(response, status, value, headers = {}) {
   response.end(body);
 }
 
+/**
+ * Writes a `text/event-stream` response from a list of frames, each `{ event, data }` (`data` is
+ * JSON-stringified unless already a string, so a caller can pass `'[DONE]'` verbatim for OpenAI's
+ * sentinel). Mirrors what a real provider's streaming endpoint sends, so fixtures exercise the
+ * same SSE-parsing path production traffic does rather than a shortcut that only looks similar.
+ */
+export function respondSSE(response, frames, headers = {}) {
+  response.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive', ...headers });
+  for (const frame of frames) {
+    const data = typeof frame.data === 'string' ? frame.data : JSON.stringify(frame.data);
+    if (frame.event && frame.event !== 'message') response.write(`event: ${frame.event}\n`);
+    response.write(`data: ${data}\n\n`);
+  }
+  response.end();
+}
+
+/** Writes a newline-delimited-JSON response (Ollama's streaming format). */
+export function respondNDJSON(response, lines, headers = {}) {
+  response.writeHead(200, { 'Content-Type': 'application/x-ndjson', ...headers });
+  for (const line of lines) response.write(`${JSON.stringify(line)}\n`);
+  response.end();
+}
+
+/**
+ * An OpenAI-compatible `/chat/completions` streaming response built from the same shape a
+ * fixture would otherwise hand `respondJson` — one content string, a list of finished tool
+ * calls, a finish reason, and optional usage — turned into the delta/tool_calls chunk sequence
+ * the real streaming endpoint sends, terminated by the `[DONE]` sentinel.
+ */
+export function respondOpenAIChatSSE(response, { content = '', toolCalls = [], finishReason = 'stop', usage = null } = {}) {
+  const frames = [];
+  if (content) frames.push({ data: { choices: [{ index: 0, delta: { content }, finish_reason: null }] } });
+  toolCalls.forEach((call, index) => {
+    frames.push({ data: { choices: [{ index: 0, delta: { tool_calls: [{ index, id: call.id, type: 'function', function: { name: call.name, arguments: '' } }] }, finish_reason: null }] } });
+    frames.push({ data: { choices: [{ index: 0, delta: { tool_calls: [{ index, function: { arguments: JSON.stringify(call.args ?? call.arguments ?? {}) } }] }, finish_reason: null }] } });
+  });
+  frames.push({ data: { choices: [{ index: 0, delta: {}, finish_reason: finishReason }], ...(usage ? { usage } : {}) } });
+  frames.push({ data: '[DONE]' });
+  respondSSE(response, frames);
+}
+
+/**
+ * An OpenAI Responses API streaming response carrying just a final `response.completed` frame
+ * with the given `output` — enough for a fixture that doesn't care about live text deltas, only
+ * about the finished result `#openAiResponses` assembles from that event.
+ */
+export function respondOpenAIResponsesSSE(response, output, { id = 'fixture', status = 'completed', extra = {} } = {}) {
+  respondSSE(response, [{ event: 'response.completed', data: { response: { id, status, output, ...extra } } }]);
+}
+
+/**
+ * An Anthropic `/messages` streaming response built from the same `content` blocks, `stop_reason`
+ * and `usage` a fixture would otherwise hand `respondJson`, turned into the message_start,
+ * content_block_start/delta/stop (one triple per block), message_delta and message_stop event
+ * sequence the real streaming endpoint sends.
+ */
+export function respondAnthropicSSE(response, { id = 'msg_fixture', content = [], stopReason = null, usage = {} } = {}) {
+  const frames = [{ event: 'message_start', data: { message: { id, type: 'message', role: 'assistant', content: [], usage } } }];
+  content.forEach((block, index) => {
+    if (block.type === 'tool_use') {
+      frames.push({ event: 'content_block_start', data: { index, content_block: { type: 'tool_use', id: block.id, name: block.name, input: {} } } });
+      frames.push({ event: 'content_block_delta', data: { index, delta: { type: 'input_json_delta', partial_json: JSON.stringify(block.input || {}) } } });
+    } else {
+      frames.push({ event: 'content_block_start', data: { index, content_block: { type: 'text', text: '' } } });
+      frames.push({ event: 'content_block_delta', data: { index, delta: { type: 'text_delta', text: block.text || '' } } });
+    }
+    frames.push({ event: 'content_block_stop', data: { index } });
+  });
+  frames.push({ event: 'message_delta', data: { delta: { stop_reason: stopReason }, usage } });
+  frames.push({ event: 'message_stop', data: {} });
+  respondSSE(response, frames);
+}
+
 export async function waitFor(predicate, { timeoutMs = 10_000, intervalMs = 40, message = 'condition' } = {}) {
   const deadline = Date.now() + timeoutMs;
   let last;

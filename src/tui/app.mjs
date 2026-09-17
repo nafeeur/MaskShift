@@ -112,6 +112,10 @@ export class MaskShiftTui {
     this.activeCapabilities = new Set();
     this.subagents = 0;
     this.pendingCalls = new Map();
+    // The assistant's text-so-far for the turn in progress, cumulative — not yet a persisted
+    // message, so it's rendered inline (see chat.mjs) but replaced wholesale, never appended to,
+    // by the real message the moment the turn actually finishes and `this.messages` reloads.
+    this.streamingText = null;
     this.tokenHistory = [];
     this.totals = { input: 0, output: 0, cost: 0 };
     this.startedAt = null;
@@ -367,7 +371,9 @@ export class MaskShiftTui {
         )],
       });
     }
-    if (this.busy && this.pendingCalls.size === 0) {
+    // Once real text is streaming in, the growing message itself (rendered in the transcript,
+    // see chat.mjs) is the "still working" signal — a spinner underneath it would be redundant.
+    if (this.busy && this.pendingCalls.size === 0 && !this.streamingText) {
       entries.push({
         render: (theme, width) => [fit(
           gutter(theme, this.spinner.frame(theme), { tone: theme.roles.primary })
@@ -921,6 +927,11 @@ export class MaskShiftTui {
         this.step = payload.step || this.step + 1;
         this.thinkingLabel = `TURN ${String(this.step).padStart(2, '0')} — ${payload.tools?.length ?? 0} TOOLS ACTIVE`;
         this.activeCapabilities = new Set(payload.tools || []);
+        this.streamingText = null;
+        break;
+      case 'run.assistant-delta':
+        this.streamingText = payload.content || '';
+        if (this.streamingText) this.thinkingLabel = 'WRITING';
         break;
       case 'run.assistant': {
         if (payload.usage) {
@@ -931,6 +942,7 @@ export class MaskShiftTui {
           if (this.tokenHistory.length > 120) this.tokenHistory.shift();
         }
         for (const call of payload.toolCalls || []) this.pendingCalls.set(call.id, { name: call.name, args: call.args });
+        this.streamingText = null;
         this.messages = this.runtime.store.listMessages(this.sessionId, 1000);
         this.thinkingLabel = payload.toolCalls?.length ? 'EXECUTING TOOLS' : 'WRITING';
         break;
@@ -948,6 +960,7 @@ export class MaskShiftTui {
       case 'run.cancelled':
       case 'run.max-steps': {
         this.pendingCalls.clear();
+        this.streamingText = null;
         this.messages = this.runtime.store.listMessages(this.sessionId, 1000);
         const run = this.runId ? this.runtime.store.getRun(this.runId) : null;
         this.activeRun = null;

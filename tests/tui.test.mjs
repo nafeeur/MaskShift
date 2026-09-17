@@ -19,7 +19,7 @@ import { Composer, ListView, TextField, Viewport, fuzzy } from '../src/tui/widge
 import { Regions } from '../src/tui/regions.mjs';
 import { resolveMouseMode } from '../src/tui/app.mjs';
 import { ConfirmOverlay, FormOverlay, TextOverlay } from '../src/tui/overlays.mjs';
-import { createProject, runtimeForTest, tempDir } from './helpers.mjs';
+import { createProject, jsonServer, respondJson, runtimeForTest, tempDir, waitFor } from './helpers.mjs';
 
 const ESC = String.fromCharCode(27);
 const theme = new Theme({ depth: 24, unicode: true });
@@ -1060,6 +1060,79 @@ test('a toast never overlaps the composer\'s own border or input row', async (t)
 
   const bottomBorder = frame[seamIndex + 2];
   assert.ok(bottomBorder.trimEnd().endsWith('┛'), `composer bottom border should be intact, got "${bottomBorder}"`);
+});
+
+test('a streaming reply grows word by word in the transcript, then settles into the finished message', async (t) => {
+  const text = 'Hello there, this streams in gradually.';
+  const words = text.split(' ');
+  const server = await jsonServer(t, async (request, response) => {
+    if (request.method === 'GET' && request.url === '/v1/models') {
+      respondJson(response, 200, { data: [{ id: 'stream-coder' }] });
+      return;
+    }
+    response.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
+    for (const [index, word] of words.entries()) {
+      const delta = index === 0 ? word : ` ${word}`;
+      response.write(`event: response.output_text.delta\ndata: ${JSON.stringify({ delta })}\n\n`);
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    const final = {
+      response: {
+        id: 'resp_stream', status: 'completed',
+        output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text }] }],
+      },
+    };
+    response.write(`event: response.completed\ndata: ${JSON.stringify(final)}\n\n`);
+    response.end();
+  });
+
+  const project = await createProject(t);
+  const runtime = await runtimeForTest(t, project, {
+    defaultModel: 'fixture-stream:stream-coder',
+    providers: [{
+      id: 'fixture-stream', name: 'Streaming fixture', type: 'openai-responses',
+      baseUrl: server.url, apiKey: 'test-key', enabled: true, autoDiscover: false,
+      models: [{ id: 'stream-coder' }], timeoutMs: 15_000,
+    }],
+  });
+  const app = new MaskShiftTui(runtime, {
+    workspacePath: project, output: new FakeTerminal(120, 32), headless: true, theme,
+  });
+  await app.bootstrap();
+  // Headless instances skip start()'s terminal takeover entirely, including the eventBus
+  // subscription it normally wires up — so a headless test that wants live run events has to
+  // hook the bus itself, same as the CLI's headless run path does independently of this class.
+  const unsubscribe = runtime.eventBus.subscribe((event) => app.onEvent(event));
+  t.after(unsubscribe);
+  app.view = 'chat';
+  app.modelRef = 'fixture-stream:stream-coder';
+
+  app.composer.set('Say hello gradually');
+  await app.submitPrompt();
+
+  // Partway through, the transcript should show a growing prefix of the final text — not
+  // nothing (still "thinking"), and not the whole thing (not yet a finished message).
+  await waitFor(() => {
+    const frame = app.snapshot().map(stripAnsi);
+    const hasFirstWord = frame.some((line) => line.includes(words[0]));
+    const hasFullText = frame.some((line) => line.includes(text));
+    return hasFirstWord && !hasFullText ? true : null;
+  }, { timeoutMs: 3000, message: 'partial streamed text to appear before the reply finishes' });
+
+  const midFrame = app.snapshot().map(stripAnsi);
+  assert.ok(midFrame.some((line) => line.includes('MASKSHIFT')), 'expected the speaker row to appear as soon as text starts streaming');
+  assert.ok(app.streamingText && text.startsWith(app.streamingText), 'app.streamingText should be a prefix of the final text while streaming');
+  // A spinner "thinking" row would be redundant once real text is already visible.
+  assert.ok(!midFrame.some((line) => /Thinking…|THINKING/i.test(line)), 'the thinking spinner should stand down once text is streaming');
+
+  await waitFor(() => (app.busy ? null : true), { timeoutMs: 5000, message: 'run to finish' });
+
+  assert.equal(app.streamingText, null, 'streamingText should clear once the turn is persisted');
+  const finalFrame = app.snapshot().map(stripAnsi);
+  assert.ok(finalFrame.some((line) => line.includes(text)), 'expected the full final text in the settled transcript');
+  const persisted = app.messages.filter((message) => message.role === 'assistant');
+  assert.equal(persisted.length, 1);
+  assert.equal(persisted[0].content, text);
 });
 
 test('markdown tables line their separators up with their columns', () => {

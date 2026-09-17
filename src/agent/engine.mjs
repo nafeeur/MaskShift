@@ -309,6 +309,14 @@ export class AgentEngine {
           outboundHistory = fitted.history;
           if (fitted.omitted) this.#event(run.id, 'context-trimmed', { omittedTurns: fitted.omitted, contextTokens }, scope);
         }
+        // Throttled rather than forwarded 1:1: a fast provider can emit dozens of fragments a
+        // second, and every one of those would otherwise (a) push into the event bus's shared,
+        // bounded history ring — crowding out everything else recorded around the same time —
+        // and (b) ask every listener (TUI, any SSE client) to do work for a change too small to
+        // see. The full, untruncated text still always reaches the transcript: it's `response`'s
+        // own return value below, persisted as the `assistant` message regardless of how many
+        // deltas were dropped here.
+        let lastDeltaEmitAt = 0;
         const response = await this.providerManager.complete({
           modelRef: currentRun.model_id,
           messages: [{ role: 'system', content: system.text, blocks: system.blocks }, ...outboundHistory],
@@ -316,6 +324,12 @@ export class AgentEngine {
           signal,
           temperature: entry.options.temperature ?? 0.1,
           maxTokens,
+          onDelta: (content) => {
+            const now = Date.now();
+            if (now - lastDeltaEmitAt < 60) return;
+            lastDeltaEmitAt = now;
+            this.eventBus.emit('run.assistant-delta', { step, content }, scope);
+          },
         });
         usage.push(response.usage);
         costs.push(estimateUsageCost(this.config.get(), response.providerId, response.providerType, response.model, response.usage));

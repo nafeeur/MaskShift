@@ -4,7 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { main } from '../src/cli/main.mjs';
 import { VERSION } from '../src/core/utils.mjs';
-import { createProject, jsonServer, readJsonBody, respondJson, runtimeForTest, waitFor } from './helpers.mjs';
+import { createProject, jsonServer, readJsonBody, respondJson, respondSSE, runtimeForTest, waitFor } from './helpers.mjs';
 
 function captureStdout() {
   const chunks = [];
@@ -43,21 +43,38 @@ async function fixtureModel(t, { file = 'generated-by-agent.txt', marker = 'MASK
       assert.equal(body.model, 'fixture-coder');
       assert.ok(body.tools.some((tool) => tool.name === 'fs_write'));
       if (!body.input.some((item) => item.type === 'function_call_output')) {
-        return respondJson(response, 200, {
-          id: 'resp_tool', status: 'completed',
-          output: [{
-            type: 'function_call', id: 'fc_1', call_id: 'call_write', name: 'fs_write',
-            arguments: JSON.stringify({ path: file, content: marker }),
-          }],
-          usage: { input_tokens: 100, output_tokens: 20, total_tokens: 120 },
-        });
+        return respondSSE(response, [{
+          event: 'response.completed',
+          data: {
+            response: {
+              id: 'resp_tool', status: 'completed',
+              output: [{
+                type: 'function_call', id: 'fc_1', call_id: 'call_write', name: 'fs_write',
+                arguments: JSON.stringify({ path: file, content: marker }),
+              }],
+              usage: { input_tokens: 100, output_tokens: 20, total_tokens: 120 },
+            },
+          },
+        }]);
       }
       assert.equal(body.input.find((item) => item.type === 'function_call_output').call_id, 'call_write');
-      return respondJson(response, 200, {
-        id: 'resp_final', status: 'completed',
-        output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'Implemented and verified the artifact.' }] }],
-        usage: { input_tokens: 120, output_tokens: 12, total_tokens: 132 },
-      });
+      const text = 'Implemented and verified the artifact.';
+      return respondSSE(response, [
+        ...[...text].reduce((frames, char) => {
+          frames.push({ event: 'response.output_text.delta', data: { delta: char } });
+          return frames;
+        }, []),
+        {
+          event: 'response.completed',
+          data: {
+            response: {
+              id: 'resp_final', status: 'completed',
+              output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text }] }],
+              usage: { input_tokens: 120, output_tokens: 12, total_tokens: 132 },
+            },
+          },
+        },
+      ]);
     }
     respondJson(response, 404, { error: { message: 'not found' } });
   });
