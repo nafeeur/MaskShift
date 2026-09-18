@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-12T14:21:54.492Z",
-  "version": "1.3.0",
-  "nativeToolCount": 159,
+  "generatedAt": "2026-09-18T02:09:03.049Z",
+  "version": "1.4.1",
+  "nativeToolCount": 167,
   "bundledSkillCount": 50,
-  "curatedMcpCount": 9,
+  "curatedMcpCount": 8,
   "tools": [
     {
       "name": "agent_bridge_discover",
@@ -57,6 +57,24 @@
       "category": "artifacts",
       "readOnly": false,
       "risk": "write",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "archive_list",
+      "title": "List archive contents",
+      "description": "List the files inside a zip or tar archive without extracting it.",
+      "category": "artifacts",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "checksum_verify",
+      "title": "Verify file checksum",
+      "description": "Compute a file's hash and compare it against an expected digest, returning a match/mismatch verdict instead of leaving the comparison to the model.",
+      "category": "artifacts",
+      "readOnly": true,
+      "risk": "normal",
       "alwaysAvailable": false
     },
     {
@@ -528,6 +546,24 @@
       "alwaysAvailable": false
     },
     {
+      "name": "chmod_set",
+      "title": "Change file permissions",
+      "description": "Change a path's POSIX mode (chmod) and optionally its owner/group (chown), reporting the mode before and after.",
+      "category": "filesystem",
+      "readOnly": false,
+      "risk": "write",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "file_diff",
+      "title": "Diff two files or directories",
+      "description": "Show a unified diff between two arbitrary paths (files or directories), independent of Git — for comparing anything on disk, not just a repo working tree.",
+      "category": "filesystem",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
       "name": "fs_apply_patch",
       "title": "Apply unified diff",
       "description": "Apply a unified diff using git apply. The patch can update multiple files and is checked before application.",
@@ -616,6 +652,15 @@
       "readOnly": false,
       "risk": "write",
       "alwaysAvailable": true
+    },
+    {
+      "name": "text_stats",
+      "title": "Count lines, words, and bytes",
+      "description": "Report line, word, and byte counts for one or more text files (like wc) without spending context on their contents — use before deciding whether to read a file in full.",
+      "category": "filesystem",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
     },
     {
       "name": "git_branch",
@@ -1374,6 +1419,15 @@
       "alwaysAvailable": true
     },
     {
+      "name": "disk_usage",
+      "title": "Inspect disk usage",
+      "description": "Report filesystem-level free/used space (df), or a per-directory usage breakdown (du) when a path is given.",
+      "category": "system",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
       "name": "environment_list",
       "title": "Read environment",
       "description": "List process environment variable names and optionally values. MaskShift overdrive mode permits direct secret-bearing environment access.",
@@ -1392,9 +1446,27 @@
       "alwaysAvailable": false
     },
     {
+      "name": "network_diagnose",
+      "title": "Diagnose network connectivity",
+      "description": "Run ping, DNS lookup, or traceroute against a host and return structured, parsed results instead of raw command text.",
+      "category": "system",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
       "name": "port_inspect",
       "title": "Inspect network ports",
       "description": "Inspect listening sockets and processes using ss, netstat, or lsof.",
+      "category": "system",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "ps_list",
+      "title": "List host processes",
+      "description": "List running processes on the host as structured records (pid, user, cpu%, mem%, command) — parsed, so nothing needs to eyeball raw `ps` output.",
       "category": "system",
       "readOnly": true,
       "risk": "normal",
@@ -1450,7 +1522,7 @@
         "license": "Complete terms in LICENSE.txt"
       },
       "bodyChars": 6612,
-      "updatedAt": "2026-09-12T14:07:47.086Z"
+      "updatedAt": "2026-09-17T03:17:00.695Z"
     },
     {
       "name": "algorithmic-art",
@@ -1464,7 +1536,7 @@
         "license": "Complete terms in LICENSE.txt"
       },
       "bodyChars": 19328,
-      "updatedAt": "2026-09-12T14:07:47.086Z"
+      "updatedAt": "2026-09-17T03:17:00.695Z"
     },
     {
       "name": "architecture",
@@ -1477,7 +1549,7 @@
         "description": "Design system architecture with explicit requirements, boundaries, data flows, tradeoffs, failure modes, and evolution paths."
       },
       "bodyChars": 615,
-      "updatedAt": "2026-09-12T14:07:47.086Z"
+      "updatedAt": "2026-09-17T03:17:00.696Z"
     },
     {
       "name": "backend-api",
@@ -1490,7 +1562,7 @@
         "description": "Design and implement reliable local or network APIs with validation, streaming, cancellation, observability, and stable contracts."
       },
       "bodyChars": 535,
-      "updatedAt": "2026-09-12T14:07:47.086Z"
+      "updatedAt": "2026-09-17T03:17:00.696Z"
     },
     {
       "name": "brand-guidelines",
@@ -1504,7 +1576,7 @@
         "license": "Complete terms in LICENSE.txt"
       },
       "bodyChars": 1915,
-      "updatedAt": "2026-09-12T14:07:47.087Z"
+      "updatedAt": "2026-09-17T03:17:00.696Z"
     },
     {
       "name": "browser-automation",
@@ -1517,7 +1589,7 @@
         "description": "Automate and verify browser workflows using accessibility-first locators, deterministic waits, screenshots, and failure artifacts."
       },
       "bodyChars": 450,
-      "updatedAt": "2026-09-12T14:07:47.087Z"
+      "updatedAt": "2026-09-17T03:17:00.696Z"
     },
     {
       "name": "build-repair",
@@ -1530,7 +1602,7 @@
         "description": "Repair broken builds, type checks, packaging, and startup paths across environments with minimal, verifiable changes."
       },
       "bodyChars": 496,
-      "updatedAt": "2026-09-12T14:07:47.087Z"
+      "updatedAt": "2026-09-17T03:17:00.696Z"
     },
     {
       "name": "canvas-design",
@@ -1544,7 +1616,7 @@
         "license": "Complete terms in LICENSE.txt"
       },
       "bodyChars": 11567,
-      "updatedAt": "2026-09-12T14:07:47.087Z"
+      "updatedAt": "2026-09-17T03:17:00.696Z"
     },
     {
       "name": "ci-cd",
@@ -1557,7 +1629,7 @@
         "description": "Create and repair CI/CD pipelines with caching, parallelism, reproducibility, artifacts, and actionable failures."
       },
       "bodyChars": 509,
-      "updatedAt": "2026-09-12T14:07:47.107Z"
+      "updatedAt": "2026-09-17T03:17:00.724Z"
     },
     {
       "name": "claude-api",
@@ -1571,7 +1643,7 @@
         "license": "Complete terms in LICENSE.txt"
       },
       "bodyChars": 85018,
-      "updatedAt": "2026-09-12T14:07:47.114Z"
+      "updatedAt": "2026-09-17T03:17:00.729Z"
     },
     {
       "name": "code-review",
@@ -1584,7 +1656,7 @@
         "description": "Review changes for real correctness, maintainability, regressions, missing tests, and integration defects with low-noise findings."
       },
       "bodyChars": 586,
-      "updatedAt": "2026-09-12T14:07:47.121Z"
+      "updatedAt": "2026-09-17T03:17:00.737Z"
     },
     {
       "name": "codebase-indexing",
@@ -1597,7 +1669,7 @@
         "description": "Build and maintain scalable repository indexes for lexical, structural, symbol, and semantic retrieval with bounded context."
       },
       "bodyChars": 611,
-      "updatedAt": "2026-09-12T14:07:47.121Z"
+      "updatedAt": "2026-09-17T03:17:00.737Z"
     },
     {
       "name": "cpp-qt",
@@ -1610,7 +1682,7 @@
         "description": "Implement and debug modern C++ and Qt applications, including signals/slots, models, threading, CMake, rendering, and ownership."
       },
       "bodyChars": 588,
-      "updatedAt": "2026-09-12T14:07:47.121Z"
+      "updatedAt": "2026-09-17T03:17:00.737Z"
     },
     {
       "name": "data-analysis",
@@ -1623,7 +1695,7 @@
         "description": "Analyze datasets reproducibly, validate quality, calculate defensible metrics, and produce clear artifacts."
       },
       "bodyChars": 490,
-      "updatedAt": "2026-09-12T14:07:47.121Z"
+      "updatedAt": "2026-09-17T03:17:00.737Z"
     },
     {
       "name": "database-migrations",
@@ -1636,7 +1708,7 @@
         "description": "Evolve persistent schemas safely with compatible migrations, backfills, rollback strategy, and integrity checks."
       },
       "bodyChars": 527,
-      "updatedAt": "2026-09-12T14:07:47.121Z"
+      "updatedAt": "2026-09-17T03:17:00.737Z"
     },
     {
       "name": "debugging",
@@ -1649,7 +1721,7 @@
         "description": "Diagnose and repair software failures using evidence, reproduction, instrumentation, and regression tests rather than speculative edits."
       },
       "bodyChars": 549,
-      "updatedAt": "2026-09-12T14:07:47.121Z"
+      "updatedAt": "2026-09-17T03:17:00.737Z"
     },
     {
       "name": "dependency-upgrade",
@@ -1662,7 +1734,7 @@
         "description": "Upgrade libraries and runtimes with compatibility research, focused changes, lockfile integrity, and regression verification."
       },
       "bodyChars": 520,
-      "updatedAt": "2026-09-12T14:07:47.121Z"
+      "updatedAt": "2026-09-17T03:17:00.737Z"
     },
     {
       "name": "discernment-nudge",
@@ -1676,7 +1748,7 @@
         "license": "Complete terms in LICENSE.txt"
       },
       "bodyChars": 9392,
-      "updatedAt": "2026-09-12T14:07:47.121Z"
+      "updatedAt": "2026-09-17T03:17:00.738Z"
     },
     {
       "name": "docker-kubernetes",
@@ -1689,7 +1761,7 @@
         "description": "Containerize and operate development services with reproducible images, health checks, persistent state, and clear networking."
       },
       "bodyChars": 520,
-      "updatedAt": "2026-09-12T14:07:47.121Z"
+      "updatedAt": "2026-09-17T03:17:00.738Z"
     },
     {
       "name": "documentation",
@@ -1702,7 +1774,7 @@
         "description": "Write accurate user, operator, API, and architecture documentation grounded in the implemented product."
       },
       "bodyChars": 530,
-      "updatedAt": "2026-09-12T14:07:47.121Z"
+      "updatedAt": "2026-09-17T03:17:00.738Z"
     },
     {
       "name": "feature-implementation",
@@ -1715,7 +1787,7 @@
         "description": "Implement production features end to end, including integration, error states, tests, documentation, and verification."
       },
       "bodyChars": 602,
-      "updatedAt": "2026-09-12T14:07:47.121Z"
+      "updatedAt": "2026-09-17T03:17:00.738Z"
     },
     {
       "name": "frontend-design",
@@ -1729,7 +1801,7 @@
         "license": "Complete terms in LICENSE.txt"
       },
       "bodyChars": 9076,
-      "updatedAt": "2026-09-12T14:07:47.122Z"
+      "updatedAt": "2026-09-17T03:17:00.738Z"
     },
     {
       "name": "git-worktrees",
@@ -1742,7 +1814,7 @@
         "description": "Use Git worktrees and checkpoints for parallel agents, isolated changes, review, integration, and recovery."
       },
       "bodyChars": 506,
-      "updatedAt": "2026-09-12T14:07:47.122Z"
+      "updatedAt": "2026-09-17T03:17:00.738Z"
     },
     {
       "name": "go-engineering",
@@ -1755,7 +1827,7 @@
         "description": "Implement idiomatic Go services and tools with context propagation, interfaces, concurrency discipline, and tests."
       },
       "bodyChars": 487,
-      "updatedAt": "2026-09-12T14:07:47.122Z"
+      "updatedAt": "2026-09-17T03:17:00.738Z"
     },
     {
       "name": "incident-response",
@@ -1768,7 +1840,7 @@
         "description": "Diagnose and stabilize production incidents, preserve evidence, restore service, and produce actionable follow-up work."
       },
       "bodyChars": 490,
-      "updatedAt": "2026-09-12T14:07:47.122Z"
+      "updatedAt": "2026-09-17T03:17:00.738Z"
     },
     {
       "name": "internal-comms",
@@ -1782,7 +1854,7 @@
         "license": "Complete terms in LICENSE.txt"
       },
       "bodyChars": 1100,
-      "updatedAt": "2026-09-12T14:07:47.122Z"
+      "updatedAt": "2026-09-17T03:17:00.738Z"
     },
     {
       "name": "mcp-authoring",
@@ -1795,7 +1867,7 @@
         "description": "Build and integrate MCP servers and clients across modern 2026 stateless and legacy initialization-based protocol revisions."
       },
       "bodyChars": 635,
-      "updatedAt": "2026-09-12T14:07:47.122Z"
+      "updatedAt": "2026-09-17T03:17:00.738Z"
     },
     {
       "name": "mcp-builder",
@@ -1809,7 +1881,7 @@
         "license": "Complete terms in LICENSE.txt"
       },
       "bodyChars": 8710,
-      "updatedAt": "2026-09-12T14:07:47.122Z"
+      "updatedAt": "2026-09-17T03:17:00.738Z"
     },
     {
       "name": "migration-modernization",
@@ -1822,7 +1894,7 @@
         "description": "Modernize legacy code or frameworks incrementally while preserving behavior, interoperability, and delivery velocity."
       },
       "bodyChars": 509,
-      "updatedAt": "2026-09-12T14:07:47.123Z"
+      "updatedAt": "2026-09-17T03:17:00.739Z"
     },
     {
       "name": "performance",
@@ -1835,7 +1907,7 @@
         "description": "Profile and optimize latency, throughput, memory, context usage, and startup costs using measured bottlenecks."
       },
       "bodyChars": 579,
-      "updatedAt": "2026-09-12T14:07:47.123Z"
+      "updatedAt": "2026-09-17T03:17:00.739Z"
     },
     {
       "name": "plugin-authoring",
@@ -1848,7 +1920,7 @@
         "description": "Create modular MaskShift plugins that add tools, skills, providers, hooks, UI panels, or MCP catalog sources without coupling core policy."
       },
       "bodyChars": 513,
-      "updatedAt": "2026-09-12T14:07:47.123Z"
+      "updatedAt": "2026-09-17T03:17:00.739Z"
     },
     {
       "name": "prompt-evals",
@@ -1861,7 +1933,7 @@
         "description": "Create evaluations for agent prompts, tool routing, context retrieval, and coding outcomes using reproducible tasks and scoring."
       },
       "bodyChars": 634,
-      "updatedAt": "2026-09-12T14:07:47.123Z"
+      "updatedAt": "2026-09-17T03:17:00.739Z"
     },
     {
       "name": "python-engineering",
@@ -1874,7 +1946,7 @@
         "description": "Build maintainable Python applications and automation with typed boundaries, packaging, environments, tests, and robust subprocess handling."
       },
       "bodyChars": 512,
-      "updatedAt": "2026-09-12T14:07:47.123Z"
+      "updatedAt": "2026-09-17T03:17:00.739Z"
     },
     {
       "name": "refactoring",
@@ -1887,7 +1959,7 @@
         "description": "Restructure code safely while preserving behavior, reducing duplication, clarifying ownership, and maintaining compatibility."
       },
       "bodyChars": 471,
-      "updatedAt": "2026-09-12T14:07:47.123Z"
+      "updatedAt": "2026-09-17T03:17:00.739Z"
     },
     {
       "name": "release",
@@ -1900,7 +1972,7 @@
         "description": "Prepare reproducible production releases with versioning, changelogs, packaging, smoke tests, and rollback notes."
       },
       "bodyChars": 543,
-      "updatedAt": "2026-09-12T14:07:47.123Z"
+      "updatedAt": "2026-09-17T03:17:00.739Z"
     },
     {
       "name": "repo-cartography",
@@ -1913,7 +1985,7 @@
         "description": "Map unfamiliar repositories and identify the correct files, dependency paths, conventions, and verification commands before implementation."
       },
       "bodyChars": 610,
-      "updatedAt": "2026-09-12T14:07:47.123Z"
+      "updatedAt": "2026-09-17T03:17:00.739Z"
     },
     {
       "name": "rust-engineering",
@@ -1926,7 +1998,7 @@
         "description": "Implement reliable Rust systems with ownership-aware design, errors, async cancellation, tests, and workspace conventions."
       },
       "bodyChars": 404,
-      "updatedAt": "2026-09-12T14:07:47.123Z"
+      "updatedAt": "2026-09-17T03:17:00.739Z"
     },
     {
       "name": "scientific-computing",
@@ -1939,7 +2011,7 @@
         "description": "Implement numerically sound scientific and engineering software with units, validation, reproducibility, and performance awareness."
       },
       "bodyChars": 540,
-      "updatedAt": "2026-09-12T14:07:47.123Z"
+      "updatedAt": "2026-09-17T03:17:00.739Z"
     },
     {
       "name": "security-audit",
@@ -1952,7 +2024,7 @@
         "description": "Audit code and dependencies for concrete exploitable weaknesses while preserving MaskShift’s intentionally permissive local execution philosophy."
       },
       "bodyChars": 683,
-      "updatedAt": "2026-09-12T14:07:47.123Z"
+      "updatedAt": "2026-09-17T03:17:00.739Z"
     },
     {
       "name": "self-improving-skills",
@@ -1965,7 +2037,7 @@
         "description": "Capture durable, non-obvious workflow knowledge as reusable skills and improve it from verified outcomes."
       },
       "bodyChars": 592,
-      "updatedAt": "2026-09-12T14:07:47.123Z"
+      "updatedAt": "2026-09-17T03:17:00.739Z"
     },
     {
       "name": "skill-creator",
@@ -1978,7 +2050,7 @@
         "description": "Create new skills, modify and improve existing skills, and measure skill performance. Use when users want to create a skill from scratch, edit, or optimize an existing skill, run evals to test a skill, benchmark skill performance with variance analysis, or optimize a skill's description for better triggering accuracy."
       },
       "bodyChars": 32626,
-      "updatedAt": "2026-09-12T14:07:47.124Z"
+      "updatedAt": "2026-09-17T03:17:00.740Z"
     },
     {
       "name": "slack-gif-creator",
@@ -1992,7 +2064,7 @@
         "license": "Complete terms in LICENSE.txt"
       },
       "bodyChars": 7529,
-      "updatedAt": "2026-09-12T14:07:47.126Z"
+      "updatedAt": "2026-09-17T03:17:00.741Z"
     },
     {
       "name": "terminal-phantom-ui",
@@ -2005,7 +2077,7 @@
         "description": "Build MaskShift terminal interfaces in the Phantom Protocol design language — tokens over hex values, one marker gutter per pane, one filled chip per screen, and the ANSI width discipline that keeps a TUI aligned."
       },
       "bodyChars": 8377,
-      "updatedAt": "2026-09-12T14:07:47.126Z"
+      "updatedAt": "2026-09-17T03:17:00.741Z"
     },
     {
       "name": "test-engineering",
@@ -2018,7 +2090,7 @@
         "description": "Design and implement high-signal unit, integration, end-to-end, property, and regression tests for changed behavior."
       },
       "bodyChars": 625,
-      "updatedAt": "2026-09-12T14:07:47.126Z"
+      "updatedAt": "2026-09-17T03:17:00.741Z"
     },
     {
       "name": "theme-factory",
@@ -2032,7 +2104,7 @@
         "license": "Complete terms in LICENSE.txt"
       },
       "bodyChars": 2781,
-      "updatedAt": "2026-09-12T14:07:47.126Z"
+      "updatedAt": "2026-09-17T03:17:00.742Z"
     },
     {
       "name": "typescript-engineering",
@@ -2045,7 +2117,7 @@
         "description": "Build strict TypeScript applications with stable runtime validation, modular architecture, and browser/server correctness."
       },
       "bodyChars": 484,
-      "updatedAt": "2026-09-12T14:07:47.129Z"
+      "updatedAt": "2026-09-17T03:17:00.743Z"
     },
     {
       "name": "ui-visual-qa",
@@ -2058,7 +2130,7 @@
         "description": "Inspect web user interfaces for clipping, overlap, responsiveness, focus, loading, empty, error, and interaction-state defects."
       },
       "bodyChars": 500,
-      "updatedAt": "2026-09-12T14:07:47.129Z"
+      "updatedAt": "2026-09-17T03:17:00.743Z"
     },
     {
       "name": "web-artifacts-builder",
@@ -2072,7 +2144,7 @@
         "license": "Complete terms in LICENSE.txt"
       },
       "bodyChars": 2696,
-      "updatedAt": "2026-09-12T14:07:47.129Z"
+      "updatedAt": "2026-09-17T03:17:00.743Z"
     },
     {
       "name": "web-research",
@@ -2085,7 +2157,7 @@
         "description": "Research changing technical facts from primary sources and convert findings into implementation decisions with traceability."
       },
       "bodyChars": 567,
-      "updatedAt": "2026-09-12T14:07:47.129Z"
+      "updatedAt": "2026-09-17T03:17:00.743Z"
     },
     {
       "name": "webapp-testing",
@@ -2099,7 +2171,7 @@
         "license": "Complete terms in LICENSE.txt"
       },
       "bodyChars": 3575,
-      "updatedAt": "2026-09-12T14:07:47.129Z"
+      "updatedAt": "2026-09-17T03:17:00.743Z"
     }
   ],
   "mcpServers": [
@@ -2171,24 +2243,6 @@
       "enabled": true,
       "lazy": true,
       "source": "curated",
-      "status": "available",
-      "protocol": null,
-      "era": null,
-      "serverInfo": null,
-      "toolCount": 0
-    },
-    {
-      "name": "node_repl",
-      "transport": "http",
-      "args": [],
-      "env": {},
-      "enabled": true,
-      "lazy": true,
-      "source": "/root/.codex/config.toml",
-      "required": false,
-      "startup_timeout_sec": "120",
-      "url": "http://gaas-browser:8000/mcp",
-      "bearer_token_env_var": "NODE_REPL_AUTH_TOKEN",
       "status": "available",
       "protocol": null,
       "era": null,
