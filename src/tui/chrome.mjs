@@ -53,7 +53,7 @@ export function wordmarkInline(theme) {
     + theme.paint('SHIFT', { fg: theme.roles.text, bold: true });
 }
 
-export function headerBand(app, width) {
+export function headerBand(app, width, offset = 0) {
   const { theme } = app;
   const config = app.runtime.config.get();
   const workspace = app.workspace;
@@ -120,7 +120,7 @@ export function headerBand(app, width) {
   // so both open their picker on a click.
   const regions = app.regions;
   if (regions) {
-    const targetColumn = visibleWidth(brand) + visibleWidth(divider(theme));
+    const targetColumn = offset + visibleWidth(brand) + visibleWidth(divider(theme));
     regions.add({
       row: 0, column: targetColumn, width: visibleWidth(targetChip), height: 1,
       id: 'chrome:target', layer: LAYER.chrome,
@@ -137,7 +137,7 @@ export function headerBand(app, width) {
     if (right.length === rightChips.length) {
       regions.add({
         row: 0,
-        column: visibleWidth(body) + gap,
+        column: offset + visibleWidth(body) + gap,
         width: visibleWidth(right[0]),
         height: 1,
         id: 'chrome:mode', layer: LAYER.chrome,
@@ -156,11 +156,11 @@ export function headerBand(app, width) {
  * here" looks like, and nothing else may borrow it. Panels below no longer
  * repeat the view's name, so this row is also the only place it appears.
  */
-export function tabStrip(app, width) {
+export function tabStrip(app, width, offset = 0) {
   const { theme } = app;
   const regions = app.regions;
   let out = ' ';
-  let column = 1;
+  let column = 1 + offset;
 
   for (const [index, view] of app.views.entries()) {
     const active = view.id === app.view;
@@ -202,7 +202,7 @@ export function tabStrip(app, width) {
 
   const gap = Math.max(1, width - visibleWidth(out) - visibleWidth(railHint) - 1);
   regions?.add({
-    row: 1, column: width - visibleWidth(railHint) - 1,
+    row: 1, column: offset + width - visibleWidth(railHint) - 1,
     width: visibleWidth(railHint), height: 1,
     id: 'chrome:rail-toggle', layer: LAYER.chrome,
     onPress: (target) => { target.railVisible = !target.railVisible; target.screen.invalidate(); },
@@ -217,7 +217,7 @@ export function tabStrip(app, width) {
  * State comes from the shared vocabulary, so the lamp beside a failed run is
  * the same glyph and the same red as the mark beside a failed plan step.
  */
-export function statusRail(app, width) {
+export function statusRail(app, width, offset = 0) {
   const { theme } = app;
   const run = app.activeRun;
   const status = run ? (run.status || 'running') : 'idle';
@@ -249,7 +249,7 @@ export function statusRail(app, width) {
   const gap = Math.max(1, width - visibleWidth(left) - visibleWidth(metrics) - 2);
 
   app.regions?.add({
-    row: app.screen.size.rows - 2, column: 1,
+    row: app.screen.size.rows - 2, column: 1 + offset,
     width: visibleWidth(left), height: 1,
     id: 'chrome:session', layer: LAYER.chrome,
     onPress: (instance) => instance.openSessionPicker(),
@@ -262,12 +262,12 @@ export function statusRail(app, width) {
  * The hint rail doubles as a menu: a hint may carry a third element, a
  * handler, and then the key and its label are clickable as well as typeable.
  */
-export function hintRail(app, width) {
+export function hintRail(app, width, offset = 0) {
   const { theme } = app;
   const hints = app.currentHints();
   const separator = divider(theme);
   const row = app.screen.size.rows - 1;
-  let column = 1;
+  let column = 1 + offset;
   const pieces = [];
 
   for (const [index, [key, label, action]] of hints.entries()) {

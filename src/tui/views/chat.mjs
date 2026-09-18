@@ -396,13 +396,16 @@ export function render(app, region) {
   const { width, height } = region;
 
   // Frame + seam is three rows; the composer takes what it needs from the
-  // rest, plus one blank row above and below the draft itself so the text
-  // never sits flush against the seam or the bottom rail.
+  // rest, plus one blank row between the seam and the draft — enough that
+  // the text doesn't sit flush against the "COMPOSER" label, without also
+  // padding the bottom, where the panel's own border already closes the box
+  // and a second blank row just made an otherwise one-line composer three
+  // rows tall for no reason.
   const composerWidth = Math.max(8, width - 6);
   const draftRows = app.composer.layout(composerWidth, 6).total;
   const composerPadY = 1;
-  const draftVisibleRows = Math.max(1, Math.min(6, draftRows, Math.max(1, height - 8 - composerPadY * 2)));
-  const composerRows = draftVisibleRows + composerPadY * 2;
+  const draftVisibleRows = Math.max(1, Math.min(6, draftRows, Math.max(1, height - 8 - composerPadY)));
+  const composerRows = draftVisibleRows + composerPadY;
   const transcriptHeight = Math.max(1, height - 3 - composerRows);
 
   // One column of scrollbar and one of breathing room sit to the right of the
@@ -480,7 +483,6 @@ export function render(app, region) {
       : theme.paint(row ?? '', { fg: theme.roles.text });
     composerBody.push(fit(`${marker}${text}`, inner));
   }
-  for (let index = 0; index < composerPadY; index += 1) composerBody.push('');
 
   // The old footer row carried an always-empty character meter. The same
   // information now costs no rows at all: it appears in the bottom stamp, and

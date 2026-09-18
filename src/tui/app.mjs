@@ -536,17 +536,22 @@ export class MaskShiftTui {
       const railLines = rail.render(this, { row: 2 + marginY, column: marginX + mainWidth, width: railWidth, height: bodyHeight });
       body = hstack([{ lines: body, width: mainWidth }, { lines: railLines, width: railWidth }], bodyHeight);
     }
-    if (marginX) body = body.map((line) => ' '.repeat(marginX) + line + ' '.repeat(marginX));
+    // Every chrome row shares the same inset as the body below it — before
+    // this, the header/tab strip/status/hint rows ran flush to the terminal's
+    // own edges while the panel beneath them sat one column in, so the whole
+    // interface visually failed to line up against itself.
+    const inset = (line) => (marginX ? ' '.repeat(marginX) + line + ' '.repeat(marginX) : line);
+    body = body.map(inset);
 
     const marginRow = ' '.repeat(columns);
     let frame = vstack([
-      [headerBand(this, columns)],
-      [tabStrip(this, columns)],
+      [inset(headerBand(this, usableWidth, marginX))],
+      [inset(tabStrip(this, usableWidth, marginX))],
       marginY ? [marginRow] : [],
       body,
       marginY ? [marginRow] : [],
-      [statusRail(this, columns)],
-      [hintRail(this, columns)],
+      [inset(statusRail(this, usableWidth, marginX))],
+      [inset(hintRail(this, usableWidth, marginX))],
     ], rows, columns);
 
     let cursor = rendered.cursor;
