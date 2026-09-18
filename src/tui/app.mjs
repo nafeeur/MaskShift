@@ -28,10 +28,16 @@ import * as arsenalView from './views/arsenal.mjs';
 import * as networkView from './views/network.mjs';
 import * as modshopView from './views/modshop.mjs';
 import * as terminalView from './views/terminal.mjs';
+import * as browserView from './views/browser.mjs';
 
-const VIEWS = [chatView, filesView, arsenalView, networkView, modshopView, terminalView];
+const VIEWS = [chatView, filesView, arsenalView, networkView, modshopView, terminalView, browserView];
 const EVENT_LIMIT = 400;
 const TERMINAL_LIMIT = 2000;
+// How often the 07 BROWSER view re-captures the page it's watching. CDP
+// screenshot capture plus a terminal repaint isn't free, so this trades
+// off against real interactivity rather than chasing smooth video — a
+// snapshot every few hundred ms is enough to tell "did my click land".
+const BROWSER_POLL_MS = 400;
 const MIN_COLUMNS = 40;
 
 // How a finished heist is announced — in character rather than as a bare
@@ -61,6 +67,7 @@ const SLASH_COMMANDS = [
   { name: 'themes', hint: 'switch colour theme' },
   { name: 'files', hint: 'browse files' },
   { name: 'terminal', hint: 'open terminal' },
+  { name: 'browser', hint: 'watch and control a browser tab' },
   { name: 'doctor', hint: 'run diagnostics' },
   { name: 'logs', hint: 'view logs' },
   { name: 'settings', hint: 'open settings' },
@@ -170,6 +177,18 @@ export class MaskShiftTui {
     this.browsers = [];
     this.processes = [];
     this.modTab = 'automations';
+
+    // 07 BROWSER — a live, clickable view of one running tab (see
+    // views/browser.mjs). Nothing here is populated until openBrowserView()
+    // picks a target; polling only ever runs while that view is active.
+    this.browserTarget = null; // { instanceId, tabId } | null
+    this.browserFrame = null; // { buffer, cssWidth, cssHeight, cols, rows, title, url, error }
+    this.browserFrameId = 0;
+    this.browserTyping = false;
+    this.browserPollTimer = null;
+    this.browserPollBusy = false;
+    this.browserPollTick = 0;
+
     this.modFilter = new TextField({ placeholder: 'Filter' });
     this.modList = new ListView();
 
@@ -272,6 +291,7 @@ export class MaskShiftTui {
 
   cleanupTerminal() {
     clearInterval(this.ticker);
+    this.stopBrowserPolling();
     this.unsubscribe?.();
     this.unsubscribe = null;
     this.screen.onResize = null;
@@ -647,7 +667,10 @@ export class MaskShiftTui {
   }
 
   globalKey(event) {
-    const typing = ['composer', 'terminal', 'file-filter', 'arsenal-filter', 'mcp-filter', 'mod-filter'].includes(this.focus);
+    // Typing into a live page (see views/browser.mjs) owns the keyboard the
+    // same way the composer does — a digit meant for a form field shouldn't
+    // switch views instead.
+    const typing = ['composer', 'terminal', 'file-filter', 'arsenal-filter', 'mcp-filter', 'mod-filter'].includes(this.focus) || this.browserTyping;
 
     if (event.ctrl && event.name === 'c') {
       if (this.busy) { this.cancelRun(); return true; }
@@ -671,11 +694,14 @@ export class MaskShiftTui {
     if (event.name === 'f2') { this.openSettings(); return true; }
     if (event.name === 'f5') { this.refreshAll(); return true; }
 
-    if (event.alt && /^[1-6]$/.test(event.name)) { this.switchView(Number(event.name) - 1); return true; }
-    if (!typing && /^[1-6]$/.test(event.name)) { this.switchView(Number(event.name) - 1); return true; }
+    if (event.alt && /^[1-7]$/.test(event.name)) { this.switchView(Number(event.name) - 1); return true; }
+    if (!typing && /^[1-7]$/.test(event.name)) { this.switchView(Number(event.name) - 1); return true; }
     if (!typing && event.name === '?') { this.openHelp(); return true; }
 
     if (event.name === 'escape') {
+      // Exits typing mode in place — the browser view's own handle() never
+      // sees this key otherwise, since escape is handled here first.
+      if (this.browserTyping) { this.browserTyping = false; return true; }
       if (this.busy && this.view === 'chat') { this.cancelRun(); return true; }
       if (this.focus === 'rail') { this.focus = this.defaultFocus(); return true; }
       if (typing && this.focus !== 'composer' && this.focus !== 'terminal') { this.focus = this.defaultFocus(); return true; }
@@ -698,18 +724,21 @@ export class MaskShiftTui {
   defaultFocus() {
     return {
       chat: 'composer', files: 'files', arsenal: 'arsenal',
-      network: 'network', modshop: 'modshop', terminal: 'terminal',
+      network: 'network', modshop: 'modshop', terminal: 'terminal', browser: 'browser',
     }[this.view];
   }
 
   switchView(index) {
     const target = this.views[index];
     if (!target) return;
+    const leavingBrowser = this.view === 'browser' && target.id !== 'browser';
     this.view = target.id;
     this.focus = this.defaultFocus();
     this.screen.invalidate();
     if (target.id === 'files' && !this.fileEntries.length) void this.loadFileTree();
     if (target.id === 'modshop') void this.refreshModShop();
+    if (target.id === 'browser') this.startBrowserPolling();
+    else if (leavingBrowser) this.stopBrowserPolling();
   }
 
   cycleRail(direction) {
@@ -1454,6 +1483,149 @@ export class MaskShiftTui {
     });
   }
 
+  // ------------------------------------------------------- 07 browser view
+
+  openBrowserTargetPicker() {
+    if (!this.browsers.length) { this.toast('No browser instances running — launch one from the mod shop', 'warn'); return; }
+    this.overlay = new PickerOverlay({
+      title: 'BROWSER TARGET',
+      placeholder: 'Filter instances…',
+      items: this.browsers.map((instance) => ({
+        id: instance.id, label: instance.profile || instance.id,
+        detail: `${instance.headless ? 'headless' : 'headed'} · pid ${instance.pid}`,
+        tone: instance.id === this.browserTarget?.instanceId ? this.theme.roles.primary : undefined,
+      })),
+      selectedId: this.browserTarget?.instanceId,
+      onSelect: (item) => void this.openBrowserView(item.id),
+    });
+  }
+
+  async openBrowserView(instanceId, tabId = null) {
+    try {
+      let resolvedTabId = tabId;
+      if (!resolvedTabId) {
+        const tabs = await this.runtime.browserManager.tabs(instanceId);
+        if (!tabs.length) { this.toast('That browser has no open tabs', 'warn'); return; }
+        resolvedTabId = tabs[0].id;
+      }
+      this.browserTarget = { instanceId, tabId: resolvedTabId };
+      this.browserFrame = null;
+      this.browserFrameId = 0;
+      this.browserPollTick = 0;
+      const index = this.views.findIndex((view) => view.id === 'browser');
+      if (index >= 0) this.switchView(index);
+      await this.pollBrowserFrame({ force: true });
+    } catch (error) {
+      this.toast(error.message, 'error');
+    }
+  }
+
+  startBrowserPolling() {
+    if (this.browserPollTimer) return;
+    this.browserPollTimer = setInterval(() => void this.pollBrowserFrame(), BROWSER_POLL_MS);
+    this.browserPollTimer.unref?.();
+  }
+
+  stopBrowserPolling() {
+    if (!this.browserPollTimer) return;
+    clearInterval(this.browserPollTimer);
+    this.browserPollTimer = null;
+  }
+
+  /** One screenshot round-trip. Skipped (not queued) if the previous one
+   *  hasn't landed yet — CDP screenshot capture is not free, and a slow
+   *  connection backing up a queue of polls is worse than just dropping a
+   *  frame and trying again on the next tick. */
+  async pollBrowserFrame({ force = false } = {}) {
+    if (!this.browserTarget) return;
+    if (!force && this.view !== 'browser') return;
+    if (this.browserPollBusy) return;
+    this.browserPollBusy = true;
+    try {
+      const { instanceId, tabId } = this.browserTarget;
+      const frame = await this.runtime.browserManager.captureFrame({ instanceId, tabId });
+      this.browserFrameId += 1;
+      this.browserPollTick += 1;
+      let { title, url } = this.browserFrame || {};
+      // The page's title/URL change far less often than its pixels do, and
+      // costs its own round-trip — worth fetching occasionally, not every tick.
+      if (this.browserPollTick % 10 === 1) {
+        try {
+          const info = await this.runtime.browserManager.evaluate({ instanceId, tabId, expression: '({title: document.title, url: location.href})' });
+          title = info.value?.title; url = info.value?.url;
+        } catch { /* keep whatever the last successful fetch had */ }
+      }
+      this.browserFrame = { buffer: frame.buffer, cssWidth: frame.cssWidth, cssHeight: frame.cssHeight, title, url, error: null };
+    } catch (error) {
+      this.browserFrame = { ...(this.browserFrame || {}), error: error.message };
+    } finally {
+      this.browserPollBusy = false;
+      if (this.view === 'browser') this.requestRender();
+    }
+  }
+
+  /** A clicked/scrolled cell, translated into the page's own CSS-pixel
+   *  coordinate space via the box the image actually occupies (`zone`) and
+   *  the CSS viewport size captureFrame reported alongside it. Terminal
+   *  mouse reporting only ever gives cell granularity, never sub-cell pixel
+   *  position — the same resolution limit any other terminal mouse
+   *  interaction has, not something specific to this view. */
+  browserPagePoint(event, zone) {
+    const frame = this.browserFrame;
+    if (!frame || !frame.cols || !frame.rows || !frame.cssWidth || !frame.cssHeight) return null;
+    const cellX = event.column - zone.column;
+    const cellY = event.row - zone.row;
+    if (cellX < 0 || cellY < 0 || cellX >= zone.width || cellY >= zone.height) return null;
+    return {
+      x: Math.round(((cellX + 0.5) / frame.cols) * frame.cssWidth),
+      y: Math.round(((cellY + 0.5) / frame.rows) * frame.cssHeight),
+    };
+  }
+
+  browserClick(event, zone) {
+    if (!this.browserTarget) return;
+    const point = this.browserPagePoint(event, zone);
+    if (!point) return;
+    this.focus = 'browser';
+    const { instanceId, tabId } = this.browserTarget;
+    void this.runtime.browserManager.mouseEvent({ instanceId, tabId, kind: 'click', ...point })
+      .then(() => this.pollBrowserFrame({ force: true }))
+      .catch((error) => this.toast(error.message, 'error'));
+  }
+
+  browserScroll(event, zone) {
+    if (!this.browserTarget) return;
+    const point = this.browserPagePoint(event, zone);
+    if (!point) return;
+    const { instanceId, tabId } = this.browserTarget;
+    const deltaY = event.button === 'wheeldown' ? 100 : event.button === 'wheelup' ? -100 : 0;
+    void this.runtime.browserManager.mouseEvent({ instanceId, tabId, kind: 'wheel', ...point, deltaY })
+      .then(() => this.pollBrowserFrame({ force: true }))
+      .catch((error) => this.toast(error.message, 'error'));
+  }
+
+  /** Every keystroke while "typing" mode is on (see views/browser.mjs) — a
+   *  chunk of literal text goes through Input.insertText (Unicode-correct,
+   *  same call the type() tool already relies on); a key with no character
+   *  of its own (Enter, Backspace, an arrow, …) goes through as a named key
+   *  instead, since insertText has nothing to send for those. */
+  async forwardBrowserKey(event) {
+    if (!this.browserTarget) return;
+    const { instanceId, tabId } = this.browserTarget;
+    try {
+      if (event.name === 'paste' && event.text) {
+        await this.runtime.browserManager.keyEvent({ instanceId, tabId, text: event.text });
+      } else if (event.printable && !event.ctrl && !event.alt) {
+        await this.runtime.browserManager.keyEvent({ instanceId, tabId, text: event.name });
+      } else {
+        await this.runtime.browserManager.keyEvent({ instanceId, tabId, key: event.name });
+      }
+      void this.pollBrowserFrame({ force: true });
+    } catch (error) {
+      this.toast(error.message, 'error');
+    }
+  }
+
   async stopProcess(processId) {
     return this.withOperation(`process:${processId}`, 'Process stop', async () => {
       try { this.runtime.processManager.stop(processId, 'SIGTERM'); this.toast('Signal sent', 'warn'); }
@@ -1576,7 +1748,7 @@ export class MaskShiftTui {
       ['ctrl+r', 'cycle rail: plan → loadout → events → git'],
       ['ctrl+y', 'focus the rail'],
       ['ctrl+v', 'record a voice prompt and transcribe it into the composer'],
-      ['1 … 6 / alt+1 … 6', 'jump to a view'],
+      ['1 … 7 / alt+1 … 7', 'jump to a view'],
       ['f1 or ?', 'this reference'],
       ['f2', 'settings'],
       ['f5', 'refresh everything'],
@@ -1880,6 +2052,8 @@ export class MaskShiftTui {
       action('view.network', 'view', 'Go to 04 NETWORK', '4'),
       action('view.modshop', 'view', 'Go to 05 MOD SHOP', '5'),
       action('view.terminal', 'view', 'Go to 06 TERMINAL', '6'),
+      action('view.browser', 'view', 'Go to 07 BROWSER', '7'),
+      action('browser.pick', 'view', 'Pick a browser tab to watch'),
       action('rail.toggle', 'rail', 'Show or hide the rail', 'ctrl+b'),
       action('rail.plan', 'rail', 'Rail: plan of attack'),
       action('rail.telemetry', 'rail', 'Rail: loadout telemetry'),
@@ -1937,6 +2111,8 @@ export class MaskShiftTui {
       case 'view.network': this.switchView(3); break;
       case 'view.modshop': this.switchView(4); break;
       case 'view.terminal': this.switchView(5); break;
+      case 'view.browser': this.switchView(6); break;
+      case 'browser.pick': this.openBrowserTargetPicker(); break;
       case 'rail.toggle': this.railVisible = !this.railVisible; this.screen.invalidate(); break;
       case 'rail.plan': this.railTab = 'plan'; this.railVisible = true; break;
       case 'rail.telemetry': this.railTab = 'telemetry'; this.railVisible = true; break;
@@ -2162,6 +2338,7 @@ export class MaskShiftTui {
       case 'themes': case 'theme': this.openThemePicker(); break;
       case 'files': this.switchView(1); break;
       case 'terminal': this.switchView(5); break;
+      case 'browser': this.switchView(6); this.openBrowserTargetPicker(); break;
       case 'doctor': await this.showDoctor(); break;
       case 'logs': await this.showLogs(); break;
       case 'settings': this.openSettings(); break;

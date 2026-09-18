@@ -44,6 +44,26 @@ function evaluateExpression(expression, awaitPromise = true) {
   return { expression, awaitPromise, returnByValue: true, userGesture: true };
 }
 
+// DOM `key`/`code` names and the legacy Windows virtual-key code CDP's
+// Input.dispatchKeyEvent still wants for keys that don't type a character —
+// what the live browser view (tui/views/browser.mjs) forwards a named key
+// press to when it isn't literal text for Input.insertText instead.
+const SPECIAL_KEYS = {
+  enter: { key: 'Enter', code: 'Enter', vk: 13 },
+  backspace: { key: 'Backspace', code: 'Backspace', vk: 8 },
+  tab: { key: 'Tab', code: 'Tab', vk: 9 },
+  escape: { key: 'Escape', code: 'Escape', vk: 27 },
+  up: { key: 'ArrowUp', code: 'ArrowUp', vk: 38 },
+  down: { key: 'ArrowDown', code: 'ArrowDown', vk: 40 },
+  left: { key: 'ArrowLeft', code: 'ArrowLeft', vk: 37 },
+  right: { key: 'ArrowRight', code: 'ArrowRight', vk: 39 },
+  delete: { key: 'Delete', code: 'Delete', vk: 46 },
+  home: { key: 'Home', code: 'Home', vk: 36 },
+  end: { key: 'End', code: 'End', vk: 35 },
+  pageup: { key: 'PageUp', code: 'PageUp', vk: 33 },
+  pagedown: { key: 'PageDown', code: 'PageDown', vk: 34 },
+};
+
 export class BrowserManager {
   constructor({ config, logger, eventBus, workspaceManager }) {
     this.config = config;
@@ -52,6 +72,9 @@ export class BrowserManager {
     this.workspaceManager = workspaceManager;
     this.instances = new Map();
     this.executable = null;
+    // Which tabs have already absorbed the one-time "first wheel event is a
+    // no-op" quirk — see mouseEvent()'s wheel branch.
+    this.wheelWarmedUpTabs = new Set();
   }
 
   async discover(force = false) {
@@ -305,6 +328,76 @@ export class BrowserManager {
     await ensureDir(path.dirname(output));
     await fsp.writeFile(output, Buffer.from(result.data, 'base64'));
     return { instanceId: instance.id, tabId: tab.id, file: output, bytes: Buffer.byteLength(result.data, 'base64'), format, fullPage };
+  }
+
+  // ------------------------------------------------------------- live view
+  //
+  // The TUI's 07 BROWSER view (src/tui/views/browser.mjs) polls captureFrame
+  // on an interval and forwards mouse/keyboard input through mouseEvent /
+  // keyEvent — the same CDP calls click()/type() above already use, just
+  // exposed at a finer grain than "click this point" needs.
+
+  /** A viewport screenshot as a raw buffer (no artifact file written) plus
+   *  the CSS-pixel viewport size, which is what a click coordinate needs to
+   *  be mapped back into page space from a terminal cell. */
+  async captureFrame({ instanceId = null, tabId = null } = {}) {
+    const { instance, tab, connection } = await this.target(instanceId, tabId);
+    const metrics = await connection.send('Page.getLayoutMetrics');
+    const viewport = metrics.cssVisualViewport || metrics.cssLayoutViewport || metrics.visualViewport || metrics.layoutViewport || {};
+    const result = await connection.send('Page.captureScreenshot', { format: 'png', fromSurface: true }, 30_000);
+    return {
+      instanceId: instance.id, tabId: tab.id,
+      buffer: Buffer.from(result.data, 'base64'),
+      cssWidth: Math.max(1, Math.round(viewport.clientWidth || 0)),
+      cssHeight: Math.max(1, Math.round(viewport.clientHeight || 0)),
+    };
+  }
+
+  /** A single mouse action at a page (CSS pixel) coordinate — move, a
+   *  press/release pair (click), or a wheel scroll. */
+  async mouseEvent({ instanceId = null, tabId = null, kind, x, y, deltaX = 0, deltaY = 0, button = 'left' }) {
+    const { instance, tab, connection } = await this.target(instanceId, tabId);
+    const point = { x: Number(x) || 0, y: Number(y) || 0 };
+    if (kind === 'move') {
+      await connection.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point });
+    } else if (kind === 'wheel') {
+      // A documented Chrome/CDP quirk (also worked around inside Puppeteer's
+      // own Mouse.wheel()): the very first synthetic wheel event a page
+      // receives after navigation only establishes a scroll gesture and
+      // doesn't actually move the page — only the second one onward does.
+      // Critically, that "establishing" event has to carry a real, nonzero
+      // delta itself (a zero-delta probe is ignored outright and doesn't
+      // consume the quirk), so the warm-up dispatch is a full duplicate of
+      // the real one, not a cheaper no-op. It happens once per tab, so every
+      // caller here (in particular the live view's mouse wheel) just sees
+      // "the scroll I asked for happened" every time.
+      if (!this.wheelWarmedUpTabs.has(tab.id)) {
+        await connection.send('Input.dispatchMouseEvent', { type: 'mouseWheel', ...point, deltaX, deltaY });
+        this.wheelWarmedUpTabs.add(tab.id);
+      }
+      await connection.send('Input.dispatchMouseEvent', { type: 'mouseWheel', ...point, deltaX, deltaY });
+    } else {
+      await connection.send('Input.dispatchMouseEvent', { type: 'mousePressed', ...point, button, clickCount: 1 });
+      await connection.send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...point, button, clickCount: 1 });
+    }
+    return { instanceId: instance.id, tabId: tab.id };
+  }
+
+  /** One keystroke — either a chunk of literal text (Input.insertText,
+   *  IME/Unicode-correct, the same call type() above already relies on) or
+   *  a named key (Enter, Backspace, an arrow, …) via dispatchKeyEvent,
+   *  since insertText has no notion of a key with no character of its own. */
+  async keyEvent({ instanceId = null, tabId = null, text = null, key = null }) {
+    const { instance, tab, connection } = await this.target(instanceId, tabId);
+    if (text) {
+      await connection.send('Input.insertText', { text });
+    } else if (key && SPECIAL_KEYS[key]) {
+      const spec = SPECIAL_KEYS[key];
+      const params = { key: spec.key, code: spec.code, windowsVirtualKeyCode: spec.vk, nativeVirtualKeyCode: spec.vk };
+      await connection.send('Input.dispatchKeyEvent', { type: 'keyDown', ...params });
+      await connection.send('Input.dispatchKeyEvent', { type: 'keyUp', ...params });
+    }
+    return { instanceId: instance.id, tabId: tab.id };
   }
 
   async printPdf({ instanceId = null, tabId = null, file = null, landscape = false, printBackground = true, workspaceId = null } = {}) {

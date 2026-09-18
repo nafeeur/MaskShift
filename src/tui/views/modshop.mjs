@@ -186,6 +186,7 @@ function activate(app, item) {
   if (item?.kind === 'automation') void app.runAutomation(item.raw.id);
   else if (item?.kind === 'plugin') void (item.status === 'active' ? app.deactivatePlugin(item.name) : app.activatePlugin(item.name));
   else if (item?.kind === 'bridge') app.openBridgeRunner(item.raw);
+  else if (item?.kind === 'browser') void app.openBrowserView(item.raw.id);
 }
 
 export function handle(app, event) {

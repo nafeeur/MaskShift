@@ -125,17 +125,6 @@ function halfblockLines(theme, decoded, cols, rows, hexToRgb) {
   return lines;
 }
 
-/**
- * Build the preview lines for an image file, sized to fit `maxCols` x
- * `maxRows`. Returns `{ lines, error }` — `lines` is always exactly as many
- * rows as it reserves, so the caller's layout math never has to special-case
- * an image versus a text preview.
- *
- * Synchronous (this is CPU work on a local file, not network I/O) so it can
- * be called straight from a view's render() without restructuring the
- * paint loop around another async round-trip the way fs_read's own preview
- * text is fetched.
- */
 /** Best-effort real dimensions for aspect-correct sizing, without requiring
  *  a full decode when a cheap header-only read will do (PNG). Returns null
  *  rather than throwing — every caller already has a box-guess fallback. */
@@ -147,7 +136,7 @@ function probeSize(buffer, extension) {
   return null;
 }
 
-function overlayResult(escape, rows, key, protocol) {
+function overlayResult(escape, cols, rows, key, protocol) {
   // The escape itself never becomes a `lines` string — that array is what
   // Screen.render() sanitizes, and an OSC/APC payload is exactly what that
   // sanitizer exists to strip. It travels instead as `overlay`, a value the
@@ -155,22 +144,21 @@ function overlayResult(escape, rows, key, protocol) {
   // (see files.mjs, chat.mjs and screen.mjs). `lines` here just reserves the
   // blank vertical space so layout and scrolling still work like any other
   // preview, and `protocol` is how Screen knows how to *clear* it later.
-  return { lines: Array.from({ length: rows }, () => ''), overlay: { escape, rows, key, protocol } };
+  // `cols`/`rows` on the top level (not just baked into `key`) are what a
+  // caller that also handles clicks — the live browser view — needs to map
+  // a clicked cell back into the page's own coordinate space.
+  return { lines: Array.from({ length: rows }, () => ''), overlay: { escape, rows, key, protocol }, cols, rows };
 }
 
-export function buildImagePreview(theme, absolutePath, { maxCols, maxRows, hexToRgb }) {
-  const extension = path.extname(absolutePath).toLowerCase();
-  if (!IMAGE_EXTENSIONS.has(extension)) return { lines: [], error: 'Not an image file.' };
-
+/**
+ * The shared core of buildImagePreview and buildLiveFramePreview: everything
+ * past "here is a buffer, this is its format, this is what makes it unique
+ * for the overlay dedupe key" is identical whether the bytes came from disk
+ * or from a live browser screenshot just captured in memory.
+ */
+function buildPreviewFromBuffer(theme, buffer, extension, sourceKey, { maxCols, maxRows, hexToRgb }) {
   const protocol = detectImageProtocol();
   if (protocol === 'none') return { lines: [], error: 'Image preview is disabled (MASKSHIFT_IMAGE=off).' };
-
-  let buffer;
-  try {
-    buffer = fs.readFileSync(absolutePath);
-  } catch (error) {
-    return { lines: [], error: `Couldn't read ${path.basename(absolutePath)}: ${error.message}` };
-  }
 
   if (protocol === 'iterm') {
     // iTerm2 decodes the file itself — every format in IMAGE_EXTENSIONS
@@ -180,7 +168,7 @@ export function buildImagePreview(theme, absolutePath, { maxCols, maxRows, hexTo
     const size = probeSize(buffer, extension);
     const { cols, rows } = size ? fitCells(size.width, size.height, maxCols, maxRows) : { cols: maxCols, rows: Math.min(maxRows, Math.round(maxCols / 2)) };
     const { anchor: escape, rows: usedRows } = itermLines(buffer, cols, rows);
-    return overlayResult(escape, usedRows, `${absolutePath}|${buffer.length}|${cols}x${rows}|iterm`, 'iterm');
+    return overlayResult(escape, cols, usedRows, `${sourceKey}|${cols}x${rows}|iterm`, 'iterm');
   }
 
   if (protocol === 'kitty') {
@@ -209,7 +197,7 @@ export function buildImagePreview(theme, absolutePath, { maxCols, maxRows, hexTo
     }
     const { cols, rows } = width ? fitCells(width, height, maxCols, maxRows) : { cols: maxCols, rows: Math.min(maxRows, Math.round(maxCols / 2)) };
     const { anchor: escape, rows: usedRows } = kittyLines(pngBytes, cols, rows);
-    return overlayResult(escape, usedRows, `${absolutePath}|${buffer.length}|${cols}x${rows}|kitty`, 'kitty');
+    return overlayResult(escape, cols, usedRows, `${sourceKey}|${cols}x${rows}|kitty`, 'kitty');
   }
 
   // halfblock: the universal fallback, but limited to what MaskShift can
@@ -224,5 +212,42 @@ export function buildImagePreview(theme, absolutePath, { maxCols, maxRows, hexTo
     return { lines: [], error: `Couldn't decode this ${extension} file: ${error.message}` };
   }
   const { cols, rows } = fitCells(decoded.width, decoded.height, maxCols, maxRows);
-  return { lines: halfblockLines(theme, decoded, cols, rows, hexToRgb) };
+  return { lines: halfblockLines(theme, decoded, cols, rows, hexToRgb), cols, rows };
+}
+
+/**
+ * Build the preview lines for an image file, sized to fit `maxCols` x
+ * `maxRows`. Returns `{ lines, cols, rows, error?, overlay? }` — `lines` is
+ * always exactly as many rows as it reserves, so the caller's layout math
+ * never has to special-case an image versus a text preview.
+ *
+ * Synchronous (this is CPU work on a local file, not network I/O) so it can
+ * be called straight from a view's render() without restructuring the
+ * paint loop around another async round-trip the way fs_read's own preview
+ * text is fetched.
+ */
+export function buildImagePreview(theme, absolutePath, { maxCols, maxRows, hexToRgb }) {
+  const extension = path.extname(absolutePath).toLowerCase();
+  if (!IMAGE_EXTENSIONS.has(extension)) return { lines: [], error: 'Not an image file.' };
+
+  let buffer;
+  try {
+    buffer = fs.readFileSync(absolutePath);
+  } catch (error) {
+    return { lines: [], error: `Couldn't read ${path.basename(absolutePath)}: ${error.message}` };
+  }
+  return buildPreviewFromBuffer(theme, buffer, extension, `${absolutePath}|${buffer.length}`, { maxCols, maxRows, hexToRgb });
+}
+
+/**
+ * The live-browser-view counterpart to buildImagePreview: the bytes are
+ * already in memory (a freshly captured PNG screenshot — see
+ * browser/manager.mjs's captureFrame), so there's no file to read and no
+ * extension to sniff. `frameId` is the caller's own uniqueness key (e.g. an
+ * incrementing counter) — screenshots don't carry a path to make an overlay
+ * key from, and two different frames can easily land on the same byte
+ * length, so the caller has to say "this one is new" explicitly.
+ */
+export function buildLiveFramePreview(theme, buffer, frameId, { maxCols, maxRows, hexToRgb }) {
+  return buildPreviewFromBuffer(theme, buffer, '.png', `live-frame|${frameId}`, { maxCols, maxRows, hexToRgb });
 }
