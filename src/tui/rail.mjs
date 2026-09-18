@@ -17,9 +17,9 @@ import { fit, padStart, truncate, visibleWidth, wrap } from './text.mjs';
 import { SPACE } from './tokens.mjs';
 import { columns, gutter, label as typeLabel, spread } from './type.mjs';
 
-export const RAIL_TABS = ['plan', 'telemetry', 'events', 'git'];
+export const RAIL_TABS = ['plan', 'telemetry', 'events'];
 
-const RAIL_TITLES = { plan: 'PLAN', telemetry: 'LOADOUT', events: 'EVENTS', git: 'GIT' };
+const RAIL_TITLES = { plan: 'PLAN', telemetry: 'LOADOUT', events: 'EVENTS' };
 
 /** A rail section heading. Quieter than a pane title, louder than a value. */
 function heading(theme, text, width, stamp = '') {
@@ -128,36 +128,11 @@ function eventLines(app, width) {
   return lines;
 }
 
-function gitLines(app, width) {
-  const { theme } = app;
-  const text = Math.max(6, width - SPACE.gutter);
-  if (!app.gitStatus) return [gutter(theme) + theme.paint('No workspace signal.', { fg: theme.roles.muted, italic: true })];
-  const lines = [];
-  for (const raw of app.gitStatus.split('\n')) {
-    if (!raw.trim()) continue;
-    const code = raw.slice(0, 2);
-    const branch = raw.startsWith('##');
-    const tone = branch ? theme.roles.accent
-      : code.includes('?') ? theme.roles.muted
-        : code.includes('M') ? theme.roles.info
-          : code.includes('A') ? theme.roles.success
-            : code.includes('D') ? theme.roles.danger : theme.roles.text;
-    // The porcelain code lives in the gutter like every other row marker; the
-    // path beside it then starts where all the other text in the rail starts.
-    lines.push(branch
-      ? gutter(theme) + theme.paint(truncate(raw.replace(/^##\s*/, ''), text), { fg: tone, bold: true })
-      : gutter(theme, code.trim() || glyphs(theme).dot, { tone })
-        + theme.paint(truncate(raw.slice(3), text), { fg: theme.roles.text }));
-  }
-  return lines.length ? lines : [gutter(theme, glyphs(theme).check, { tone: theme.roles.success })
-    + theme.paint('Working tree clean.', { fg: theme.roles.dim })];
-}
-
 export function render(app, region) {
   const { width, height } = region;
   const inner = Math.max(4, width - 2);
 
-  const builders = { plan: planLines, telemetry: telemetryLines, events: eventLines, git: gitLines };
+  const builders = { plan: planLines, telemetry: telemetryLines, events: eventLines };
   const body = builders[app.railTab](app, inner);
   app.railView.set(body);
 
@@ -165,7 +140,6 @@ export function render(app, region) {
     plan: app.plan?.steps?.length ? `${app.plan.steps.length} STEPS` : '',
     telemetry: `${app.subagents} SUB`,
     events: String(app.events.length),
-    git: (app.gitBranch || '').toUpperCase(),
   };
 
   const lines = [
@@ -219,7 +193,6 @@ function registerRegions(app, region, inner) {
         target.railTab = tab;
         target.focus = 'rail';
         target.railView.toTop();
-        if (tab === 'git') void target.refreshGit();
       },
     });
     column += span;
@@ -243,6 +216,5 @@ function registerRegions(app, region, inner) {
 export function handle(app, event) {
   if (event.name === 'tab') { app.cycleRail(1); return true; }
   if (event.name === 'c' && app.railTab === 'events') { app.events = []; return true; }
-  if (event.name === 'r' && app.railTab === 'git') { void app.refreshGit(); return true; }
   return app.railView.handle(event, Math.max(1, app.bodyRegion.height - 1));
 }

@@ -79,6 +79,17 @@ const VOCABULARY = {
   exited: ['off', 'EXITED'],
   headless: ['ready', 'HEADLESS'],
   visible: ['ready', 'VISIBLE'],
+
+  // Git.
+  staged: ['done', 'STAGED'],
+  modified: ['warn', 'MODIFIED'],
+  untracked: ['pending', 'UNTRACKED'],
+  deleted: ['fail', 'DELETED'],
+  renamed: ['ready', 'RENAMED'],
+  conflict: ['fail', 'CONFLICT'],
+  current: ['done', 'CURRENT'],
+  local: ['ready', 'LOCAL'],
+  remote: ['off', 'REMOTE'],
 };
 
 /** Resolve any subsystem state string to a kind, a tone and a label. */

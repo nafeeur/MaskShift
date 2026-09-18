@@ -111,6 +111,8 @@ usable at 80×24.
 | **04 NETWORK** | MCP servers: connect, disconnect, add by hand, search the official registry and install from it. |
 | **05 MOD SHOP** | Automations, plugins, agent bridges, browsers and processes — each with create, arm/pause, reload and delete. |
 | **06 TERMINAL** | The host shell, running with your full account permissions. |
+| **07 BROWSER** | A live, clickable, typeable view of a running browser tab — the same CDP connection the browser tools drive. |
+| **08 GIT** | Working tree changes, commit log, branches, stash, MaskShift checkpoints and worktrees, each with their own actions — plus push/pull/fetch from any tab. |
 
 ![01 HEIST](screenshots/heist.svg)
 
@@ -132,11 +134,12 @@ indexing and checkpoint behaviour — without editing `config.json` by hand:
 
 ![Settings](screenshots/settings.svg)
 
-The right rail carries four sections, spelled out across a single header row so
+The right rail carries three sections, spelled out across a single header row so
 its first line of content sits on the same screen row as the first line of the
 pane it is reporting on: **plan** (live multi-stage plan with progress),
 **loadout** (which tools, skills and MCP servers the current run has actually
-summoned, plus token flow), **events** (the raw runtime bus) and **git**.
+summoned, plus token flow) and **events** (the raw runtime bus). Source control
+has its own dedicated view — see **08 GIT** below — rather than a rail summary.
 
 ![Live loadout telemetry](screenshots/loadout.svg)
 
@@ -193,9 +196,9 @@ default.
 | `ctrl+g` | Change persona (model) |
 | `ctrl+o` | Open a different workspace |
 | `ctrl+b` | Show or hide the rail |
-| `ctrl+r` | Cycle rail: plan → loadout → events → git |
+| `ctrl+r` | Cycle rail: plan → loadout → events |
 | `ctrl+y` | Focus the rail |
-| `1`…`6`, `alt+1`…`alt+6` | Jump to a view |
+| `1`…`8`, `alt+1`…`alt+8` | Jump to a view |
 | `f1` or `?` | Key reference |
 | `f2` | Settings, including the mouse mode |
 | `f5` | Refresh everything |
@@ -231,13 +234,36 @@ cross session or workspace boundaries.
 | `delete` | Remove the selected entry |
 | `r` | Refresh |
 
+### 08 GIT
+
+Built on the same catalogue chrome as ARSENAL/NETWORK/MOD SHOP above — `/`,
+`tab`/`shift+tab`, `→` and `r` all work the same way — plus its own actions,
+some of which only apply on the tab named:
+
+| Key | Action |
+|---|---|
+| `P` / `L` / `F` | Push / pull / fetch — from any tab |
+| `space` / `enter` | Stage or unstage a change (CHANGES) · switch branch (BRANCHES) · apply a stash (STASH) · restore a checkpoint (CHECKPOINTS) |
+| `a` / `u` | Stage all / unstage all (CHANGES) |
+| `c` | Commit, with amend and `--no-verify` toggles (CHANGES) |
+| `d` | Discard a change (CHANGES) |
+| `n` | New branch / stash / checkpoint / worktree, depending on the active tab |
+| `e` | Rename a branch (BRANCHES) |
+| `p` | Pop a stash (STASH) |
+| `delete` | Delete a branch · drop a stash · remove a worktree |
+
+Diffs and `git show` output load asynchronously into the dossier pane the
+moment a row is selected. Every mutating action shells out to the system
+`git` binary directly, the same way the header's branch readout always has —
+it does not go through the agent-facing tool registry.
+
 ## Slash commands
 
 Typed into the composer:
 
 `/new` `/clear` `/model [REF]` `/sessions` `/workspace` `/tools [QUERY]`
-`/skills [QUERY]` `/mcp [QUERY]` `/mods` `/files` `/terminal` `/doctor` `/logs`
-`/settings` `/help` `/quit`
+`/skills [QUERY]` `/mcp [QUERY]` `/mods` `/files` `/terminal` `/browser` `/git`
+`/doctor` `/logs` `/settings` `/help` `/quit`
 
 ## Terminal requirements
 
