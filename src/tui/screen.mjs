@@ -51,8 +51,14 @@ export class Screen {
     // 'off' | 'click' (press, release, drag) | 'hover' (adds bare motion).
     this.mouse = mouse;
     this.mouseActive = false;
+    // The last inline-image placement actually sent to the terminal (see
+    // `render`'s `overlay` parameter) — tracked so an unchanged image isn't
+    // re-transmitted (a real cost: these payloads are base64 image bytes,
+    // not a few SGR codes) on every one of the many frames it sits through.
+    this.imageKey = null;
     this.handleResize = () => {
       this.previous = [];
+      this.imageKey = null;
       if (this.onResize) this.onResize(this.size);
     };
   }
@@ -114,8 +120,19 @@ export class Screen {
     this.write(`${ESC}]0;${text}${BEL}`);
   }
 
-  // Paint one frame. `cursor` is { row, column } or null to keep it hidden.
-  render(lines, cursor = null) {
+  /**
+   * Paint one frame. `cursor` is { row, column } or null to keep it hidden.
+   *
+   * `overlay`, when given, is `{ row, column, escape, key }` — a terminal
+   * graphics protocol placement (Kitty/iTerm2 inline images; see
+   * tui/image/render.mjs) written directly to the terminal at an absolute
+   * screen position, bypassing `sanitizeTerminalLine` entirely. That
+   * sanitizer is the trust boundary for anything that flows through `lines`
+   * — model text, tool output, file contents — so an overlay is accepted
+   * only as this separate, structurally distinct parameter, never smuggled
+   * through a line string. Only code inside MaskShift itself constructs one.
+   */
+  render(lines, cursor = null, overlay = null) {
     const { columns, rows } = this.size;
     const frame = [];
     for (let row = 0; row < rows; row += 1) {
@@ -127,6 +144,12 @@ export class Screen {
       if (this.previous[row] === frame[row]) continue;
       changedRows += 1;
       out += `${ANSI.moveTo(row, 0)}${ANSI.clearLine}${frame[row]}${ANSI.reset}`;
+    }
+    if (overlay && overlay.key !== this.imageKey) {
+      out += `${ANSI.moveTo(overlay.row, overlay.column)}${overlay.escape}`;
+      this.imageKey = overlay.key;
+    } else if (!overlay) {
+      this.imageKey = null;
     }
     if (cursor) out += `${ANSI.moveTo(cursor.row, cursor.column)}${ANSI.showCursor}`;
     else if (this.cursor) out += ANSI.hideCursor;
@@ -142,5 +165,6 @@ export class Screen {
   // Drop the cached frame so the next render repaints everything.
   invalidate() {
     this.previous = [];
+    this.imageKey = null;
   }
 }

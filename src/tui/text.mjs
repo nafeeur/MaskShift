@@ -4,7 +4,12 @@
 
 import { ESC } from './theme.mjs';
 
-const ANSI_PATTERN = new RegExp(`${ESC}\\[[0-9;?]*[A-Za-z]|${ESC}\\][^\\u0007]*(?:\\u0007|${ESC}\\\\)`, 'g');
+// The third alternative is APC (Application Program Command, `ESC _ ... ESC \`)
+// — used by the Kitty terminal graphics protocol (see tui/image/render.mjs)
+// to smuggle a base64 image payload through a line of otherwise-plain text.
+// Without it, a payload's own bytes read as thousands of columns of "visible"
+// text and truncate()/fit() would slice straight through the escape.
+const ANSI_PATTERN = new RegExp(`${ESC}\\[[0-9;?]*[A-Za-z]|${ESC}\\][^\\u0007]*(?:\\u0007|${ESC}\\\\)|${ESC}_[^${ESC}]*${ESC}\\\\`, 'g');
 
 const RESET = `${ESC}[0m`;
 
