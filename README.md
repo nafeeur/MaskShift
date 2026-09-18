@@ -208,6 +208,10 @@ it needs a dependency: the PNG, JPEG and BMP decoders are hand-written against N
 <td width="50%"><img width="100%" alt="Command palette" src="docs/screenshots/palette.svg"><br><sub><b>ctrl+k</b> — every action, nothing buried behind a memorised key</sub></td>
 <td width="50%"><img width="100%" alt="Live loadout telemetry" src="docs/screenshots/loadout.svg"><br><sub><b>The rail</b> — plan, loadout telemetry, event bus</sub></td>
 </tr>
+<tr>
+<td width="50%"><img width="100%" alt="Git view" src="docs/screenshots/git.svg"><br><sub><b>08 GIT</b> — changes, log, branches, stash, checkpoints and worktrees, with push/pull/fetch from anywhere</sub></td>
+<td width="50%"><img width="100%" alt="Mod shop" src="docs/screenshots/modshop.svg"><br><sub><b>05 MOD SHOP</b> — automations, plugins, agent bridges and processes</sub></td>
+</tr>
 </table>
 
 Below 108 columns the rail hides itself and the header sheds telemetry, so the same eight views

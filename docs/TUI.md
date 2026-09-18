@@ -124,6 +124,8 @@ usable at 80×24.
 
 ![05 MOD SHOP](screenshots/modshop.svg)
 
+![08 GIT](screenshots/git.svg)
+
 `ctrl+k` opens a fuzzy command palette over every action MaskShift can perform, so nothing is
 buried behind a key you have to memorise:
 
