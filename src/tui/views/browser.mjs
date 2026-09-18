@@ -60,8 +60,12 @@ export function render(app, region) {
     }
   }
 
+  // The panel's own top rail already shows the page title (see the `panel({
+  // title })` call below) — repeating it here too just put the same text on
+  // screen twice, once upper-cased by the title chip and once not. The URL
+  // is the thing that row can actually add.
   const statusLeft = app.browserTarget
-    ? truncate(app.browserFrame?.title || `${app.browserTarget.instanceId} · ${app.browserTarget.tabId}`, Math.max(10, inner - 24))
+    ? truncate(app.browserFrame?.url || `${app.browserTarget.instanceId} · ${app.browserTarget.tabId}`, Math.max(10, inner - 24))
     : 'no target';
   const mode = app.browserTyping
     ? theme.paint(' TYPING — esc to stop ', { fg: theme.roles.onPrimary, bg: theme.roles.accent, bold: true })

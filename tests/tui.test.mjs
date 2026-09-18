@@ -364,6 +364,32 @@ test('an image overlay is resent after invalidate() even with an unchanged key, 
   assert.match(output.written, /fake-image-bytes/, 'a full repaint should resend an image even with the same key');
 });
 
+test('scrolling a still-visible Kitty image to a new row resends its placement instead of leaving a ghost behind', () => {
+  // Reported live: scrolling the transcript up/down while an inline image
+  // (a browser_screenshot result, say) is on screen left the old image
+  // frozen at its original terminal position while the text around it kept
+  // scrolling. Root cause: the overlay's dedupe key is purely content-based
+  // (see image/render.mjs) — it doesn't change just because the same image
+  // moved to a different row — so the old "unchanged key, skip the resend"
+  // fast path from the test above was *also* skipping a real move. Kitty's
+  // placement is a cell-coordinate overlay outside the normal text grid, so
+  // redrawing that row's text alone (which does happen every scroll tick)
+  // never touches it.
+  const output = new FakeTerminal(40, 6);
+  const screen = new Screen({ theme, output });
+  const overlay = { row: 1, column: 2, escape: '\x1b_Gfake-image-bytes\x1b\\', key: 'file.png|kitty', protocol: 'kitty' };
+
+  screen.render(['a', 'b', 'c'], null, overlay);
+  output.written = '';
+
+  // Same key (same image), scrolled up by one row — exactly what a
+  // transcript scroll while the image stays partly on screen looks like.
+  const scrolled = { ...overlay, row: 0 };
+  screen.render(['b', 'c', 'd'], null, scrolled);
+  assert.match(output.written, /fake-image-bytes/, 'a moved (but still visible) image must be resent, not silently skipped');
+  assert.match(output.written, new RegExp(`\\x1b\\[1;3H.*fake-image-bytes`), 'it should be redrawn at its new row, not the old one');
+});
+
 test('leaving the screen clears a Kitty image left on screen instead of stranding it after exit', () => {
   const output = new FakeTerminal(40, 6);
   const screen = new Screen({ theme, output });
@@ -1151,8 +1177,9 @@ test('a toast never overlaps the composer\'s own border or input row', async (t)
   assert.ok(seamIndex >= 1, 'sanity: the seam is not the very first row');
   assert.ok(frame[seamIndex].includes('━━ COMPOSER'), 'the seam divider must render intact, not be cut by a toast');
 
-  // One blank row of padding sits between the seam and the draft itself (and
-  // another between the draft and the bottom border) — see chat.mjs's render().
+  // One blank row of padding sits between the seam and the draft itself —
+  // see chat.mjs's render(). Not a second one below the draft too: the
+  // panel's own border already closes the box there.
   const blankRow = frame[seamIndex + 1];
   assert.ok(blankRow.trimEnd().endsWith('┃'), `composer's top padding row should keep its right border, got "${blankRow}"`);
 
@@ -1160,7 +1187,7 @@ test('a toast never overlaps the composer\'s own border or input row', async (t)
   assert.ok(inputRow.trimEnd().endsWith('┃'), `composer input row should keep its right border, got "${inputRow}"`);
   assert.ok(inputRow.includes('❯'), 'composer prompt marker should still be visible');
 
-  const bottomBorder = frame[seamIndex + 4];
+  const bottomBorder = frame[seamIndex + 3];
   assert.ok(bottomBorder.trimEnd().endsWith('┛'), `composer bottom border should be intact, got "${bottomBorder}"`);
 });
 
