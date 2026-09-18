@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 220" role="img" aria-label="MaskShift — the full toolbox for any coding model">
+  <rect width="1200" height="220" rx="28" fill="#161A20"/>
+  <svg x="56" y="46" width="128" height="128" viewBox="0 0 512 512">
+    <path d="M256 26L486 256L256 486L26 256Z" fill="#E42A3C"/>
+    <path d="M256 26L428 198L78 308L26 256Z" fill="#0E1117"/>
+    <path d="M199 138L407 205L122 294Z" fill="#A8172B"/>
+    <path d="M162 154L222 198L148 226L181 274L146 303L81 250Z" fill="#F4EFE6" stroke="#F4EFE6" stroke-width="6" stroke-linejoin="round"/>
+    <path d="M350 154L290 198L364 226L331 274L366 303L431 250Z" fill="#F4EFE6" stroke="#F4EFE6" stroke-width="6" stroke-linejoin="round"/>
+    <path d="M256 174L240 198L216 206L256 266L296 206L272 198Z" fill="#F4EFE6" stroke="#F4EFE6" stroke-width="6" stroke-linejoin="round"/>
+    <path d="M256 26L486 256L256 486L26 256Z" fill="none" stroke="#F4EFE6" stroke-width="22" stroke-linejoin="round"/>
+  </svg>
+  <text x="222" y="126" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="70" font-weight="700" letter-spacing="-2" fill="#F4EFE6">mask<tspan fill="#E42A3C">shift</tspan></text>
+  <text x="224" y="162" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="15" letter-spacing="3" fill="#8891A0">THE FULL TOOLBOX FOR ANY CODING MODEL</text>
+  <line x1="856" y1="56" x2="856" y2="164" stroke="#2E3A47" stroke-width="2"/>
+  <text x="900" y="98" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="13" letter-spacing="2.5" fill="#6B7684">ANY MODEL</text>
+  <text x="900" y="122" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="13" letter-spacing="2.5" fill="#6B7684">ZERO DEPENDENCIES</text>
+  <text x="900" y="146" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="13" letter-spacing="2.5" fill="#6B7684">ONE CONTROL PLANE</text>
+</svg>
