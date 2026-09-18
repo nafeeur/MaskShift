@@ -330,10 +330,14 @@ export function render(app, region) {
   const mark = glyphs(theme);
   const { width, height } = region;
 
-  // Frame + seam is three rows; the composer takes what it needs from the rest.
+  // Frame + seam is three rows; the composer takes what it needs from the
+  // rest, plus one blank row above and below the draft itself so the text
+  // never sits flush against the seam or the bottom rail.
   const composerWidth = Math.max(8, width - 6);
   const draftRows = app.composer.layout(composerWidth, 6).total;
-  const composerRows = Math.max(1, Math.min(6, draftRows, Math.max(1, height - 8)));
+  const composerPadY = 1;
+  const draftVisibleRows = Math.max(1, Math.min(6, draftRows, Math.max(1, height - 8 - composerPadY * 2)));
+  const composerRows = draftVisibleRows + composerPadY * 2;
   const transcriptHeight = Math.max(1, height - 3 - composerRows);
 
   // One column of scrollbar and one of breathing room sit to the right of the
@@ -394,27 +398,31 @@ export function render(app, region) {
       : 'tab or click to type',
   });
 
-  const layout = app.composer.layout(composerWidth, composerRows);
-  const composerBody = [];
-  for (let index = 0; index < composerRows; index += 1) {
+  // One extra column beyond the usual gutter width, so the caret has more
+  // breathing room before the draft text starts than a list row's marker does.
+  const composerGutterWidth = SPACE.gutter + 1;
+  const layout = app.composer.layout(composerWidth, draftVisibleRows);
+  const composerBody = Array(composerPadY).fill('');
+  for (let index = 0; index < draftVisibleRows; index += 1) {
     const row = layout.rows[index];
     // The caret lives in the same gutter every other row in the pane uses, so
     // a draft lines up with the transcript above it.
     const marker = index === 0
-      ? gutter(theme, mark.caret, { tone: app.busy ? theme.roles.muted : theme.roles.primary })
-      : gutter(theme);
+      ? gutter(theme, mark.caret, { tone: app.busy ? theme.roles.muted : theme.roles.primary, width: composerGutterWidth })
+      : gutter(theme, '', { width: composerGutterWidth });
     const text = index === 0 && !app.composer.value
       ? theme.paint(truncate(app.composerPlaceholder(), composerWidth), { fg: theme.roles.muted, italic: true })
       : theme.paint(row ?? '', { fg: theme.roles.text });
     composerBody.push(fit(`${marker}${text}`, inner));
   }
+  for (let index = 0; index < composerPadY; index += 1) composerBody.push('');
 
   // The old footer row carried an always-empty character meter. The same
   // information now costs no rows at all: it appears in the bottom stamp, and
   // only once the draft is long enough for the budget to matter.
   const drafted = app.composer.value.length;
   const stampParts = [];
-  if (draftRows > composerRows) stampParts.push(`${draftRows} lines`);
+  if (draftRows > draftVisibleRows) stampParts.push(`${draftRows} lines`);
   if (drafted > 1000) stampParts.push(`${Math.round((drafted / 4000) * 100)}% of budget`);
   if (!app.autoLoad) stampParts.push('MANUAL LOAD');
 
@@ -436,8 +444,8 @@ export function render(app, region) {
 
   const cursor = composerFocused
     ? {
-      row: region.row + 1 + transcriptHeight + 1 + layout.caret.row,
-      column: region.column + 2 + 2 + layout.caret.column,
+      row: region.row + 1 + transcriptHeight + 1 + composerPadY + layout.caret.row,
+      column: region.column + 2 + composerGutterWidth + layout.caret.column,
     }
     : null;
 
