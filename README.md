@@ -178,7 +178,7 @@ interface to edit the core settings without touching the file, or use `maskshift
 ## The interface
 
 `maskshift` opens a full-screen terminal application built on a bespoke, zero-dependency
-renderer, driven equally by keyboard and mouse. Seven views switch with `1`–`7`, `ctrl+b` toggles
+renderer, driven equally by keyboard and mouse. Eight views switch with `1`–`8`, `ctrl+b` toggles
 the right rail, and `ctrl+k` opens a fuzzy command palette over every action.
 
 | View | Holds |
@@ -190,6 +190,7 @@ the right rail, and `ctrl+k` opens a fuzzy command palette over every action.
 | **05 MOD SHOP** | Automations, plugins, agent bridges, browser profiles and background processes |
 | **06 TERMINAL** | The host shell |
 | **07 BROWSER** | A live, clickable, typeable view of a running browser tab — the same CDP connection the browser tools drive |
+| **08 GIT** | Working tree changes (stage/unstage/discard/commit), commit log, branches, stash, MaskShift checkpoints and worktrees — plus push/pull/fetch from anywhere in the view |
 
 Inline images — a Files preview, a chat screenshot result, or the live BROWSER view — render
 through whatever the terminal actually supports, picked automatically: the Kitty graphics
@@ -205,11 +206,11 @@ it needs a dependency: the PNG, JPEG and BMP decoders are hand-written against N
 </tr>
 <tr>
 <td width="50%"><img width="100%" alt="Command palette" src="docs/screenshots/palette.svg"><br><sub><b>ctrl+k</b> — every action, nothing buried behind a memorised key</sub></td>
-<td width="50%"><img width="100%" alt="Live loadout telemetry" src="docs/screenshots/loadout.svg"><br><sub><b>The rail</b> — plan, loadout telemetry, event bus, Git pulse</sub></td>
+<td width="50%"><img width="100%" alt="Live loadout telemetry" src="docs/screenshots/loadout.svg"><br><sub><b>The rail</b> — plan, loadout telemetry, event bus</sub></td>
 </tr>
 </table>
 
-Below 108 columns the rail hides itself and the header sheds telemetry, so the same seven views
+Below 108 columns the rail hides itself and the header sheds telemetry, so the same eight views
 work in a narrow split pane. `MASKSHIFT_MOUSE=off` (or `f2`) hands text selection back to the
 terminal, and `NO_COLOR`, `MASKSHIFT_COLOR=off` and `MASKSHIFT_ASCII=1` each produce a clean,
 aligned fallback.

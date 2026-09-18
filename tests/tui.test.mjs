@@ -661,7 +661,9 @@ test('the interface paints every view and overlay at the terminal size', async (
     for (const line of frame) assert.equal(visibleWidth(line), columns, `${label}: "${stripAnsi(line)}"`);
   };
 
-  for (const view of ['chat', 'files', 'arsenal', 'network', 'modshop', 'terminal']) {
+  await app.refreshGitView({ force: false });
+
+  for (const view of ['chat', 'files', 'arsenal', 'network', 'modshop', 'terminal', 'git']) {
     app.view = view;
     app.focus = app.defaultFocus();
     app.screen.invalidate();
@@ -669,7 +671,7 @@ test('the interface paints every view and overlay at the terminal size', async (
   }
 
   app.view = 'chat';
-  for (const railTab of ['plan', 'telemetry', 'events', 'git']) {
+  for (const railTab of ['plan', 'telemetry', 'events']) {
     app.railTab = railTab;
     app.screen.invalidate();
     check(`rail:${railTab}`, app.snapshot());

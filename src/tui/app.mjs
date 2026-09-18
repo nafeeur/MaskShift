@@ -19,7 +19,7 @@ import { Theme, listThemes } from './theme.mjs';
 import { fit, oneLine, truncate, visibleWidth, wrap } from './text.mjs';
 import { Composer, ListView, Spinner, TextField, Toasts, Viewport } from './widgets.mjs';
 import { columns, gutter, key as typeKey, label as sectionLabel } from './type.mjs';
-import { VERSION, runCommand, safeJsonParse } from '../core/utils.mjs';
+import { VERSION, runCommand, safeJsonParse, shellQuote } from '../core/utils.mjs';
 import { tokenCounts } from '../core/pricing.mjs';
 import { notify } from '../notify/index.mjs';
 import { VoiceInput } from '../voice/index.mjs';
@@ -30,8 +30,12 @@ import * as networkView from './views/network.mjs';
 import * as modshopView from './views/modshop.mjs';
 import * as terminalView from './views/terminal.mjs';
 import * as browserView from './views/browser.mjs';
+import * as gitView from './views/git.mjs';
+import {
+  expandGitChanges, parseGitBranches, parseGitLog, parseGitStash, parseGitStatus, parseGitWorktrees,
+} from './views/git.mjs';
 
-const VIEWS = [chatView, filesView, arsenalView, networkView, modshopView, terminalView, browserView];
+const VIEWS = [chatView, filesView, arsenalView, networkView, modshopView, terminalView, browserView, gitView];
 const EVENT_LIMIT = 400;
 const TERMINAL_LIMIT = 2000;
 // How often the 07 BROWSER view re-captures the page it's watching. CDP
@@ -69,6 +73,7 @@ const SLASH_COMMANDS = [
   { name: 'files', hint: 'browse files' },
   { name: 'terminal', hint: 'open terminal' },
   { name: 'browser', hint: 'watch and control a browser tab' },
+  { name: 'git', hint: 'open the git view' },
   { name: 'doctor', hint: 'run diagnostics' },
   { name: 'logs', hint: 'view logs' },
   { name: 'settings', hint: 'open settings' },
@@ -141,6 +146,25 @@ export class MaskShiftTui {
     this.events = [];
     this.gitBranch = '';
     this.gitStatus = '';
+
+    // 08 GIT.
+    this.gitTab = 'changes';
+    this.gitFilter = new TextField({ placeholder: 'Filter' });
+    this.gitList = new ListView();
+    this.gitChanges = [];
+    this.gitLogEntries = [];
+    this.gitBranches = [];
+    this.gitStashes = [];
+    this.gitWorktrees = [];
+    this.gitUpstream = '';
+    this.gitAhead = 0;
+    this.gitBehind = 0;
+    // Async diff/show output for the selected row, keyed by a stable id (see
+    // loadGitDetail) — the same toggle-load-into-a-Map shape loadSkillBody
+    // already uses, since a diff can't be produced synchronously inside a
+    // view's render().
+    this.gitDetailCache = new Map();
+    this.gitBusy = false;
 
     // Model and provider state.
     this.providers = [];
@@ -701,7 +725,7 @@ export class MaskShiftTui {
     // Typing into a live page (see views/browser.mjs) owns the keyboard the
     // same way the composer does — a digit meant for a form field shouldn't
     // switch views instead.
-    const typing = ['composer', 'terminal', 'file-filter', 'arsenal-filter', 'mcp-filter', 'mod-filter'].includes(this.focus) || this.browserTyping;
+    const typing = ['composer', 'terminal', 'file-filter', 'arsenal-filter', 'mcp-filter', 'mod-filter', 'git-filter'].includes(this.focus) || this.browserTyping;
 
     if (event.ctrl && event.name === 'c') {
       if (this.busy) { this.cancelRun(); return true; }
@@ -725,8 +749,8 @@ export class MaskShiftTui {
     if (event.name === 'f2') { this.openSettings(); return true; }
     if (event.name === 'f5') { this.refreshAll(); return true; }
 
-    if (event.alt && /^[1-7]$/.test(event.name)) { this.switchView(Number(event.name) - 1); return true; }
-    if (!typing && /^[1-7]$/.test(event.name)) { this.switchView(Number(event.name) - 1); return true; }
+    if (event.alt && /^[1-8]$/.test(event.name)) { this.switchView(Number(event.name) - 1); return true; }
+    if (!typing && /^[1-8]$/.test(event.name)) { this.switchView(Number(event.name) - 1); return true; }
     if (!typing && event.name === '?') { this.openHelp(); return true; }
 
     if (event.name === 'escape') {
@@ -755,7 +779,7 @@ export class MaskShiftTui {
   defaultFocus() {
     return {
       chat: 'composer', files: 'files', arsenal: 'arsenal',
-      network: 'network', modshop: 'modshop', terminal: 'terminal', browser: 'browser',
+      network: 'network', modshop: 'modshop', terminal: 'terminal', browser: 'browser', git: 'git',
     }[this.view];
   }
 
@@ -768,6 +792,7 @@ export class MaskShiftTui {
     this.screen.invalidate();
     if (target.id === 'files' && !this.fileEntries.length) void this.loadFileTree();
     if (target.id === 'modshop') void this.refreshModShop();
+    if (target.id === 'git') void this.refreshGitView();
     if (target.id === 'browser') this.startBrowserPolling();
     else if (leavingBrowser) this.stopBrowserPolling();
   }
@@ -776,7 +801,6 @@ export class MaskShiftTui {
     const index = RAIL_TABS.indexOf(this.railTab);
     this.railTab = RAIL_TABS[(index + direction + RAIL_TABS.length) % RAIL_TABS.length];
     this.railView.toTop();
-    if (this.railTab === 'git') void this.refreshGit();
   }
 
   // ------------------------------------------------------------- runtime data
@@ -1230,6 +1254,398 @@ export class MaskShiftTui {
       this.gitStatus = status?.code === 0 ? status.stdout.trim() : '';
     } catch { /* git is optional */ }
     this.requestRender();
+  }
+
+  // --------------------------------------------------------------- 08 git
+
+  async refreshGitView({ force = false } = {}) {
+    if (!this.workspace?.path) return;
+    if (this.gitBusy && !force) return;
+    const cwd = this.workspace.path;
+    this.gitBusy = true;
+    this.requestRender();
+    try {
+      const [status, log, branches, stashes, worktrees] = await Promise.all([
+        runCommand('git status --porcelain=v2 --branch', { cwd, timeoutMs: 12_000 }).catch(() => null),
+        runCommand('git log -n 300 --date=short --pretty=format:%H%x09%h%x09%ad%x09%an%x09%D%x09%s', { cwd, timeoutMs: 12_000 }).catch(() => null),
+        runCommand('git branch -a -vv --no-color', { cwd, timeoutMs: 12_000 }).catch(() => null),
+        runCommand('git stash list --pretty=format:%gd%x09%gs', { cwd, timeoutMs: 8000 }).catch(() => null),
+        runCommand('git worktree list --porcelain', { cwd, timeoutMs: 8000 }).catch(() => null),
+      ]);
+      const parsedStatus = parseGitStatus(status?.stdout || '');
+      this.gitUpstream = parsedStatus.upstream;
+      this.gitAhead = parsedStatus.ahead;
+      this.gitBehind = parsedStatus.behind;
+      this.gitChanges = expandGitChanges(parsedStatus);
+      this.gitLogEntries = parseGitLog(log?.stdout || '');
+      this.gitBranches = parseGitBranches(branches?.stdout || '');
+      this.gitStashes = parseGitStash(stashes?.stdout || '');
+      this.gitWorktrees = parseGitWorktrees(worktrees?.stdout || '');
+    } catch { /* git is optional */ }
+    this.gitBusy = false;
+    this.requestRender();
+  }
+
+  /** Fetch and cache a diff/show for the selected row in the 08 GIT view —
+   *  the pane's own render() has to stay synchronous, so this feeds
+   *  gitDetailCache the same way loadSkillBody feeds skillBodies. */
+  async loadGitDetail(item) {
+    const cwd = this.workspace?.path;
+    if (!cwd || !item) return;
+    let key = null;
+    let command = null;
+    if (item.kind === 'change') {
+      const raw = item.raw;
+      key = `change:${raw.staged ? 's' : 'u'}:${raw.path}`;
+      command = raw.statusKey === 'untracked'
+        ? `git diff --no-index -- /dev/null ${shellQuote(raw.path)}`
+        : `git diff ${raw.staged ? '--staged' : ''} -- ${shellQuote(raw.path)}`;
+    } else if (item.kind === 'commit') {
+      key = `commit:${item.raw.hash}`;
+      command = `git show --pretty=format: ${shellQuote(item.raw.hash)}`;
+    } else if (item.kind === 'stash') {
+      key = `stash:${item.raw.ref}`;
+      command = `git stash show -p ${shellQuote(item.raw.ref)}`;
+    } else {
+      return;
+    }
+    if (this.gitDetailCache.has(key)) return;
+    this.gitDetailCache.set(key, { loading: true });
+    this.requestRender();
+    try {
+      const result = await runCommand(command, { cwd, timeoutMs: 15_000 });
+      this.gitDetailCache.set(key, { loading: false, text: result.stdout || result.stderr || '' });
+    } catch (error) {
+      this.gitDetailCache.set(key, { loading: false, error: error.message });
+    }
+    this.requestRender();
+  }
+
+  async gitStageToggle(item) {
+    const cwd = this.workspace?.path;
+    if (!cwd || !item || item.kind !== 'change') return;
+    const raw = item.raw;
+    try {
+      if (raw.staged) await runCommand(`git restore --staged -- ${shellQuote(raw.path)}`, { cwd, timeoutMs: 10_000 });
+      else await runCommand(`git add -- ${shellQuote(raw.path)}`, { cwd, timeoutMs: 10_000 });
+      await this.refreshGitView({ force: true });
+    } catch (error) { this.toast(error.message, 'error'); }
+  }
+
+  async gitStageAll() {
+    const cwd = this.workspace?.path;
+    if (!cwd) return;
+    try {
+      await runCommand('git add -A', { cwd, timeoutMs: 15_000 });
+      this.toast('Staged all changes', 'success');
+      await this.refreshGitView({ force: true });
+    } catch (error) { this.toast(error.message, 'error'); }
+  }
+
+  async gitUnstageAll() {
+    const cwd = this.workspace?.path;
+    if (!cwd) return;
+    try {
+      await runCommand('git restore --staged .', { cwd, timeoutMs: 15_000 });
+      this.toast('Unstaged all changes', 'info');
+      await this.refreshGitView({ force: true });
+    } catch (error) { this.toast(error.message, 'error'); }
+  }
+
+  confirmDiscardChange(item) {
+    const raw = item.raw;
+    this.overlay = new ConfirmOverlay({
+      title: 'DISCARD CHANGE', danger: true,
+      message: `Discard changes to "${raw.path}"? This cannot be undone.`,
+      onConfirm: async () => {
+        const cwd = this.workspace?.path;
+        if (!cwd) return;
+        try {
+          if (raw.statusKey === 'untracked') await runCommand(`git clean -f -- ${shellQuote(raw.path)}`, { cwd, timeoutMs: 10_000 });
+          else {
+            if (raw.staged) await runCommand(`git restore --staged -- ${shellQuote(raw.path)}`, { cwd, timeoutMs: 10_000 });
+            await runCommand(`git checkout -- ${shellQuote(raw.path)}`, { cwd, timeoutMs: 10_000 });
+          }
+          this.toast('Change discarded', 'warn');
+          await this.refreshGitView({ force: true });
+        } catch (error) { this.toast(error.message, 'error'); }
+      },
+    });
+  }
+
+  openGitCommitDialog() {
+    const stagedCount = this.gitChanges.filter((change) => change.staged).length;
+    this.overlay = new FormOverlay({
+      title: 'COMMIT', submitLabel: stagedCount ? `COMMIT ${stagedCount} FILE${stagedCount === 1 ? '' : 'S'}` : 'COMMIT ALL TRACKED',
+      note: stagedCount ? '' : 'Nothing staged — this commits every tracked change (git commit -a).',
+      fields: [
+        { name: 'message', label: 'message', type: 'textarea', value: '' },
+        { name: 'amend', label: 'amend previous commit', type: 'toggle', value: false },
+        { name: 'noVerify', label: 'skip hooks (--no-verify)', type: 'toggle', value: false },
+      ],
+      onSubmit: async (values) => {
+        if (!values.amend && !values.message.trim()) throw new Error('A commit message is required');
+        const cwd = this.workspace?.path;
+        if (!cwd) throw new Error('No workspace open');
+        const parts = ['git commit'];
+        if (values.amend) parts.push('--amend');
+        if (values.noVerify) parts.push('--no-verify');
+        if (!stagedCount) parts.push('-a');
+        if (values.message.trim()) parts.push(`-m ${shellQuote(values.message.trim())}`);
+        else parts.push('--no-edit');
+        const result = await runCommand(parts.join(' '), { cwd, timeoutMs: 30_000 });
+        if (result.code !== 0) throw new Error(oneLine(result.stderr || result.stdout || 'commit failed', 300));
+        this.toast('Committed', 'success');
+        await this.refreshGitView({ force: true });
+        await this.refreshGit();
+      },
+    });
+  }
+
+  async gitSwitchBranch(item) {
+    const raw = item.raw;
+    if (!raw || raw.current) return;
+    const cwd = this.workspace?.path;
+    if (!cwd) return;
+    const run = async () => {
+      try {
+        const command = raw.remote ? `git checkout --track ${shellQuote(raw.name)}` : `git checkout ${shellQuote(raw.name)}`;
+        const result = await runCommand(command, { cwd, timeoutMs: 30_000 });
+        if (result.code !== 0) throw new Error(oneLine(result.stderr || result.stdout || 'checkout failed', 300));
+        this.toast(`Switched to ${raw.name}`, 'success');
+        await this.refreshGitView({ force: true });
+        await this.refreshGit();
+        await this.loadFileTree({ force: true });
+      } catch (error) { this.toast(error.message, 'error'); }
+    };
+    if (this.gitChanges.length) {
+      this.overlay = new ConfirmOverlay({
+        title: 'SWITCH BRANCH', danger: true,
+        message: `Switch to ${raw.name} with uncommitted changes present? Git refuses if it would overwrite anything.`,
+        onConfirm: run,
+      });
+    } else {
+      await run();
+    }
+  }
+
+  openGitBranchDialog() {
+    this.overlay = new FormOverlay({
+      title: 'NEW BRANCH', submitLabel: 'CREATE + SWITCH',
+      fields: [
+        { name: 'name', label: 'name', value: '' },
+        { name: 'startPoint', label: 'start point', value: this.gitBranches.find((branch) => branch.current)?.name || 'HEAD' },
+        { name: 'switch', label: 'switch to it', type: 'toggle', value: true },
+      ],
+      onSubmit: async (values) => {
+        if (!values.name.trim()) throw new Error('A branch name is required');
+        const cwd = this.workspace?.path;
+        if (!cwd) throw new Error('No workspace open');
+        const command = values.switch
+          ? `git checkout -b ${shellQuote(values.name.trim())} ${shellQuote(values.startPoint || 'HEAD')}`
+          : `git branch ${shellQuote(values.name.trim())} ${shellQuote(values.startPoint || 'HEAD')}`;
+        const result = await runCommand(command, { cwd, timeoutMs: 20_000 });
+        if (result.code !== 0) throw new Error(oneLine(result.stderr || result.stdout || 'branch create failed', 300));
+        this.toast(`Branch ${values.name.trim()} created`, 'success');
+        await this.refreshGitView({ force: true });
+        await this.refreshGit();
+      },
+    });
+  }
+
+  openGitRenameBranch(item) {
+    const raw = item.raw;
+    if (!raw || raw.remote) return;
+    this.overlay = new FormOverlay({
+      title: 'RENAME BRANCH', submitLabel: 'RENAME',
+      fields: [{ name: 'name', label: 'new name', value: raw.name }],
+      onSubmit: async (values) => {
+        if (!values.name.trim()) throw new Error('A new name is required');
+        const cwd = this.workspace?.path;
+        if (!cwd) throw new Error('No workspace open');
+        const command = raw.current
+          ? `git branch -m ${shellQuote(values.name.trim())}`
+          : `git branch -m ${shellQuote(raw.name)} ${shellQuote(values.name.trim())}`;
+        const result = await runCommand(command, { cwd, timeoutMs: 15_000 });
+        if (result.code !== 0) throw new Error(oneLine(result.stderr || result.stdout || 'rename failed', 300));
+        this.toast('Branch renamed', 'success');
+        await this.refreshGitView({ force: true });
+        await this.refreshGit();
+      },
+    });
+  }
+
+  confirmDeleteBranch(item) {
+    const raw = item.raw;
+    if (!raw || raw.current) { this.toast('Cannot delete the current branch', 'warn'); return; }
+    this.overlay = new ConfirmOverlay({
+      title: 'DELETE BRANCH', danger: true,
+      message: `Delete branch "${raw.name}"? This cannot be undone if it isn't merged elsewhere.`,
+      onConfirm: async () => {
+        const cwd = this.workspace?.path;
+        if (!cwd) return;
+        try {
+          const command = raw.remote ? `git branch -d -r ${shellQuote(raw.name)}` : `git branch -D ${shellQuote(raw.name)}`;
+          const result = await runCommand(command, { cwd, timeoutMs: 15_000 });
+          if (result.code !== 0) throw new Error(oneLine(result.stderr || result.stdout || 'delete failed', 300));
+          this.toast('Branch deleted', 'warn');
+          await this.refreshGitView({ force: true });
+        } catch (error) { this.toast(error.message, 'error'); }
+      },
+    });
+  }
+
+  async gitStashApply(item, { pop = false } = {}) {
+    const raw = item.raw;
+    const cwd = this.workspace?.path;
+    if (!cwd) return;
+    try {
+      const result = await runCommand(`git stash ${pop ? 'pop' : 'apply'} ${shellQuote(raw.ref)}`, { cwd, timeoutMs: 20_000 });
+      if (result.code !== 0) throw new Error(oneLine(result.stderr || result.stdout || 'stash failed', 300));
+      this.toast(pop ? 'Stash popped' : 'Stash applied', 'success');
+      await this.refreshGitView({ force: true });
+    } catch (error) { this.toast(error.message, 'error'); }
+  }
+
+  confirmDropStash(item) {
+    const raw = item.raw;
+    this.overlay = new ConfirmOverlay({
+      title: 'DROP STASH', danger: true,
+      message: `Drop ${raw.ref} permanently?`,
+      onConfirm: async () => {
+        const cwd = this.workspace?.path;
+        if (!cwd) return;
+        try {
+          await runCommand(`git stash drop ${shellQuote(raw.ref)}`, { cwd, timeoutMs: 15_000 });
+          this.toast('Stash dropped', 'warn');
+          await this.refreshGitView({ force: true });
+        } catch (error) { this.toast(error.message, 'error'); }
+      },
+    });
+  }
+
+  openGitStashDialog() {
+    this.overlay = new FormOverlay({
+      title: 'STASH CHANGES', submitLabel: 'STASH',
+      fields: [
+        { name: 'message', label: 'message', value: '' },
+        { name: 'includeUntracked', label: 'include untracked', type: 'toggle', value: true },
+      ],
+      onSubmit: async (values) => {
+        const cwd = this.workspace?.path;
+        if (!cwd) throw new Error('No workspace open');
+        const parts = ['git stash push'];
+        if (values.includeUntracked) parts.push('-u');
+        if (values.message.trim()) parts.push(`-m ${shellQuote(values.message.trim())}`);
+        const result = await runCommand(parts.join(' '), { cwd, timeoutMs: 20_000 });
+        if (result.code !== 0) throw new Error(oneLine(result.stderr || result.stdout || 'stash failed', 300));
+        this.toast('Changes stashed', 'success');
+        await this.refreshGitView({ force: true });
+      },
+    });
+  }
+
+  gitConfirmRestoreCheckpoint(item) {
+    const checkpoint = item.raw;
+    if (this.busy) { this.toast('Cancel the active run before restoring a checkpoint', 'warn'); return; }
+    this.overlay = new ConfirmOverlay({
+      title: 'RESTORE', danger: true,
+      message: `Restore the workspace to checkpoint ${checkpoint.ref || checkpoint.id}? Uncommitted changes will be replaced.`,
+      onConfirm: async () => {
+        await this.runtime.workspaceManager.restoreCheckpoint(this.workspaceId, checkpoint);
+        this.toast('Checkpoint restored', 'success');
+        await this.loadFileTree({ force: true });
+        await this.refreshGit();
+        await this.refreshGitView({ force: true });
+      },
+    });
+  }
+
+  openGitWorktreeDialog() {
+    this.overlay = new FormOverlay({
+      title: 'NEW WORKTREE', submitLabel: 'CREATE',
+      fields: [
+        { name: 'path', label: 'path', value: '' },
+        { name: 'branch', label: 'branch (existing, blank for a new one)', value: '' },
+      ],
+      onSubmit: async (values) => {
+        if (!values.path.trim()) throw new Error('A path is required');
+        const cwd = this.workspace?.path;
+        if (!cwd) throw new Error('No workspace open');
+        const branch = values.branch.trim();
+        const command = branch
+          ? `git worktree add ${shellQuote(values.path.trim())} ${shellQuote(branch)}`
+          : `git worktree add -b ${shellQuote(`wt-${Date.now()}`)} ${shellQuote(values.path.trim())}`;
+        const result = await runCommand(command, { cwd, timeoutMs: 30_000 });
+        if (result.code !== 0) throw new Error(oneLine(result.stderr || result.stdout || 'worktree add failed', 300));
+        this.toast('Worktree created', 'success');
+        await this.refreshGitView({ force: true });
+      },
+    });
+  }
+
+  confirmRemoveWorktree(item) {
+    const raw = item.raw;
+    this.overlay = new ConfirmOverlay({
+      title: 'REMOVE WORKTREE', danger: true,
+      message: `Remove worktree at ${raw.path}?`,
+      onConfirm: async () => {
+        const cwd = this.workspace?.path;
+        if (!cwd) return;
+        try {
+          const result = await runCommand(`git worktree remove ${shellQuote(raw.path)}`, { cwd, timeoutMs: 20_000 });
+          if (result.code !== 0) throw new Error(oneLine(result.stderr || result.stdout || 'remove failed', 300));
+          this.toast('Worktree removed', 'warn');
+          await this.refreshGitView({ force: true });
+        } catch (error) { this.toast(error.message, 'error'); }
+      },
+    });
+  }
+
+  async gitPush() {
+    return this.withOperation('git:push', 'Git push', async () => {
+      const cwd = this.workspace?.path;
+      if (!cwd) return;
+      this.toast('Pushing…', 'info');
+      try {
+        const result = await runCommand('git push', { cwd, timeoutMs: 60_000 });
+        if (result.code !== 0) throw new Error(oneLine(result.stderr || result.stdout || 'push failed', 300));
+        this.toast('Pushed', 'success');
+      } catch (error) { this.toast(error.message, 'error'); }
+      await this.refreshGitView({ force: true });
+      await this.refreshGit();
+    });
+  }
+
+  async gitPull() {
+    return this.withOperation('git:pull', 'Git pull', async () => {
+      const cwd = this.workspace?.path;
+      if (!cwd) return;
+      this.toast('Pulling…', 'info');
+      try {
+        const result = await runCommand('git pull', { cwd, timeoutMs: 60_000 });
+        if (result.code !== 0) throw new Error(oneLine(result.stderr || result.stdout || 'pull failed', 300));
+        this.toast('Pulled', 'success');
+      } catch (error) { this.toast(error.message, 'error'); }
+      await this.refreshGitView({ force: true });
+      await this.refreshGit();
+      await this.loadFileTree({ force: true });
+    });
+  }
+
+  async gitFetch() {
+    return this.withOperation('git:fetch', 'Git fetch', async () => {
+      const cwd = this.workspace?.path;
+      if (!cwd) return;
+      this.toast('Fetching…', 'info');
+      try {
+        const result = await runCommand('git fetch --all --prune', { cwd, timeoutMs: 60_000 });
+        if (result.code !== 0) throw new Error(oneLine(result.stderr || result.stdout || 'fetch failed', 300));
+        this.toast('Fetched', 'success');
+      } catch (error) { this.toast(error.message, 'error'); }
+      await this.refreshGitView({ force: true });
+      await this.refreshGit();
+    });
   }
 
   // -------------------------------------------------------------------- MCP
@@ -1793,10 +2209,10 @@ export class MaskShiftTui {
       ['ctrl+g', 'change persona (model)'],
       ['ctrl+o', 'open a different workspace'],
       ['ctrl+b', 'show or hide the right rail'],
-      ['ctrl+r', 'cycle rail: plan → loadout → events → git'],
+      ['ctrl+r', 'cycle rail: plan → loadout → events'],
       ['ctrl+y', 'focus the rail'],
       ['ctrl+v', 'record a voice prompt and transcribe it into the composer'],
-      ['1 … 7 / alt+1 … 7', 'jump to a view'],
+      ['1 … 8 / alt+1 … 8', 'jump to a view'],
       ['f1 or ?', 'this reference'],
       ['f2', 'settings'],
       ['f5', 'refresh everything'],
@@ -1827,6 +2243,18 @@ export class MaskShiftTui {
       ['05 MOD SHOP', ''],
       ['n', 'new automation, plugin or browser'],
       ['space', 'arm or pause an automation'],
+      ['', ''],
+      ['08 GIT', ''],
+      ['tab', 'section: changes, log, branches, stash, checkpoints, worktrees'],
+      ['space / enter', 'stage or unstage a change · switch branch · apply stash'],
+      ['a / u', 'stage all / unstage all'],
+      ['c', 'commit'],
+      ['d', 'discard a change'],
+      ['n', 'new branch, stash, checkpoint or worktree'],
+      ['e', 'rename a branch'],
+      ['p', 'pop a stash'],
+      ['del', 'delete a branch, drop a stash, or remove a worktree'],
+      ['P / L / F', 'push / pull / fetch'],
     ];
     const lines = rows.map(([key, description]) => {
       if (!key && !description) return '';
@@ -2101,12 +2529,12 @@ export class MaskShiftTui {
       action('view.modshop', 'view', 'Go to 05 MOD SHOP', '5'),
       action('view.terminal', 'view', 'Go to 06 TERMINAL', '6'),
       action('view.browser', 'view', 'Go to 07 BROWSER', '7'),
+      action('view.git', 'view', 'Go to 08 GIT', '8'),
       action('browser.pick', 'view', 'Pick a browser tab to watch'),
       action('rail.toggle', 'rail', 'Show or hide the rail', 'ctrl+b'),
       action('rail.plan', 'rail', 'Rail: plan of attack'),
       action('rail.telemetry', 'rail', 'Rail: loadout telemetry'),
       action('rail.events', 'rail', 'Rail: event feed'),
-      action('rail.git', 'rail', 'Rail: git pulse'),
       action('mcp.add', 'network', 'Add an MCP server'),
       action('mcp.registry', 'network', 'Search the official MCP registry'),
       action('mcp.connectAll', 'network', 'Connect every configured MCP server'),
@@ -2115,6 +2543,11 @@ export class MaskShiftTui {
       action('mod.plugin', 'mod shop', 'Install a plugin'),
       action('mod.browser', 'mod shop', 'Launch a browser'),
       action('mod.refresh', 'mod shop', 'Refresh extensions'),
+      action('git.push', 'git', 'Push'),
+      action('git.pull', 'git', 'Pull'),
+      action('git.fetch', 'git', 'Fetch'),
+      action('git.commit', 'git', 'Commit staged changes'),
+      action('git.refresh', 'git', 'Refresh git view'),
       action('tools.search', 'arsenal', 'Search tools'),
       action('skills.search', 'arsenal', 'Search skills'),
       action('capabilities.toggleTools', 'arsenal', 'Expand or collapse tool output', 't'),
@@ -2160,12 +2593,12 @@ export class MaskShiftTui {
       case 'view.modshop': this.switchView(4); break;
       case 'view.terminal': this.switchView(5); break;
       case 'view.browser': this.switchView(6); break;
+      case 'view.git': this.switchView(7); break;
       case 'browser.pick': this.openBrowserTargetPicker(); break;
       case 'rail.toggle': this.railVisible = !this.railVisible; this.screen.invalidate(); break;
       case 'rail.plan': this.railTab = 'plan'; this.railVisible = true; break;
       case 'rail.telemetry': this.railTab = 'telemetry'; this.railVisible = true; break;
       case 'rail.events': this.railTab = 'events'; this.railVisible = true; break;
-      case 'rail.git': this.railTab = 'git'; this.railVisible = true; void this.refreshGit(); break;
       case 'mcp.add': this.switchView(3); this.openMcpDialog(); break;
       case 'mcp.registry': this.switchView(3); this.mcpTab = 'registry'; this.focus = 'mcp-filter'; break;
       case 'mcp.connectAll': await this.connectAllMcp(); break;
@@ -2174,6 +2607,11 @@ export class MaskShiftTui {
       case 'mod.plugin': this.switchView(4); this.modTab = 'plugins'; this.openPluginDialog(); break;
       case 'mod.browser': this.switchView(4); this.modTab = 'browser'; this.openBrowserDialog(); break;
       case 'mod.refresh': await this.refreshModShop({ force: true }); this.toast('Mod shop refreshed', 'success'); break;
+      case 'git.push': void this.gitPush(); break;
+      case 'git.pull': void this.gitPull(); break;
+      case 'git.fetch': void this.gitFetch(); break;
+      case 'git.commit': this.switchView(7); this.gitTab = 'changes'; this.openGitCommitDialog(); break;
+      case 'git.refresh': await this.refreshGitView({ force: true }); this.toast('Git view refreshed', 'success'); break;
       case 'tools.search': this.switchView(2); this.arsenalTab = 'tools'; this.focus = 'arsenal-filter'; break;
       case 'skills.search': this.switchView(2); this.arsenalTab = 'skills'; this.focus = 'arsenal-filter'; break;
       case 'capabilities.toggleTools': this.expandTools = !this.expandTools; break;
@@ -2197,6 +2635,7 @@ export class MaskShiftTui {
     void this.loadFileTree({ force: true });
     void this.refreshGit();
     void this.refreshModShop({ force: true });
+    void this.refreshGitView({ force: true });
     this.screen.invalidate();
     this.toast('Everything refreshed', 'success');
   }
@@ -2387,6 +2826,7 @@ export class MaskShiftTui {
       case 'files': this.switchView(1); break;
       case 'terminal': this.switchView(5); break;
       case 'browser': this.switchView(6); this.openBrowserTargetPicker(); break;
+      case 'git': this.switchView(7); break;
       case 'doctor': await this.showDoctor(); break;
       case 'logs': await this.showLogs(); break;
       case 'settings': this.openSettings(); break;
