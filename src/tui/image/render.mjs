@@ -13,16 +13,43 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { decodePng, readPngSize } from './png.mjs';
+import { decodeBmp } from './bmp.mjs';
+import { decodeJpeg } from './jpeg.mjs';
+import { decodePng, encodePng, readPngSize } from './png.mjs';
 import { detectImageProtocol } from './protocol.mjs';
 
 const ESC = '\x1b';
 const KITTY_CHUNK = 4096;
 
-const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp']);
+// What counts as "an image" at all, for Files/chat detection — deliberately
+// broader than what MaskShift can actually decode (see DECODERS below),
+// since iTerm2 shows every one of these regardless: its protocol just hands
+// the file to the OS's own image loader rather than asking MaskShift to
+// decode it. SVG included for the same reason, even though it isn't a
+// raster format at all and neither Kitty nor the half-block renderer can
+// ever show one without a full vector renderer behind them.
+const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.bmp', '.gif', '.webp', '.svg']);
 
 export function isImagePath(filePath) {
   return IMAGE_EXTENSIONS.has(path.extname(filePath).toLowerCase());
+}
+
+// Formats MaskShift can decode itself, for the half-block renderer and for
+// re-encoding into PNG so Kitty's PNG-only transmission (see kittyLines
+// below) can display something that isn't already a PNG. GIF and WebP need
+// their own (LZW / VP8) decoders this doesn't have yet; SVG isn't a raster
+// format at all.
+const DECODERS = {
+  '.png': decodePng,
+  '.jpg': decodeJpeg,
+  '.jpeg': decodeJpeg,
+  '.bmp': decodeBmp,
+};
+
+function decodeImage(buffer, extension) {
+  const decoder = DECODERS[extension];
+  if (!decoder) throw new Error(`No built-in decoder for ${extension} files`);
+  return decoder(buffer);
 }
 
 /** Fit an image into a `maxCols` x `maxRows` character box, aspect-preserved,
@@ -109,6 +136,28 @@ function halfblockLines(theme, decoded, cols, rows, hexToRgb) {
  * paint loop around another async round-trip the way fs_read's own preview
  * text is fetched.
  */
+/** Best-effort real dimensions for aspect-correct sizing, without requiring
+ *  a full decode when a cheap header-only read will do (PNG). Returns null
+ *  rather than throwing — every caller already has a box-guess fallback. */
+function probeSize(buffer, extension) {
+  try {
+    if (extension === '.png') return readPngSize(buffer);
+    if (DECODERS[extension]) { const { width, height } = decodeImage(buffer, extension); return { width, height }; }
+  } catch { /* fall through to null */ }
+  return null;
+}
+
+function overlayResult(escape, rows, key, protocol) {
+  // The escape itself never becomes a `lines` string — that array is what
+  // Screen.render() sanitizes, and an OSC/APC payload is exactly what that
+  // sanitizer exists to strip. It travels instead as `overlay`, a value the
+  // caller places at an absolute screen position outside that pipeline
+  // (see files.mjs, chat.mjs and screen.mjs). `lines` here just reserves the
+  // blank vertical space so layout and scrolling still work like any other
+  // preview, and `protocol` is how Screen knows how to *clear* it later.
+  return { lines: Array.from({ length: rows }, () => ''), overlay: { escape, rows, key, protocol } };
+}
+
 export function buildImagePreview(theme, absolutePath, { maxCols, maxRows, hexToRgb }) {
   const extension = path.extname(absolutePath).toLowerCase();
   if (!IMAGE_EXTENSIONS.has(extension)) return { lines: [], error: 'Not an image file.' };
@@ -123,36 +172,56 @@ export function buildImagePreview(theme, absolutePath, { maxCols, maxRows, hexTo
     return { lines: [], error: `Couldn't read ${path.basename(absolutePath)}: ${error.message}` };
   }
 
-  if (protocol === 'kitty' || protocol === 'iterm') {
-    let cols = maxCols;
-    let rows = Math.min(maxRows, Math.round(maxCols / 2));
-    if (extension === '.png') {
-      try {
-        const size = readPngSize(buffer);
-        ({ cols, rows } = fitCells(size.width, size.height, maxCols, maxRows));
-      } catch { /* fall through with the plain box guess above */ }
-    }
-    const { anchor: escape, rows: usedRows } = protocol === 'kitty' ? kittyLines(buffer, cols, rows) : itermLines(buffer, cols, rows);
-    // The escape itself never becomes a `lines` string — that array is what
-    // Screen.render() sanitizes, and an OSC/APC payload is exactly what that
-    // sanitizer exists to strip. It travels instead as `overlay`, a value the
-    // caller places at an absolute screen position outside that pipeline
-    // (see files.mjs and screen.mjs). `lines` here just reserves the blank
-    // vertical space so layout and scrolling still work like any other preview.
-    return {
-      lines: Array.from({ length: usedRows }, () => ''),
-      overlay: { escape, rows: usedRows, key: `${absolutePath}|${buffer.length}|${cols}x${rows}|${protocol}` },
-    };
+  if (protocol === 'iterm') {
+    // iTerm2 decodes the file itself — every format in IMAGE_EXTENSIONS
+    // (including SVG, GIF, WebP: none of them need a MaskShift-side decoder
+    // here) displays unmodified. A decode is only attempted for sizing, so
+    // the aspect ratio is exact instead of a box guess.
+    const size = probeSize(buffer, extension);
+    const { cols, rows } = size ? fitCells(size.width, size.height, maxCols, maxRows) : { cols: maxCols, rows: Math.min(maxRows, Math.round(maxCols / 2)) };
+    const { anchor: escape, rows: usedRows } = itermLines(buffer, cols, rows);
+    return overlayResult(escape, usedRows, `${absolutePath}|${buffer.length}|${cols}x${rows}|iterm`, 'iterm');
   }
 
-  if (extension !== '.png') {
-    return { lines: [], error: `This terminal has no inline-image support MaskShift can use, and ASCII preview only supports PNG (got ${extension}).` };
+  if (protocol === 'kitty') {
+    // Kitty's inline-image transmission (`f=100`) means exactly one thing:
+    // the payload is PNG-encoded data — not "any image format", the way
+    // iTerm2's protocol works. A PNG file's bytes go straight through; a
+    // format MaskShift can decode gets re-encoded as PNG first (see
+    // encodePng in png.mjs) rather than sent as raw bytes tagged with a
+    // format they aren't, which is what used to silently fail to display.
+    let pngBytes = buffer;
+    let width;
+    let height;
+    if (extension === '.png') {
+      try { ({ width, height } = readPngSize(buffer)); } catch { /* size unknown; box-guess below */ }
+    } else if (DECODERS[extension]) {
+      let decoded;
+      try {
+        decoded = decodeImage(buffer, extension);
+      } catch (error) {
+        return { lines: [], error: `Couldn't decode this ${extension} file: ${error.message}` };
+      }
+      ({ width, height } = decoded);
+      pngBytes = encodePng(decoded.width, decoded.height, decoded.rgba);
+    } else {
+      return { lines: [], error: `Kitty's inline-image protocol only accepts PNG data, and MaskShift can't decode ${extension} to convert it yet — open it in an app that can, or try iTerm2, which shows this format directly.` };
+    }
+    const { cols, rows } = width ? fitCells(width, height, maxCols, maxRows) : { cols: maxCols, rows: Math.min(maxRows, Math.round(maxCols / 2)) };
+    const { anchor: escape, rows: usedRows } = kittyLines(pngBytes, cols, rows);
+    return overlayResult(escape, usedRows, `${absolutePath}|${buffer.length}|${cols}x${rows}|kitty`, 'kitty');
+  }
+
+  // halfblock: the universal fallback, but limited to what MaskShift can
+  // actually decode into pixels itself (see DECODERS above).
+  if (!DECODERS[extension]) {
+    return { lines: [], error: `This terminal has no inline-image support MaskShift can use, and the ASCII preview can only decode PNG, JPEG and BMP (got ${extension}).` };
   }
   let decoded;
   try {
-    decoded = decodePng(buffer);
+    decoded = decodeImage(buffer, extension);
   } catch (error) {
-    return { lines: [], error: `Couldn't decode this PNG: ${error.message}` };
+    return { lines: [], error: `Couldn't decode this ${extension} file: ${error.message}` };
   }
   const { cols, rows } = fitCells(decoded.width, decoded.height, maxCols, maxRows);
   return { lines: halfblockLines(theme, decoded, cols, rows, hexToRgb) };

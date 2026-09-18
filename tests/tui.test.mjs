@@ -334,6 +334,47 @@ test('the screen only rewrites rows that changed', () => {
   assert.equal(output.written, '');
 });
 
+test('the screen sends a Kitty image overlay once, skips an unchanged resend, and clears it when it disappears', () => {
+  const output = new FakeTerminal(40, 6);
+  const screen = new Screen({ theme, output });
+  const overlay = { row: 1, column: 2, escape: '\x1b_Gfake-image-bytes\x1b\\', key: 'file.png|kitty', protocol: 'kitty' };
+
+  screen.render(['a', 'b', 'c'], null, overlay);
+  assert.match(output.written, /fake-image-bytes/, 'first paint should send the image');
+
+  output.written = '';
+  screen.render(['a', 'b', 'c'], null, overlay); // same overlay object/key, nothing else changed
+  assert.equal(output.written, '', 'an unchanged overlay should not be re-sent');
+
+  output.written = '';
+  screen.render(['a', 'b', 'c'], null, null); // switched to a view with no image
+  assert.match(output.written, /\x1b_Ga=d\x1b\\/, 'switching away should explicitly delete the Kitty placement');
+  assert.doesNotMatch(output.written, /fake-image-bytes/, 'should not resend the image just to clear it');
+});
+
+test('an image overlay is resent after invalidate() even with an unchanged key, since a full repaint can disturb it', () => {
+  const output = new FakeTerminal(40, 6);
+  const screen = new Screen({ theme, output });
+  const overlay = { row: 1, column: 2, escape: '\x1b_Gfake-image-bytes\x1b\\', key: 'file.png|kitty', protocol: 'kitty' };
+
+  screen.render(['a', 'b', 'c'], null, overlay);
+  output.written = '';
+  screen.invalidate();
+  screen.render(['a', 'b', 'c'], null, overlay);
+  assert.match(output.written, /fake-image-bytes/, 'a full repaint should resend an image even with the same key');
+});
+
+test('leaving the screen clears a Kitty image left on screen instead of stranding it after exit', () => {
+  const output = new FakeTerminal(40, 6);
+  const screen = new Screen({ theme, output });
+  const overlay = { row: 1, column: 2, escape: '\x1b_Gfake-image-bytes\x1b\\', key: 'file.png|kitty', protocol: 'kitty' };
+  screen.enter();
+  screen.render(['a', 'b', 'c'], null, overlay);
+  output.written = '';
+  screen.leave();
+  assert.match(output.written, /\x1b_Ga=d\x1b\\/);
+});
+
 test('the screen strips terminal injection while retaining internal SGR styles', () => {
   const output = new FakeTerminal(80, 2);
   const screen = new Screen({ theme, output });

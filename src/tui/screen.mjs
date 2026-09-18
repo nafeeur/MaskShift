@@ -46,6 +46,11 @@ export const ANSI = {
   mouseOn: (hover = false) => `${CSI}?1000h${CSI}?${hover ? 1003 : 1002}h${CSI}?1006h`,
   mouseOff: `${CSI}?1006l${CSI}?1003l${CSI}?1002l${CSI}?1000l`,
   moveTo: (row, column) => `${CSI}${row + 1};${column + 1}H`,
+  // Kitty graphics protocol: delete every image this pane placed. Sent
+  // whenever an image overlay goes from present to absent — the placement
+  // otherwise just sits there until something else happens to overwrite
+  // those exact cells, which is the "picture doesn't go away" bug.
+  kittyDeleteImages: `${ESC}_Ga=d${ESC}\\`,
 };
 
 export class Screen {
@@ -65,9 +70,18 @@ export class Screen {
     // re-transmitted (a real cost: these payloads are base64 image bytes,
     // not a few SGR codes) on every one of the many frames it sits through.
     this.imageKey = null;
+    // Which protocol drew it, so a *disappearing* image (switched views,
+    // switched files, opened a modal) knows how to actually take it off the
+    // terminal instead of just forgetting it was ever sent — Kitty holds a
+    // placement until something explicitly deletes it or the alt-screen
+    // itself is torn down, so simply stopping isn't enough.
+    this.imageProtocol = null;
+    // Deliberately doesn't also reset imageKey/imageProtocol: render()'s own
+    // overlay diff is the one place that decides an image needs clearing
+    // from the real terminal, and it can only make that call correctly if
+    // it still remembers what (if anything) is actually sitting there.
     this.handleResize = () => {
       this.previous = [];
-      this.imageKey = null;
       if (this.onResize) this.onResize(this.size);
     };
   }
@@ -98,7 +112,14 @@ export class Screen {
     this.active = false;
     this.output.off('resize', this.handleResize);
     if (this.mouseActive) { this.write(ANSI.mouseOff); this.mouseActive = false; }
-    this.write(`${ANSI.focusOff}${ANSI.reset}${ANSI.showCursor}${ANSI.altScreenOff}${ANSI.restoreTitle}`);
+    // Leaving the alt-screen normally takes any Kitty placement with it, but
+    // that's the terminal's own behaviour to rely on, not a guarantee — the
+    // explicit delete costs nothing and closes the one path a stray image
+    // could otherwise survive past MaskShift's own exit.
+    const clearImage = this.imageProtocol === 'kitty' ? ANSI.kittyDeleteImages : '';
+    this.imageKey = null;
+    this.imageProtocol = null;
+    this.write(`${clearImage}${ANSI.focusOff}${ANSI.reset}${ANSI.showCursor}${ANSI.altScreenOff}${ANSI.restoreTitle}`);
     // Writing is synchronous for a TTY, but the handle itself stays referenced until told
     // otherwise, which is what kept the process alive after quitting.
     this.output.unref?.();
@@ -143,6 +164,12 @@ export class Screen {
    */
   render(lines, cursor = null, overlay = null) {
     const { columns, rows } = this.size;
+    // invalidate()/a resize dropped the cached frame — every row is about to
+    // be rewritten from scratch, which on a real terminal can itself be what
+    // disturbs (or outright clears) an existing Kitty placement. An
+    // unchanged overlay would otherwise be skipped as "already sent"; here
+    // that assumption no longer holds, so it needs resending too.
+    const fullRepaint = this.previous.length === 0;
     const frame = [];
     for (let row = 0; row < rows; row += 1) {
       frame.push(fit(sanitizeTerminalLine(lines[row] ?? ''), columns));
@@ -154,11 +181,17 @@ export class Screen {
       changedRows += 1;
       out += `${ANSI.moveTo(row, 0)}${ANSI.clearLine}${frame[row]}${ANSI.reset}`;
     }
-    if (overlay && overlay.key !== this.imageKey) {
+    if (overlay && (overlay.key !== this.imageKey || fullRepaint)) {
       out += `${ANSI.moveTo(overlay.row, overlay.column)}${overlay.escape}`;
       this.imageKey = overlay.key;
-    } else if (!overlay) {
+      this.imageProtocol = overlay.protocol || null;
+    } else if (!overlay && this.imageKey) {
+      // The escape that drew a *new* image already carries its own
+      // Kitty delete-all prefix (see image/render.mjs), so that transition
+      // self-clears. This is the other one: no new image to draw at all.
+      if (this.imageProtocol === 'kitty') out += ANSI.kittyDeleteImages;
       this.imageKey = null;
+      this.imageProtocol = null;
     }
     if (cursor) out += `${ANSI.moveTo(cursor.row, cursor.column)}${ANSI.showCursor}`;
     else if (this.cursor) out += ANSI.hideCursor;
@@ -171,9 +204,9 @@ export class Screen {
     if (out) this.write(changedRows > 1 ? `${ANSI.syncOutputOn}${out}${ANSI.syncOutputOff}` : out);
   }
 
-  // Drop the cached frame so the next render repaints everything.
+  // Drop the cached frame so the next render repaints everything. Leaves
+  // imageKey/imageProtocol alone for the same reason handleResize does.
   invalidate() {
     this.previous = [];
-    this.imageKey = null;
   }
 }
