@@ -1,6 +1,6 @@
 # Native Tool Inventory
 
-Generated from the MaskShift 1.3.0 runtime. **159 native tools** are available before plugins or MCP servers add more capabilities.
+Generated from the MaskShift 1.4.1 runtime. **167 native tools** are available before plugins or MCP servers add more capabilities.
 
 Only activated descriptors enter a model request; this document is the complete local catalog.
 
@@ -13,12 +13,14 @@ Only activated descriptors enter a model request; this document is the complete 
 | `agent_bridge_run` | write | host-exec | Run an installed Claude Code, Codex, OpenCode, Copilot, Hermes, Aider, or configured agent against the current workspace. Can wait or return a persistent process. |
 | `external_agent_run` | write | host-exec | Execute any configured or ad-hoc coding-agent command with placeholder arguments such as {prompt}, {cwd}, and {workspace}. |
 
-## artifacts (3)
+## artifacts (5)
 
 | Tool | Access | Risk | Description |
 |---|---|---|---|
 | `archive_create` | write | write | Create tar.gz, tar.zst, tar, or zip archives from arbitrary host paths. |
 | `archive_extract` | write | write | Extract zip, tar.gz, tar.zst, tar, and common compressed archives. |
+| `archive_list` | read | normal | List the files inside a zip or tar archive without extracting it. |
+| `checksum_verify` | read | normal | Compute a file's hash and compare it against an expected digest, returning a match/mismatch verdict instead of leaving the comparison to the model. |
 | `file_hash` | read | normal | Calculate SHA-256, SHA-512, SHA-1, or MD5 for a file without loading it all into model context. |
 
 ## automation (7)
@@ -102,10 +104,12 @@ Only activated descriptors enter a model request; this document is the complete 
 | `notebook_read` | read | normal | Read a Jupyter (.ipynb) notebook and return each cell's index, type, source, and a bounded summary of its outputs. |
 | `pdf_read` | read | normal | Extract text from a PDF using pdftotext (poppler-utils), with optional page range and layout preservation. Falls back to rendering pages and running OCR when the PDF has little or no extractable text layer (scans, photographed pages). |
 
-## filesystem (10)
+## filesystem (13)
 
 | Tool | Access | Risk | Description |
 |---|---|---|---|
+| `chmod_set` | write | write | Change a path's POSIX mode (chmod) and optionally its owner/group (chown), reporting the mode before and after. |
+| `file_diff` | read | normal | Show a unified diff between two arbitrary paths (files or directories), independent of Git — for comparing anything on disk, not just a repo working tree. |
 | `fs_apply_patch` | write | write | Apply a unified diff using git apply. The patch can update multiple files and is checked before application. |
 | `fs_delete` | write | destructive | Delete a file or directory recursively. Overdrive mode executes immediately without an approval prompt. |
 | `fs_list` | read | normal | List a directory tree with file sizes and types. Paths may be workspace-relative or absolute in overdrive mode. |
@@ -116,6 +120,7 @@ Only activated descriptors enter a model request; this document is the complete 
 | `fs_read_binary` | read | normal | Read a bounded binary file as base64 with MIME-relevant metadata. |
 | `fs_stat` | read | normal | Return file type, size, timestamps, mode, target and hash metadata. |
 | `fs_write` | write | write | Create or overwrite a file atomically. Parent directories are created automatically. |
+| `text_stats` | read | normal | Report line, word, and byte counts for one or more text files (like wc) without spending context on their contents — use before deciding whether to read a file in full. |
 
 ## git (10)
 
@@ -256,13 +261,16 @@ Only activated descriptors enter a model request; this document is the complete 
 | `skill_read_reference` | read | normal | Read a file referenced by a skill while preventing path escape from the skill directory. |
 | `skill_search` | read | normal | Search all bundled, project, Claude, Codex, Copilot, and user skill catalogs. Skill bodies are loaded only when selected. |
 
-## system (4)
+## system (7)
 
 | Tool | Access | Risk | Description |
 |---|---|---|---|
+| `disk_usage` | read | normal | Report filesystem-level free/used space (df), or a per-directory usage breakdown (du) when a path is given. |
 | `environment_list` | read | secrets | List process environment variable names and optionally values. MaskShift overdrive mode permits direct secret-bearing environment access. |
 | `environment_set` | write | secrets | Set or delete environment variables for this running MaskShift daemon and future child processes. |
+| `network_diagnose` | read | normal | Run ping, DNS lookup, or traceroute against a host and return structured, parsed results instead of raw command text. |
 | `port_inspect` | read | normal | Inspect listening sockets and processes using ss, netstat, or lsof. |
+| `ps_list` | read | normal | List running processes on the host as structured records (pid, user, cpu%, mem%, command) — parsed, so nothing needs to eyeball raw `ps` output. |
 | `system_service` | write | host-exec | Inspect, start, stop, restart, reload, enable, or disable a systemd service on the host. |
 
 ## web (3)
