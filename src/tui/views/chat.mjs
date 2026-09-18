@@ -108,10 +108,38 @@ export function detectDiffText(message, toolCallsById) {
   return null;
 }
 
+/** A tool result is usually `JSON.stringify`d with no spacing — readable
+ *  enough flattened onto one short line, but a wall of run-together tokens
+ *  once it's long enough to wrap. Indented back out, it wraps at meaningful
+ *  boundaries instead of an arbitrary column. Anything that isn't valid JSON
+ *  (plain text, a stack trace) is returned exactly as the tool sent it. */
+function prettyToolText(text) {
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed && typeof parsed === 'object') return JSON.stringify(parsed, null, 2);
+  } catch { /* not JSON — show as sent */ }
+  return text;
+}
+
+function wrappedDetailLines(theme, text, width, mark) {
+  const lines = [];
+  for (const raw of text.split('\n')) {
+    for (const piece of wrap(raw, Math.max(8, width - 2))) {
+      lines.push(gutter(theme) + theme.paint(`${mark.bar} `, { fg: theme.roles.border }) + theme.paint(piece, { fg: theme.roles.muted }));
+    }
+  }
+  return lines;
+}
+
 /**
  * A tool call: its outcome in the gutter, its name in a fixed column, its
  * result filling the rest. Fixed columns are what let a run of six calls read
- * as a table instead of as six unrelated sentences.
+ * as a table instead of as six unrelated sentences — for a result short
+ * enough to sit on that one row. A longer one used to just get cut off with
+ * an ellipsis there; now it wraps onto its own indented lines underneath
+ * instead, the same shape `t`-expanded results already used, bounded to a
+ * handful of lines so one huge result doesn't push the rest of the run off
+ * screen unless the operator actually expands it.
  */
 function toolLines(app, message, width, expanded) {
   const { theme } = app;
@@ -120,19 +148,25 @@ function toolLines(app, message, width, expanded) {
   const failed = Boolean(message.meta?.isError);
   const tone = failed ? theme.roles.danger : theme.roles.success;
   const text = String(message.content || '');
+  const nameWidth = Math.min(TOOL_NAME_WIDTH, Math.max(8, width - 12));
+  const resultWidth = Math.max(6, width - nameWidth - SPACE.columnGap);
+  const flat = oneLine(text);
+  const fitsInline = visibleWidth(flat) <= resultWidth;
 
   const head = gutter(theme, failed ? mark.cross : mark.check, { tone })
     + columns(theme, [
-      { text: name, width: Math.min(TOOL_NAME_WIDTH, Math.max(8, width - 12)), tone: theme.roles.tool, bold: true },
-      { text: oneLine(text, Math.max(6, width - TOOL_NAME_WIDTH - SPACE.columnGap)), tone: failed ? theme.roles.danger : theme.roles.dim },
+      { text: name, width: nameWidth, tone: theme.roles.tool, bold: true },
+      { text: fitsInline ? flat : '', tone: failed ? theme.roles.danger : theme.roles.dim },
     ], width);
 
   const lines = [fit(head, width + SPACE.gutter)];
-  if (!expanded) return lines;
-  for (const raw of text.split('\n').slice(0, 60)) {
-    for (const piece of wrap(raw, Math.max(8, width - 2))) {
-      lines.push(gutter(theme) + theme.paint(`${mark.bar} `, { fg: theme.roles.border }) + theme.paint(piece, { fg: theme.roles.muted }));
-    }
+  if (fitsInline && !expanded) return lines;
+
+  const detail = wrappedDetailLines(theme, prettyToolText(text), width, mark);
+  const cap = expanded ? 60 : 6;
+  lines.push(...detail.slice(0, cap));
+  if (detail.length > cap) {
+    lines.push(gutter(theme) + theme.paint(`… ${detail.length - cap} more lines — t to expand`, { fg: theme.roles.faint, italic: true }));
   }
   return lines;
 }
