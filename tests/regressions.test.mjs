@@ -325,6 +325,52 @@ test('the 07 BROWSER live view can capture, click, type into, and scroll a real 
   assert.ok(scrollY.value > 0, 'expected the wheel event to scroll the page');
 });
 
+test('captureFrame caps its screenshot resolution for maxWidth/maxHeight without changing the reported CSS viewport size', async (t) => {
+  const project = await createProject(t);
+  const probe = await runtimeForTest(t, project);
+  let executable = (await probe.browserManager.discover(true)).executable;
+  for (const candidate of [process.env.MASKSHIFT_TEST_BROWSER, '/opt/pw-browsers/chromium']) {
+    if (executable || !candidate) continue;
+    if (await fsp.access(candidate).then(() => true).catch(() => false)) executable = candidate;
+  }
+  if (!executable) {
+    t.skip('no Chromium/Chrome executable is installed on this host');
+    return;
+  }
+  const runtime = await runtimeForTest(t, project, { browser: { executable } });
+  const page = await jsonServer(t, (request, response) => {
+    response.writeHead(200, { 'Content-Type': 'text/html' });
+    response.end('<html><body style="margin:0;height:400px;background:#123456">hi</body></html>');
+  });
+  const instance = await runtime.browserManager.launch({ headless: true, url: page.url, executable, extraArgs: ['--window-size=1200,800'] });
+  t.after(() => runtime.browserManager.close(instance.id).catch(() => {}));
+  const tabs = await runtime.browserManager.tabs(instance.id);
+  const tabId = tabs[0].id;
+
+  // The viewport can still be settling (window chrome, scrollbar) right
+  // after launch — one throwaway capture lets that finish before the two
+  // captures being compared below.
+  await runtime.browserManager.captureFrame({ instanceId: instance.id, tabId });
+
+  // Uncapped: this is what the fast-path terminals (Kitty passes the bytes
+  // straight through; iTerm2 only reads the header) get — no reason to pay
+  // for a smaller screenshot when nothing here decodes it.
+  const full = await runtime.browserManager.captureFrame({ instanceId: instance.id, tabId });
+  const { decodePng } = await import('../src/tui/image/png.mjs');
+  const fullDecoded = decodePng(full.buffer);
+  assert.ok(fullDecoded.width > 300, `expected an uncapped screenshot, got ${fullDecoded.width}px wide`);
+
+  // Capped: what the half-block fallback asks for — it has to decode this
+  // buffer itself on every poll, so a smaller capture keeps that fast (see
+  // app.mjs's pollBrowserFrame). The CSS viewport size it reports back —
+  // what click-coordinate mapping actually uses — must stay the real one.
+  const capped = await runtime.browserManager.captureFrame({ instanceId: instance.id, tabId, maxWidth: 100, maxHeight: 60 });
+  const cappedDecoded = decodePng(capped.buffer);
+  assert.ok(cappedDecoded.width <= 100, `expected a capped screenshot, got ${cappedDecoded.width}px wide`);
+  assert.equal(capped.cssWidth, full.cssWidth);
+  assert.equal(capped.cssHeight, full.cssHeight);
+});
+
 test('bin/maskshift.mjs loads a .env file from the working directory on startup', async (t) => {
   const temp = await fsp.mkdtemp(path.join(os.tmpdir(), 'maskshift-env-'));
   t.after(() => fsp.rm(temp, { recursive: true, force: true }));

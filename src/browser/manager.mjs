@@ -339,17 +339,38 @@ export class BrowserManager {
 
   /** A viewport screenshot as a raw buffer (no artifact file written) plus
    *  the CSS-pixel viewport size, which is what a click coordinate needs to
-   *  be mapped back into page space from a terminal cell. */
-  async captureFrame({ instanceId = null, tabId = null } = {}) {
+   *  be mapped back into page space from a terminal cell.
+   *
+   *  `maxWidth`/`maxHeight`, when given, cap the *captured* pixel size via
+   *  CDP's own clip/scale (not a resize after the fact — Chrome renders
+   *  straight to that resolution). Callers whose terminal can't show inline
+   *  images at all pass their own decoder through the half-block fallback
+   *  (see image/render.mjs), which is a synchronous, roughly O(pixel count)
+   *  decode run on every poll; capturing at full viewport resolution there
+   *  costs tens of milliseconds of blocking work per tick for no visual
+   *  benefit, since half-block sampling can't use more than two source
+   *  pixel-rows per terminal row anyway. Terminals with real inline-image
+   *  support (Kitty passes PNG bytes straight through, iTerm2 only reads
+   *  the header) don't pay that cost and so don't need to downscale, so
+   *  they simply don't pass these. Click mapping is unaffected either way —
+   *  it works in CSS pixels from `cssWidth`/`cssHeight`, never the
+   *  screenshot's own raster size. */
+  async captureFrame({ instanceId = null, tabId = null, maxWidth = null, maxHeight = null } = {}) {
     const { instance, tab, connection } = await this.target(instanceId, tabId);
     const metrics = await connection.send('Page.getLayoutMetrics');
     const viewport = metrics.cssVisualViewport || metrics.cssLayoutViewport || metrics.visualViewport || metrics.layoutViewport || {};
-    const result = await connection.send('Page.captureScreenshot', { format: 'png', fromSurface: true }, 30_000);
+    const cssWidth = Math.max(1, Math.round(viewport.clientWidth || 0));
+    const cssHeight = Math.max(1, Math.round(viewport.clientHeight || 0));
+    const params = { format: 'png', fromSurface: true };
+    if (maxWidth && maxHeight) {
+      const scale = Math.min(1, maxWidth / cssWidth, maxHeight / cssHeight);
+      if (scale < 1) params.clip = { x: 0, y: 0, width: cssWidth, height: cssHeight, scale };
+    }
+    const result = await connection.send('Page.captureScreenshot', params, 30_000);
     return {
       instanceId: instance.id, tabId: tab.id,
       buffer: Buffer.from(result.data, 'base64'),
-      cssWidth: Math.max(1, Math.round(viewport.clientWidth || 0)),
-      cssHeight: Math.max(1, Math.round(viewport.clientHeight || 0)),
+      cssWidth, cssHeight,
     };
   }
 
