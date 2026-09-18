@@ -195,6 +195,19 @@ test('the key decoder handles control, escape, modifier and paste sequences', ()
   assert.ok(matches(decode(String.fromCharCode(10)).events[0], 'ctrl+j'));
 });
 
+test('the key decoder reports DEC 1004 focus in/out without confusing it for SS3 function keys', () => {
+  const focusIn = decode(`${ESC}[I`).events[0];
+  assert.equal(focusIn.name, 'focus');
+  assert.equal(focusIn.focused, true);
+  const focusOut = decode(`${ESC}[O`).events[0];
+  assert.equal(focusOut.name, 'focus');
+  assert.equal(focusOut.focused, false);
+  // SS3-encoded F1 (`ESC O P`) on a terminal that sends it that way must
+  // never be misread as a focus event just because it also involves 'O'.
+  const f1 = decode(`${ESC}OP`).events[0];
+  assert.notEqual(f1.name, 'focus');
+});
+
 test('text editing moves and deletes whole grapheme clusters', () => {
   const field = new TextField({ value: 'A👨‍👩‍👧‍👦e\u0301界' });
   field.cursor = 1 + '👨‍👩‍👧‍👦'.length;

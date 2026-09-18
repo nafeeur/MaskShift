@@ -16,6 +16,10 @@ test('configuration overrides are isolated and persisted under the requested hom
   assert.equal(config.get().dataFile, path.join(home, 'maskshift.sqlite'));
   assert.equal(config.get().permissionMode, 'overdrive');
   assert.equal(config.get().automations.enabled, false);
+  // Both off/unset by default — an external notify command and a spend
+  // guardrail are things an operator opts into, never a silent default.
+  assert.equal(config.get().notifications.enabled, false);
+  assert.equal(config.get().costBudget.session, null);
 });
 
 test('SQLite store provides FTS memory and exact nullable automation updates', async (t) => {
@@ -54,4 +58,37 @@ test('SQLite store provides FTS memory and exact nullable automation updates', a
   assert.equal(updated.next_run_at, null);
   assert.equal(updated.last_run_at, null);
   assert.equal(updated.last_status, null);
+});
+
+test('searchMessages greps every session in a workspace, not just the open one', async (t) => {
+  const root = await tempDir(t, 'maskshift-search-');
+  const store = new Store(path.join(root, 'state.sqlite'));
+  await store.init();
+  t.after(() => store.close());
+
+  const workspace = store.upsertWorkspace(path.join(root, 'repo'), 'repo', {});
+  const other = store.upsertWorkspace(path.join(root, 'other'), 'other', {});
+
+  const sessionA = store.createSession({ workspaceId: workspace.id, title: 'First heist' });
+  const sessionB = store.createSession({ workspaceId: workspace.id, title: 'Second heist' });
+  const sessionC = store.createSession({ workspaceId: other.id, title: 'Different target' });
+
+  store.addMessage({ sessionId: sessionA.id, role: 'user', content: 'How do I configure the vault door widget?' });
+  store.addMessage({ sessionId: sessionB.id, role: 'assistant', content: 'The widget takes a keycode prop.' });
+  store.addMessage({ sessionId: sessionC.id, role: 'user', content: 'widget question from a different workspace' });
+
+  const scoped = store.searchMessages('widget', { workspaceId: workspace.id });
+  assert.equal(scoped.length, 2);
+  assert.deepEqual(new Set(scoped.map((r) => r.sessionId)), new Set([sessionA.id, sessionB.id]));
+  assert.ok(scoped.every((r) => r.sessionTitle));
+
+  const unscoped = store.searchMessages('widget');
+  assert.equal(unscoped.length, 3);
+
+  assert.deepEqual(store.searchMessages(''), []);
+  assert.deepEqual(store.searchMessages('nothing-matches-this-phrase'), []);
+
+  // A LIKE wildcard in the query itself is a literal character to search for, not a wildcard.
+  store.addMessage({ sessionId: sessionA.id, role: 'user', content: 'discount: 50%_off applies' });
+  assert.equal(store.searchMessages('50%_off', { workspaceId: workspace.id }).length, 1);
 });

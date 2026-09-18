@@ -14,6 +14,7 @@
 import path from 'node:path';
 import { frameColour, glyphs, panel, rule } from '../box.mjs';
 import { MASK_WIDTH, heroBlock, maskArt } from '../brand.mjs';
+import { diffLines, looksLikeDiff } from '../diff.mjs';
 import { buildImagePreview, isImagePath } from '../image/render.mjs';
 import { renderMarkdown } from '../markdown.mjs';
 import { spin } from '../motion.mjs';
@@ -82,6 +83,32 @@ export function detectImageResult(message, workspacePath) {
 }
 
 /**
+ * The unified diff behind a patch/diff tool's result — `fs_apply_patch`
+ * never returns the diff itself (just `{applied, cwd}`), so it comes from
+ * the *call* that produced this result instead, via `toolCallsById`
+ * (built while walking the transcript in order — the assistant message
+ * carrying that call always precedes its result). `file_diff`/`git_diff`
+ * do return the diff, as one field of their own JSON result.
+ */
+export function detectDiffText(message, toolCallsById) {
+  if (message.role !== 'tool') return null;
+  const name = message.meta?.toolName;
+  if (name === 'fs_apply_patch') {
+    const patch = toolCallsById.get(message.meta?.toolCallId)?.args?.patch;
+    return typeof patch === 'string' && patch.trim() ? patch : null;
+  }
+  if (name === 'file_diff' || name === 'git_diff') {
+    try {
+      const diff = JSON.parse(message.content)?.diff;
+      return looksLikeDiff(diff) ? diff : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+/**
  * A tool call: its outcome in the gutter, its name in a fixed column, its
  * result filling the rest. Fixed columns are what let a run of six calls read
  * as a table instead of as six unrelated sentences.
@@ -123,6 +150,11 @@ const CHAT_IMAGE_MAX_ROWS = 16;
 function buildMessageLines(app, theme, text) {
   const lines = [];
   const imageBlocks = [];
+  // Populated as every assistant message is walked (including one with no
+  // prose of its own, just tool calls) so that by the time a 'tool' message
+  // is reached, the call that produced it — and its original arguments,
+  // which a result alone doesn't carry — is already known.
+  const toolCallsById = new Map();
   let previousKind = null;
   const openBlock = (kind) => {
     if (lines.length && !(kind === 'tool' && previousKind === 'tool')) lines.push('');
@@ -142,6 +174,7 @@ function buildMessageLines(app, theme, text) {
     }
 
     if (message.role === 'assistant') {
+      for (const call of message.meta?.toolCalls || []) toolCallsById.set(call.id, call);
       if (!String(message.content || '').trim()) continue;
       openBlock('assistant');
       const colour = theme.roles.primary;
@@ -171,6 +204,11 @@ function buildMessageLines(app, theme, text) {
           if (built.overlay) imageBlocks.push({ startLine, rows: built.lines.length, overlay: built.overlay });
         }
       }
+      // A patch is the actual change, not a description of one — showing it
+      // colourised is what makes a run reviewable after the fact without
+      // switching to Files and diffing the working tree by hand.
+      const diffText = detectDiffText(message, toolCallsById);
+      if (diffText) lines.push(...diffLines(theme, diffText, text));
       continue;
     }
   }

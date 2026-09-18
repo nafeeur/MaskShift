@@ -320,6 +320,33 @@ export class Store {
     ) ORDER BY created_at ASC`).all(sessionId, limit).map((row) => parseFields(row, ['meta']));
   }
 
+  /**
+   * Grep every session's transcript for a phrase — "when did I ask about X"
+   * with no session picked ahead of time. A plain LIKE rather than an FTS5
+   * table: message history is small enough (thousands, not millions, of
+   * rows for a personal coding agent) that the index wouldn't earn its
+   * keep, and it sidesteps the backfill problem a *new* FTS table would
+   * have against every message written before this existed.
+   */
+  searchMessages(query, { workspaceId = null, limit = 40 } = {}) {
+    const needle = String(query || '').trim();
+    if (!needle) return [];
+    const like = `%${needle.replaceAll('%', '\\%').replaceAll('_', '\\_')}%`;
+    const rows = workspaceId
+      ? this.db.prepare(`SELECT m.id AS message_id, m.session_id, m.role, m.content, m.created_at, s.title AS session_title, s.workspace_id
+          FROM messages m JOIN sessions s ON s.id = m.session_id
+          WHERE s.workspace_id = ? AND m.content LIKE ? ESCAPE '\\' ORDER BY m.created_at DESC LIMIT ?`)
+        .all(workspaceId, like, limit)
+      : this.db.prepare(`SELECT m.id AS message_id, m.session_id, m.role, m.content, m.created_at, s.title AS session_title, s.workspace_id
+          FROM messages m JOIN sessions s ON s.id = m.session_id
+          WHERE m.content LIKE ? ESCAPE '\\' ORDER BY m.created_at DESC LIMIT ?`)
+        .all(like, limit);
+    return rows.map((row) => ({
+      messageId: row.message_id, sessionId: row.session_id, sessionTitle: row.session_title,
+      workspaceId: row.workspace_id, role: row.role, content: row.content, createdAt: row.created_at,
+    }));
+  }
+
   createRun({ sessionId, workspaceId, prompt, modelId, meta = {} }) {
     const run = {
       id: id('run'), session_id: sessionId, workspace_id: workspaceId || null, status: 'queued',

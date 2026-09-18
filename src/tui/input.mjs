@@ -150,9 +150,16 @@ export function decode(chunk) {
       const parameters = match[2].split(';');
       const final = match[3];
       const flags = modifiers(parameters[1]);
+      // DEC 1004 focus reporting (enabled by screen.mjs): CSI I on focus-in,
+      // CSI O on focus-out — i.e. `ESC [ I` / `ESC [ O`, no parameters.
+      // Distinct from SS3 (`ESC O <letter>`, used for F1-F4 on some
+      // terminals): that form has `match[1] === 'O'` from matching the
+      // regex's other alternative, never '['.
       if (final === '~') {
         const name = CSI_TILDE[Number(parameters[0])];
         if (name) events.push(key(name, { ...flags, sequence: match[0] }));
+      } else if (match[1] === '[' && !match[2] && (final === 'I' || final === 'O')) {
+        events.push(key('focus', { sequence: match[0], focused: final === 'I' }));
       } else if (CSI_FINAL[final]) {
         const name = CSI_FINAL[final];
         const shift = name === 'backtab' ? true : flags.shift;
