@@ -18,9 +18,9 @@ wire.
 
 | Token | Means | Never |
 |---|---|---|
-| **crimson** `#e5384f` | Identity and focus: the wordmark, the active view tab, the pane holding the keyboard | A data value, or a severity |
-| **gold** `#f0b429` | The operator: their turn, their keys, their pending input | A status |
-| **danger** `#ff5f56` | Failure and destruction, and nothing else | Confused with crimson |
+| **crimson** `#E32C40` | Identity and focus: the wordmark, the active view tab, the pane holding the keyboard | A data value, or a severity |
+| **gold** `#E9A227` | The operator: their turn, their keys, their pending input | A status |
+| **danger** `#FF6B4A` | Failure and destruction, and nothing else | Confused with crimson |
 | **tool / skill / mcp** | Capability classes, constant across every view | Reused for state |
 | **neutrals** | Everything else | — |
 
