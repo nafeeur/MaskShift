@@ -108,33 +108,82 @@ export function detectDiffText(message, toolCallsById) {
   return null;
 }
 
+/** A tool result is usually `JSON.stringify`d with no spacing — readable
+ *  enough flattened onto one short line, but a wall of run-together tokens
+ *  once it's long enough to wrap. Indented back out, it wraps at meaningful
+ *  boundaries instead of an arbitrary column. Anything that isn't valid JSON
+ *  (plain text, a stack trace) is returned exactly as the tool sent it. */
+function prettyToolText(text) {
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed && typeof parsed === 'object') return JSON.stringify(parsed, null, 2);
+  } catch { /* not JSON — show as sent */ }
+  return text;
+}
+
+function wrappedDetailLines(theme, text, width, mark) {
+  const lines = [];
+  for (const raw of text.split('\n')) {
+    for (const piece of wrap(raw, Math.max(8, width - 2))) {
+      lines.push(gutter(theme) + theme.paint(`${mark.bar} `, { fg: theme.roles.border }) + theme.paint(piece, { fg: theme.roles.muted }));
+    }
+  }
+  return lines;
+}
+
+// How many more wrapped detail lines one click on a collapsed/partly-expanded
+// result reveals — a screenful-sized bite, not "everything at once". Read by
+// app.mjs's toggleToolExpansion, the click handler that actually advances it.
+export const TOOL_EXPAND_STEP = 8;
+
 /**
  * A tool call: its outcome in the gutter, its name in a fixed column, its
  * result filling the rest. Fixed columns are what let a run of six calls read
- * as a table instead of as six unrelated sentences.
+ * as a table instead of as six unrelated sentences. A result too long for
+ * that one row is truncated there with "…", same as it always was — but that
+ * row (or, once expanded, the "N more — click to expand" line beneath it) is
+ * a click target: press it and another `TOOL_EXPAND_STEP` lines of the result
+ * unfold underneath, pretty-printed if it's JSON so it wraps at real
+ * structural boundaries instead of an arbitrary column. Keep clicking and it
+ * keeps growing until there's nothing left to reveal. `t` still expands (or
+ * collapses) every call in the transcript at once, same as before.
+ *
+ * Returns `{ lines, triggerRow }` — `triggerRow` is the index into `lines`
+ * the caller should register a click region on to advance this call's own
+ * expansion, or null once there is nothing more this call could reveal.
  */
-function toolLines(app, message, width, expanded) {
+function toolLines(app, message, width, key, globalExpanded) {
   const { theme } = app;
   const mark = glyphs(theme);
   const name = message.meta?.toolName || 'tool';
   const failed = Boolean(message.meta?.isError);
   const tone = failed ? theme.roles.danger : theme.roles.success;
   const text = String(message.content || '');
+  const nameWidth = Math.min(TOOL_NAME_WIDTH, Math.max(8, width - 12));
+  const resultWidth = Math.max(6, width - nameWidth - SPACE.columnGap);
+  const flat = oneLine(text);
+  const fitsInline = visibleWidth(flat) <= resultWidth;
+  const shown = globalExpanded ? Infinity : (app.toolExpansion.get(key) || 0);
 
   const head = gutter(theme, failed ? mark.cross : mark.check, { tone })
     + columns(theme, [
-      { text: name, width: Math.min(TOOL_NAME_WIDTH, Math.max(8, width - 12)), tone: theme.roles.tool, bold: true },
-      { text: oneLine(text, Math.max(6, width - TOOL_NAME_WIDTH - SPACE.columnGap)), tone: failed ? theme.roles.danger : theme.roles.dim },
+      { text: name, width: nameWidth, tone: theme.roles.tool, bold: true },
+      {
+        text: fitsInline ? flat : (shown > 0 ? '' : oneLine(text, resultWidth)),
+        tone: failed ? theme.roles.danger : theme.roles.dim,
+      },
     ], width);
 
   const lines = [fit(head, width + SPACE.gutter)];
-  if (!expanded) return lines;
-  for (const raw of text.split('\n').slice(0, 60)) {
-    for (const piece of wrap(raw, Math.max(8, width - 2))) {
-      lines.push(gutter(theme) + theme.paint(`${mark.bar} `, { fg: theme.roles.border }) + theme.paint(piece, { fg: theme.roles.muted }));
-    }
-  }
-  return lines;
+  if (fitsInline) return { lines, triggerRow: null };
+  if (shown === 0) return { lines, triggerRow: 0 };
+
+  const detail = wrappedDetailLines(theme, prettyToolText(text), width, mark);
+  const visible = Math.min(detail.length, shown);
+  lines.push(...detail.slice(0, visible));
+  if (visible >= detail.length) return { lines, triggerRow: null };
+  lines.push(gutter(theme) + theme.paint(`… ${detail.length - visible} more — click to expand`, { fg: theme.roles.faint, italic: true }));
+  return { lines, triggerRow: lines.length - 1 };
 }
 
 // Rendering a whole transcript — every persisted message's markdown, freshly parsed — is not
@@ -150,6 +199,10 @@ const CHAT_IMAGE_MAX_ROWS = 16;
 function buildMessageLines(app, theme, text) {
   const lines = [];
   const imageBlocks = [];
+  // One entry per tool call whose result has more to reveal than its
+  // current expansion shows — the row within `lines` a click should land on
+  // to advance it. Read by registerRegions below.
+  const toolTriggers = [];
   // Populated as every assistant message is walked (including one with no
   // prose of its own, just tool calls) so that by the time a 'tool' message
   // is reached, the call that produced it — and its original arguments,
@@ -161,7 +214,7 @@ function buildMessageLines(app, theme, text) {
     previousKind = kind;
   };
 
-  for (const message of app.messages) {
+  for (const [messageIndex, message] of app.messages.entries()) {
     if (message.role === 'user') {
       openBlock('user');
       const colour = theme.roles.user;
@@ -191,7 +244,11 @@ function buildMessageLines(app, theme, text) {
 
     if (message.role === 'tool') {
       openBlock('tool');
-      lines.push(...toolLines(app, message, text, app.expandTools));
+      const key = message.meta?.toolCallId || message.id || `tool:${messageIndex}`;
+      const startRow = lines.length;
+      const built = toolLines(app, message, text, key, app.expandTools);
+      lines.push(...built.lines);
+      if (built.triggerRow !== null) toolTriggers.push({ row: startRow + built.triggerRow, key });
       // A screenshot (or any tool that hands back an image path) is worth
       // more inline than as another JSON blob — the same renderer that
       // powers the Files preview draws it straight into the transcript.
@@ -212,24 +269,32 @@ function buildMessageLines(app, theme, text) {
       continue;
     }
   }
-  return { lines, lastKind: previousKind, imageBlocks };
+  return { lines, lastKind: previousKind, imageBlocks, toolTriggers };
 }
 
 export function transcriptLines(app, width) {
   const { theme } = app;
   const text = Math.max(8, width - SPACE.gutter);
 
-  const cache = (app._transcriptCache ||= { messages: null, text: null, lines: null, lastKind: null, imageBlocks: [] });
-  if (cache.messages !== app.messages || cache.text !== text) {
+  const cache = (app._transcriptCache ||= {
+    messages: null, text: null, expandTools: null, toolExpansionVersion: null,
+    lines: null, lastKind: null, imageBlocks: [], toolTriggers: [],
+  });
+  if (cache.messages !== app.messages || cache.text !== text
+    || cache.expandTools !== app.expandTools || cache.toolExpansionVersion !== app.toolExpansionVersion) {
     const built = buildMessageLines(app, theme, text);
     cache.messages = app.messages;
     cache.text = text;
+    cache.expandTools = app.expandTools;
+    cache.toolExpansionVersion = app.toolExpansionVersion;
     cache.lines = built.lines;
     cache.lastKind = built.lastKind;
     cache.imageBlocks = built.imageBlocks;
+    cache.toolTriggers = built.toolTriggers;
   }
   // Read by render() below, once it knows which of these logical lines the
   // transcript's current scroll position actually has on screen.
+  app._transcriptToolTriggers = cache.toolTriggers;
   app._transcriptImageBlocks = cache.imageBlocks;
   const lines = cache.lines.slice();
   let previousKind = cache.lastKind;
@@ -330,10 +395,14 @@ export function render(app, region) {
   const mark = glyphs(theme);
   const { width, height } = region;
 
-  // Frame + seam is three rows; the composer takes what it needs from the rest.
+  // Frame + seam is three rows; the composer takes what it needs from the
+  // rest, plus one blank row above and below the draft itself so the text
+  // never sits flush against the seam or the bottom rail.
   const composerWidth = Math.max(8, width - 6);
   const draftRows = app.composer.layout(composerWidth, 6).total;
-  const composerRows = Math.max(1, Math.min(6, draftRows, Math.max(1, height - 8)));
+  const composerPadY = 1;
+  const draftVisibleRows = Math.max(1, Math.min(6, draftRows, Math.max(1, height - 8 - composerPadY * 2)));
+  const composerRows = draftVisibleRows + composerPadY * 2;
   const transcriptHeight = Math.max(1, height - 3 - composerRows);
 
   // One column of scrollbar and one of breathing room sit to the right of the
@@ -394,27 +463,31 @@ export function render(app, region) {
       : 'tab or click to type',
   });
 
-  const layout = app.composer.layout(composerWidth, composerRows);
-  const composerBody = [];
-  for (let index = 0; index < composerRows; index += 1) {
+  // One extra column beyond the usual gutter width, so the caret has more
+  // breathing room before the draft text starts than a list row's marker does.
+  const composerGutterWidth = SPACE.gutter + 1;
+  const layout = app.composer.layout(composerWidth, draftVisibleRows);
+  const composerBody = Array(composerPadY).fill('');
+  for (let index = 0; index < draftVisibleRows; index += 1) {
     const row = layout.rows[index];
     // The caret lives in the same gutter every other row in the pane uses, so
     // a draft lines up with the transcript above it.
     const marker = index === 0
-      ? gutter(theme, mark.caret, { tone: app.busy ? theme.roles.muted : theme.roles.primary })
-      : gutter(theme);
+      ? gutter(theme, mark.caret, { tone: app.busy ? theme.roles.muted : theme.roles.primary, width: composerGutterWidth })
+      : gutter(theme, '', { width: composerGutterWidth });
     const text = index === 0 && !app.composer.value
       ? theme.paint(truncate(app.composerPlaceholder(), composerWidth), { fg: theme.roles.muted, italic: true })
       : theme.paint(row ?? '', { fg: theme.roles.text });
     composerBody.push(fit(`${marker}${text}`, inner));
   }
+  for (let index = 0; index < composerPadY; index += 1) composerBody.push('');
 
   // The old footer row carried an always-empty character meter. The same
   // information now costs no rows at all: it appears in the bottom stamp, and
   // only once the draft is long enough for the budget to matter.
   const drafted = app.composer.value.length;
   const stampParts = [];
-  if (draftRows > composerRows) stampParts.push(`${draftRows} lines`);
+  if (draftRows > draftVisibleRows) stampParts.push(`${draftRows} lines`);
   if (drafted > 1000) stampParts.push(`${Math.round((drafted / 4000) * 100)}% of budget`);
   if (!app.autoLoad) stampParts.push('MANUAL LOAD');
 
@@ -436,8 +509,8 @@ export function render(app, region) {
 
   const cursor = composerFocused
     ? {
-      row: region.row + 1 + transcriptHeight + 1 + layout.caret.row,
-      column: region.column + 2 + 2 + layout.caret.column,
+      row: region.row + 1 + transcriptHeight + 1 + composerPadY + layout.caret.row,
+      column: region.column + 2 + composerGutterWidth + layout.caret.column,
     }
     : null;
 
@@ -514,6 +587,26 @@ function registerRegions(app, region, { transcriptHeight, composerRows, textWidt
           target.composer.set(starter[1]);
           target.focus = 'composer';
         },
+      });
+    }
+  }
+
+  // A collapsed or partly-expanded tool result's trigger row (see toolLines)
+  // is recorded as a position into the same logical buffer starterRows uses,
+  // so it translates by the current scroll offset the same way.
+  if (app._transcriptToolTriggers?.length) {
+    const scroll = Number.isFinite(app.transcript.offset) ? app.transcript.offset : 0;
+    for (const [index, trigger] of app._transcriptToolTriggers.entries()) {
+      const offset = trigger.row - scroll;
+      if (offset < 0 || offset >= transcriptHeight) continue;
+      regions.add({
+        row: transcriptTop + offset,
+        column: region.column + 1,
+        width: Math.max(0, textWidth),
+        height: 1,
+        id: `chat:tool-expand:${index}`,
+        layer: LAYER.body + 1,
+        onPress: (target) => target.toggleToolExpansion(trigger.key),
       });
     }
   }
