@@ -11,13 +11,16 @@
 // carries the only per-turn ornament: a rail in the speaker's colour, full
 // strength on the row that names them and softened down the body.
 
+import path from 'node:path';
 import { frameColour, glyphs, panel, rule } from '../box.mjs';
 import { MASK_WIDTH, heroBlock, maskArt } from '../brand.mjs';
+import { buildImagePreview, isImagePath } from '../image/render.mjs';
 import { renderMarkdown } from '../markdown.mjs';
 import { spin } from '../motion.mjs';
 import { LAYER, Regions } from '../regions.mjs';
+import { hexToRgb } from '../theme.mjs';
 import { center, fit, oneLine, truncate, visibleWidth, wrap } from '../text.mjs';
-import { SPACE } from '../tokens.mjs';
+import { CONTENT_OFFSET, SPACE } from '../tokens.mjs';
 import { columns, gutter, key as typeKey, spread } from '../type.mjs';
 
 const STARTERS = [
@@ -59,6 +62,26 @@ function speakerRow(theme, name, colour, width, { qualifier = '', stamp = '' } =
 }
 
 /**
+ * A tool result is usually its return value JSON.stringified (see engine.mjs's
+ * renderToolResult) — `browser_screenshot` and friends come back as
+ * `{ file: "/abs/path/shot.png", ... }`. This is the same shape a tool that
+ * just hands back a bare path would produce too, so both are recognised.
+ */
+export function detectImageResult(message, workspacePath) {
+  if (message.role !== 'tool') return null;
+  const raw = String(message.content || '').trim();
+  let candidate = null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object') candidate = parsed.file || parsed.path || parsed.screenshot || parsed.image || null;
+  } catch {
+    if (isImagePath(raw)) candidate = raw;
+  }
+  if (typeof candidate !== 'string' || !isImagePath(candidate)) return null;
+  return path.isAbsolute(candidate) ? candidate : path.resolve(workspacePath, candidate);
+}
+
+/**
  * A tool call: its outcome in the gutter, its name in a fixed column, its
  * result filling the rest. Fixed columns are what let a run of six calls read
  * as a table instead of as six unrelated sentences.
@@ -95,8 +118,11 @@ function toolLines(app, message, width, expanded) {
 // mutated, whenever it actually changes — see onRunEvent) and the render width, so a repaint
 // triggered by nothing but a new streaming delta reuses that work and only builds the small,
 // genuinely-changing tail (the in-progress bubble and any live tool-call rows).
+const CHAT_IMAGE_MAX_ROWS = 16;
+
 function buildMessageLines(app, theme, text) {
   const lines = [];
+  const imageBlocks = [];
   let previousKind = null;
   const openBlock = (kind) => {
     if (lines.length && !(kind === 'tool' && previousKind === 'tool')) lines.push('');
@@ -133,24 +159,40 @@ function buildMessageLines(app, theme, text) {
     if (message.role === 'tool') {
       openBlock('tool');
       lines.push(...toolLines(app, message, text, app.expandTools));
+      // A screenshot (or any tool that hands back an image path) is worth
+      // more inline than as another JSON blob — the same renderer that
+      // powers the Files preview draws it straight into the transcript.
+      const imagePath = app.workspace?.path ? detectImageResult(message, app.workspace.path) : null;
+      if (imagePath) {
+        const built = buildImagePreview(theme, imagePath, { maxCols: text, maxRows: CHAT_IMAGE_MAX_ROWS, hexToRgb });
+        if (!built.error && built.lines.length) {
+          const startLine = lines.length;
+          lines.push(...built.lines.map((line) => gutter(theme) + line));
+          if (built.overlay) imageBlocks.push({ startLine, rows: built.lines.length, overlay: built.overlay });
+        }
+      }
       continue;
     }
   }
-  return { lines, lastKind: previousKind };
+  return { lines, lastKind: previousKind, imageBlocks };
 }
 
 export function transcriptLines(app, width) {
   const { theme } = app;
   const text = Math.max(8, width - SPACE.gutter);
 
-  const cache = (app._transcriptCache ||= { messages: null, text: null, lines: null, lastKind: null });
+  const cache = (app._transcriptCache ||= { messages: null, text: null, lines: null, lastKind: null, imageBlocks: [] });
   if (cache.messages !== app.messages || cache.text !== text) {
     const built = buildMessageLines(app, theme, text);
     cache.messages = app.messages;
     cache.text = text;
     cache.lines = built.lines;
     cache.lastKind = built.lastKind;
+    cache.imageBlocks = built.imageBlocks;
   }
+  // Read by render() below, once it knows which of these logical lines the
+  // transcript's current scroll position actually has on screen.
+  app._transcriptImageBlocks = cache.imageBlocks;
   const lines = cache.lines.slice();
   let previousKind = cache.lastKind;
 
@@ -261,14 +303,34 @@ export function render(app, region) {
   const inner = width - 4;
   const textWidth = Math.max(8, inner - 2);
 
-  const body = app.messages.length === 0 && app.liveTrail.length === 0
-    ? emptyState(app, textWidth, transcriptHeight)
-    : transcriptLines(app, textWidth);
+  const isEmpty = app.messages.length === 0 && app.liveTrail.length === 0;
+  if (isEmpty) app._transcriptImageBlocks = [];
+  const body = isEmpty ? emptyState(app, textWidth, transcriptHeight) : transcriptLines(app, textWidth);
 
   app.transcript.set(body);
   const visible = app.transcript.render(transcriptHeight, textWidth);
   const bar = app.transcript.scrollbar(theme, transcriptHeight);
   const transcriptRows = visible.map((line, index) => `${fit(line, textWidth + 1)}${bar[index] ?? ' '}`);
+
+  // A Kitty/iTerm2 placement (see image/render.mjs) only goes out when its
+  // whole block is on screen at once — scrolling it half out of view would
+  // otherwise either overflow past the pane or need clipping neither
+  // protocol offers cleanly here. A half-block image needs none of this:
+  // it's already just ordinary coloured text, clipped by Viewport like any
+  // other line.
+  const scrollOffset = app.transcript.offset;
+  let imageOverlay = null;
+  for (const block of app._transcriptImageBlocks || []) {
+    if (block.startLine >= scrollOffset && block.startLine + block.rows <= scrollOffset + transcriptHeight) {
+      imageOverlay = {
+        row: region.row + 1 + (block.startLine - scrollOffset),
+        column: region.column + CONTENT_OFFSET,
+        escape: block.overlay.escape,
+        key: block.overlay.key,
+      };
+      break;
+    }
+  }
 
   // The rail reports where you are when you have scrolled away from the live
   // edge, and how much there is when you have not.
@@ -340,7 +402,7 @@ export function render(app, region) {
     }
     : null;
 
-  return { lines, cursor };
+  return { lines, cursor, imageOverlay };
 }
 
 // Every pane, the scrollbar track and each starter prompt become click targets.

@@ -9,6 +9,7 @@ import { detectImageProtocol } from '../src/tui/image/protocol.mjs';
 import { buildImagePreview, isImagePath } from '../src/tui/image/render.mjs';
 import { Theme, hexToRgb } from '../src/tui/theme.mjs';
 import { fit, sanitizeTerminalLine, visibleWidth } from '../src/tui/text.mjs';
+import { detectImageResult } from '../src/tui/views/chat.mjs';
 
 const SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
@@ -191,4 +192,24 @@ test('buildImagePreview reports a clear error instead of throwing for a non-imag
   assert.equal(buildImagePreview(theme, '/tmp/not-an-image.txt', { maxCols: 10, maxRows: 10, hexToRgb }).error, 'Not an image file.');
   const missing = buildImagePreview(theme, '/tmp/does-not-exist-maskshift.png', { maxCols: 10, maxRows: 10, hexToRgb });
   assert.match(missing.error, /Couldn.t read/);
+});
+
+test('detectImageResult finds an image path inside a JSON tool result (browser_screenshot and friends)', () => {
+  const workspacePath = '/work';
+  const shot = { role: 'tool', content: JSON.stringify({ instanceId: 'i1', file: '/work/artifacts/shot.png', bytes: 42 }) };
+  assert.equal(detectImageResult(shot, workspacePath), '/work/artifacts/shot.png');
+
+  const relative = { role: 'tool', content: JSON.stringify({ path: 'screens/out.jpg' }) };
+  assert.equal(detectImageResult(relative, workspacePath), path.resolve(workspacePath, 'screens/out.jpg'));
+
+  const barePath = { role: 'tool', content: '/work/logo.webp' };
+  assert.equal(detectImageResult(barePath, workspacePath), '/work/logo.webp');
+});
+
+test('detectImageResult stays quiet for ordinary tool output, non-tool messages, and non-image fields', () => {
+  const workspacePath = '/work';
+  assert.equal(detectImageResult({ role: 'tool', content: JSON.stringify({ files: ['a.js', 'b.js'] }) }, workspacePath), null);
+  assert.equal(detectImageResult({ role: 'tool', content: 'node --test tests/tui.test.mjs → 12 pass, 0 fail' }, workspacePath), null);
+  assert.equal(detectImageResult({ role: 'tool', content: JSON.stringify({ file: '/work/report.pdf' }) }, workspacePath), null);
+  assert.equal(detectImageResult({ role: 'assistant', content: '/work/shot.png' }, workspacePath), null);
 });
