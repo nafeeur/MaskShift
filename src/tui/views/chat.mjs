@@ -131,17 +131,28 @@ function wrappedDetailLines(theme, text, width, mark) {
   return lines;
 }
 
+// How many more wrapped detail lines one click on a collapsed/partly-expanded
+// result reveals — a screenful-sized bite, not "everything at once". Read by
+// app.mjs's toggleToolExpansion, the click handler that actually advances it.
+export const TOOL_EXPAND_STEP = 8;
+
 /**
  * A tool call: its outcome in the gutter, its name in a fixed column, its
  * result filling the rest. Fixed columns are what let a run of six calls read
- * as a table instead of as six unrelated sentences — for a result short
- * enough to sit on that one row. A longer one used to just get cut off with
- * an ellipsis there; now it wraps onto its own indented lines underneath
- * instead, the same shape `t`-expanded results already used, bounded to a
- * handful of lines so one huge result doesn't push the rest of the run off
- * screen unless the operator actually expands it.
+ * as a table instead of as six unrelated sentences. A result too long for
+ * that one row is truncated there with "…", same as it always was — but that
+ * row (or, once expanded, the "N more — click to expand" line beneath it) is
+ * a click target: press it and another `TOOL_EXPAND_STEP` lines of the result
+ * unfold underneath, pretty-printed if it's JSON so it wraps at real
+ * structural boundaries instead of an arbitrary column. Keep clicking and it
+ * keeps growing until there's nothing left to reveal. `t` still expands (or
+ * collapses) every call in the transcript at once, same as before.
+ *
+ * Returns `{ lines, triggerRow }` — `triggerRow` is the index into `lines`
+ * the caller should register a click region on to advance this call's own
+ * expansion, or null once there is nothing more this call could reveal.
  */
-function toolLines(app, message, width, expanded) {
+function toolLines(app, message, width, key, globalExpanded) {
   const { theme } = app;
   const mark = glyphs(theme);
   const name = message.meta?.toolName || 'tool';
@@ -152,23 +163,27 @@ function toolLines(app, message, width, expanded) {
   const resultWidth = Math.max(6, width - nameWidth - SPACE.columnGap);
   const flat = oneLine(text);
   const fitsInline = visibleWidth(flat) <= resultWidth;
+  const shown = globalExpanded ? Infinity : (app.toolExpansion.get(key) || 0);
 
   const head = gutter(theme, failed ? mark.cross : mark.check, { tone })
     + columns(theme, [
       { text: name, width: nameWidth, tone: theme.roles.tool, bold: true },
-      { text: fitsInline ? flat : '', tone: failed ? theme.roles.danger : theme.roles.dim },
+      {
+        text: fitsInline ? flat : (shown > 0 ? '' : oneLine(text, resultWidth)),
+        tone: failed ? theme.roles.danger : theme.roles.dim,
+      },
     ], width);
 
   const lines = [fit(head, width + SPACE.gutter)];
-  if (fitsInline && !expanded) return lines;
+  if (fitsInline) return { lines, triggerRow: null };
+  if (shown === 0) return { lines, triggerRow: 0 };
 
   const detail = wrappedDetailLines(theme, prettyToolText(text), width, mark);
-  const cap = expanded ? 60 : 6;
-  lines.push(...detail.slice(0, cap));
-  if (detail.length > cap) {
-    lines.push(gutter(theme) + theme.paint(`… ${detail.length - cap} more lines — t to expand`, { fg: theme.roles.faint, italic: true }));
-  }
-  return lines;
+  const visible = Math.min(detail.length, shown);
+  lines.push(...detail.slice(0, visible));
+  if (visible >= detail.length) return { lines, triggerRow: null };
+  lines.push(gutter(theme) + theme.paint(`… ${detail.length - visible} more — click to expand`, { fg: theme.roles.faint, italic: true }));
+  return { lines, triggerRow: lines.length - 1 };
 }
 
 // Rendering a whole transcript — every persisted message's markdown, freshly parsed — is not
@@ -184,6 +199,10 @@ const CHAT_IMAGE_MAX_ROWS = 16;
 function buildMessageLines(app, theme, text) {
   const lines = [];
   const imageBlocks = [];
+  // One entry per tool call whose result has more to reveal than its
+  // current expansion shows — the row within `lines` a click should land on
+  // to advance it. Read by registerRegions below.
+  const toolTriggers = [];
   // Populated as every assistant message is walked (including one with no
   // prose of its own, just tool calls) so that by the time a 'tool' message
   // is reached, the call that produced it — and its original arguments,
@@ -195,7 +214,7 @@ function buildMessageLines(app, theme, text) {
     previousKind = kind;
   };
 
-  for (const message of app.messages) {
+  for (const [messageIndex, message] of app.messages.entries()) {
     if (message.role === 'user') {
       openBlock('user');
       const colour = theme.roles.user;
@@ -225,7 +244,11 @@ function buildMessageLines(app, theme, text) {
 
     if (message.role === 'tool') {
       openBlock('tool');
-      lines.push(...toolLines(app, message, text, app.expandTools));
+      const key = message.meta?.toolCallId || message.id || `tool:${messageIndex}`;
+      const startRow = lines.length;
+      const built = toolLines(app, message, text, key, app.expandTools);
+      lines.push(...built.lines);
+      if (built.triggerRow !== null) toolTriggers.push({ row: startRow + built.triggerRow, key });
       // A screenshot (or any tool that hands back an image path) is worth
       // more inline than as another JSON blob — the same renderer that
       // powers the Files preview draws it straight into the transcript.
@@ -246,24 +269,32 @@ function buildMessageLines(app, theme, text) {
       continue;
     }
   }
-  return { lines, lastKind: previousKind, imageBlocks };
+  return { lines, lastKind: previousKind, imageBlocks, toolTriggers };
 }
 
 export function transcriptLines(app, width) {
   const { theme } = app;
   const text = Math.max(8, width - SPACE.gutter);
 
-  const cache = (app._transcriptCache ||= { messages: null, text: null, lines: null, lastKind: null, imageBlocks: [] });
-  if (cache.messages !== app.messages || cache.text !== text) {
+  const cache = (app._transcriptCache ||= {
+    messages: null, text: null, expandTools: null, toolExpansionVersion: null,
+    lines: null, lastKind: null, imageBlocks: [], toolTriggers: [],
+  });
+  if (cache.messages !== app.messages || cache.text !== text
+    || cache.expandTools !== app.expandTools || cache.toolExpansionVersion !== app.toolExpansionVersion) {
     const built = buildMessageLines(app, theme, text);
     cache.messages = app.messages;
     cache.text = text;
+    cache.expandTools = app.expandTools;
+    cache.toolExpansionVersion = app.toolExpansionVersion;
     cache.lines = built.lines;
     cache.lastKind = built.lastKind;
     cache.imageBlocks = built.imageBlocks;
+    cache.toolTriggers = built.toolTriggers;
   }
   // Read by render() below, once it knows which of these logical lines the
   // transcript's current scroll position actually has on screen.
+  app._transcriptToolTriggers = cache.toolTriggers;
   app._transcriptImageBlocks = cache.imageBlocks;
   const lines = cache.lines.slice();
   let previousKind = cache.lastKind;
@@ -556,6 +587,26 @@ function registerRegions(app, region, { transcriptHeight, composerRows, textWidt
           target.composer.set(starter[1]);
           target.focus = 'composer';
         },
+      });
+    }
+  }
+
+  // A collapsed or partly-expanded tool result's trigger row (see toolLines)
+  // is recorded as a position into the same logical buffer starterRows uses,
+  // so it translates by the current scroll offset the same way.
+  if (app._transcriptToolTriggers?.length) {
+    const scroll = Number.isFinite(app.transcript.offset) ? app.transcript.offset : 0;
+    for (const [index, trigger] of app._transcriptToolTriggers.entries()) {
+      const offset = trigger.row - scroll;
+      if (offset < 0 || offset >= transcriptHeight) continue;
+      regions.add({
+        row: transcriptTop + offset,
+        column: region.column + 1,
+        width: Math.max(0, textWidth),
+        height: 1,
+        id: `chat:tool-expand:${index}`,
+        layer: LAYER.body + 1,
+        onPress: (target) => target.toggleToolExpansion(trigger.key),
       });
     }
   }

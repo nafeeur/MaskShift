@@ -155,6 +155,13 @@ export class MaskShiftTui {
     this.detail = new Viewport();
     this.railView = new Viewport();
     this.expandTools = Boolean(preferences.expandToolOutput);
+    // Per-call, click-driven expansion for a long tool result (see chat.mjs's
+    // toolLines) — how many of its wrapped detail lines are currently shown,
+    // keyed by tool-call id. Absent/0 means still collapsed to one line.
+    // Separate from expandTools above, which is the `t` keyboard shortcut
+    // for expanding every call at once.
+    this.toolExpansion = new Map();
+    this.toolExpansionVersion = 0;
     this.autoLoad = runtime.config.get().autoLoadCapabilities !== false;
 
     // Catalogue state.
@@ -911,6 +918,14 @@ export class MaskShiftTui {
       return;
     }
     await this.startPrompt(prompt, { restoreOnFailure: original });
+  }
+
+  // Clicking a collapsed (or partially expanded) tool result reveals another
+  // chunk of it — chat.mjs's transcript cache is keyed on toolExpansionVersion
+  // too, so this alone is enough to make the next repaint show more.
+  toggleToolExpansion(key) {
+    this.toolExpansion.set(key, (this.toolExpansion.get(key) || 0) + chatView.TOOL_EXPAND_STEP);
+    this.toolExpansionVersion += 1;
   }
 
   async startPrompt(prompt, { restoreOnFailure = '' } = {}) {
