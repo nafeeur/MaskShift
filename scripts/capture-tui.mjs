@@ -193,6 +193,7 @@ try {
   await app.bootstrap();
   await app.loadFileTree();
   await app.refreshModShop({ force: true });
+  await app.refreshGitView({ force: true });
 
   // A representative transcript so the hero capture shows real work.
   const now = new Date().toISOString();
@@ -234,6 +235,14 @@ try {
     ['arsenal', 'MaskShift — 03 ARSENAL', () => { app.view = 'arsenal'; app.focus = 'arsenal'; app.arsenalFilter.set('git'); }],
     ['network', 'MaskShift — 04 NETWORK', () => { app.view = 'network'; app.focus = 'network'; }],
     ['modshop', 'MaskShift — 05 MOD SHOP', () => { app.view = 'modshop'; app.modTab = 'bridges'; app.focus = 'modshop'; }],
+    ['git', 'MaskShift — 08 GIT', async () => {
+      app.view = 'git'; app.gitTab = 'changes'; app.focus = 'git';
+      // The list is only populated inside the view's own render(), so force
+      // one before asking for its current row's diff.
+      app.screen.invalidate();
+      app.snapshot();
+      await app.loadGitDetail(app.gitList.current);
+    }],
     ['palette', 'MaskShift — command palette', () => { app.view = 'chat'; app.openPalette(); app.overlay.field.set('mcp'); }],
     ['settings', 'MaskShift — settings', () => { app.view = 'chat'; app.openSettings(); }],
   ];
@@ -242,7 +251,7 @@ try {
   const written = [];
   for (const [name, title, prepare] of captures) {
     app.closeOverlay();
-    prepare();
+    await prepare();
     app.screen.invalidate();
     const frame = app.snapshot();
     const file = path.join(outputDir, `${name}.svg`);

@@ -46,7 +46,7 @@ out of context until a step actually needs it.
 | Native tool surface | 167 tools — shell, LSP, browsers, containers, Kubernetes, SSH, databases, PDFs, images, MCP | Built-in file/shell/web tools, plus MCP | File/shell tools plus per-language LSP and MCP | File/shell/sandboxed-exec tools, plus MCP | 40+ tools, plus MCP over the agentskills.io standard |
 | Codebase intelligence | Persistent file/symbol/call graph with reverse change-impact analysis | Ad hoc search and grep | Per-language LSP (go-to-definition, references) | Ad hoc search and grep | General-purpose tool search, not code-graph specific |
 | Multi-agent orchestration | Executable dependency DAGs, worktree-isolated by default, bounded parallel waves | Subagents (Explore, Plan, general-purpose) | Multiple parallel sessions | Native subagents, sandboxed | Isolated subagents, each with its own conversation and terminal |
-| Interface | Full-screen, zero-dependency TUI — seven views including a live, clickable browser tab, mouse and keyboard — plus an MCP server so any MCP client can drive it | Chat-style terminal interface, plus IDE and desktop apps | Terminal-first TUI, plus desktop and IDE extensions | Terminal chat, plus a VS Code extension | Full TUI, plus Telegram, Discord, Slack and other surfaces |
+| Interface | Full-screen, zero-dependency TUI — eight views including a live, clickable browser tab and a dedicated Git view, mouse and keyboard — plus an MCP server so any MCP client can drive it | Chat-style terminal interface, plus IDE and desktop apps | Terminal-first TUI, plus desktop and IDE extensions | Terminal chat, plus a VS Code extension | Full TUI, plus Telegram, Discord, Slack and other surfaces |
 | Primary focus | A coding harness — any model, the whole tool catalog | Coding agent | Coding agent | Coding agent | General-purpose autonomous assistant; coding is one surface among many |
 
 Not a knock on any of them — they make different tradeoffs on purpose. This is where MaskShift
@@ -207,6 +207,10 @@ it needs a dependency: the PNG, JPEG and BMP decoders are hand-written against N
 <tr>
 <td width="50%"><img width="100%" alt="Command palette" src="docs/screenshots/palette.svg"><br><sub><b>ctrl+k</b> — every action, nothing buried behind a memorised key</sub></td>
 <td width="50%"><img width="100%" alt="Live loadout telemetry" src="docs/screenshots/loadout.svg"><br><sub><b>The rail</b> — plan, loadout telemetry, event bus</sub></td>
+</tr>
+<tr>
+<td width="50%"><img width="100%" alt="Git view" src="docs/screenshots/git.svg"><br><sub><b>08 GIT</b> — changes, log, branches, stash, checkpoints and worktrees, with push/pull/fetch from anywhere</sub></td>
+<td width="50%"><img width="100%" alt="Mod shop" src="docs/screenshots/modshop.svg"><br><sub><b>05 MOD SHOP</b> — automations, plugins, agent bridges and processes</sub></td>
 </tr>
 </table>
 
