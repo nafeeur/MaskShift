@@ -260,6 +260,71 @@ test('browser artifacts resolve inside the workspace, not the server working dir
   assert.deepEqual((await fsp.readdir(process.cwd())).filter((entry) => !before.includes(entry)), []);
 });
 
+test('the 07 BROWSER live view can capture, click, type into, and scroll a real page', async (t) => {
+  const project = await createProject(t);
+  const probe = await runtimeForTest(t, project);
+  let executable = (await probe.browserManager.discover(true)).executable;
+  for (const candidate of [process.env.MASKSHIFT_TEST_BROWSER, '/opt/pw-browsers/chromium']) {
+    if (executable || !candidate) continue;
+    if (await fsp.access(candidate).then(() => true).catch(() => false)) executable = candidate;
+  }
+  if (!executable) {
+    t.skip('no Chromium/Chrome executable is installed on this host');
+    return;
+  }
+  const runtime = await runtimeForTest(t, project, { browser: { executable } });
+  const page = await jsonServer(t, (request, response) => {
+    response.writeHead(200, { 'Content-Type': 'text/html' });
+    response.end(`<html><body style="margin:0;height:3000px">
+      <input id="box" style="position:absolute;top:200px;left:20px;width:300px;height:40px">
+      <button id="btn" style="position:absolute;top:260px;left:20px;width:150px;height:40px"
+        onclick="document.title='CLICKED'">Click me</button>
+    </body></html>`);
+  });
+
+  const instance = await runtime.browserManager.launch({ headless: true, url: page.url, executable, extraArgs: ['--window-size=800,600'] });
+  t.after(() => runtime.browserManager.close(instance.id).catch(() => {}));
+  const tabs = await runtime.browserManager.tabs(instance.id);
+  const tabId = tabs[0].id;
+
+  // captureFrame: a real, decodable PNG at the viewport's own CSS size.
+  const frame = await runtime.browserManager.captureFrame({ instanceId: instance.id, tabId });
+  assert.ok(frame.buffer.length > 100, 'expected a non-trivial PNG payload');
+  assert.equal(frame.buffer[0], 0x89, 'captureFrame should return PNG bytes'); // PNG signature's first byte
+  assert.ok(frame.cssWidth > 0 && frame.cssHeight > 0);
+
+  // mouseEvent(click): the same CSS-pixel click the live view computes from
+  // a terminal cell actually reaches the page and fires its handler.
+  const buttonRect = await runtime.browserManager.evaluate({
+    instanceId: instance.id, tabId,
+    expression: '(() => { const r = document.getElementById("btn").getBoundingClientRect(); return {x: r.x + r.width / 2, y: r.y + r.height / 2}; })()',
+  });
+  await runtime.browserManager.mouseEvent({ instanceId: instance.id, tabId, kind: 'click', ...buttonRect.value });
+  const titleAfterClick = await runtime.browserManager.evaluate({ instanceId: instance.id, tabId, expression: 'document.title' });
+  assert.equal(titleAfterClick.value, 'CLICKED');
+
+  // mouseEvent(click) + keyEvent(text): focus the input, then type into it —
+  // the two calls the live view's typing mode chains together.
+  const inputRect = await runtime.browserManager.evaluate({
+    instanceId: instance.id, tabId,
+    expression: '(() => { const r = document.getElementById("box").getBoundingClientRect(); return {x: r.x + r.width / 2, y: r.y + r.height / 2}; })()',
+  });
+  await runtime.browserManager.mouseEvent({ instanceId: instance.id, tabId, kind: 'click', ...inputRect.value });
+  for (const character of 'hi!') await runtime.browserManager.keyEvent({ instanceId: instance.id, tabId, text: character });
+  const inputValue = await runtime.browserManager.evaluate({ instanceId: instance.id, tabId, expression: 'document.getElementById("box").value' });
+  assert.equal(inputValue.value, 'hi!');
+
+  // keyEvent(key): a named key with no character of its own still reaches the page.
+  await runtime.browserManager.keyEvent({ instanceId: instance.id, tabId, key: 'backspace' });
+  const afterBackspace = await runtime.browserManager.evaluate({ instanceId: instance.id, tabId, expression: 'document.getElementById("box").value' });
+  assert.equal(afterBackspace.value, 'hi');
+
+  // mouseEvent(wheel): a scroll actually moves the page.
+  await runtime.browserManager.mouseEvent({ instanceId: instance.id, tabId, kind: 'wheel', x: 100, y: 100, deltaY: 100 });
+  const scrollY = await runtime.browserManager.evaluate({ instanceId: instance.id, tabId, expression: 'window.scrollY' });
+  assert.ok(scrollY.value > 0, 'expected the wheel event to scroll the page');
+});
+
 test('bin/maskshift.mjs loads a .env file from the working directory on startup', async (t) => {
   const temp = await fsp.mkdtemp(path.join(os.tmpdir(), 'maskshift-env-'));
   t.after(() => fsp.rm(temp, { recursive: true, force: true }));
