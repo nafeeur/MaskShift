@@ -278,6 +278,23 @@ export const THEMES = {
     success: '#29d398', warning: '#fab795', danger: '#e95678', info: '#26bbd9',
     tool: '#59e1e3', skill: '#b877db', user: '#fab795',
   }),
+
+  // Citron on void, from the "Mono void" mark variant: the badge's own void
+  // black rendered on its citron ground instead of the other way round.
+  // Genuinely two-tone rather than another hue set with a new name — every
+  // role but the four signals below is one of exactly two colours, so status
+  // is read by glyph shape (see status.mjs) the way it already is in every
+  // theme, not by an extra hue this one doesn't have. The signals get the
+  // barest tint of their usual hue, dark enough to still read as "void", so
+  // pass/fail stays tellable apart at a glance without breaking the two-tone.
+  'mono-void': theme('Mono Void', {
+    bg: '#F2C14E', surface: '#E6B23E', surfaceRaised: '#D9A52E', selection: '#C89425',
+    border: '#C89425', borderStrong: '#8F6714', borderActive: '#0E1117',
+    heading: '#0E1117', text: '#0E1117', label: '#1B1710', dim: '#332B14', muted: '#5C4C1E', faint: '#7A6526', hairline: '#6B5720',
+    primary: '#0E1117', primaryDeep: '#000000', primaryTrack: '#C89425', accent: '#0E1117', accentDeep: '#241D0A', onPrimary: '#F2C14E',
+    success: '#123B1F', warning: '#3B2A05', danger: '#3B0F0F', info: '#0F1F3B',
+    tool: '#123B3B', skill: '#2A0F3B', user: '#0E1117',
+  }),
 };
 
 export function listThemes() {

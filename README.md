@@ -1,8 +1,6 @@
-<p align="center">
-  <img width="150" height="150" alt="MaskShift" src="https://github.com/user-attachments/assets/137393bb-7576-4edd-ac4d-78e19a0215a2" />
-</p>
-
-<h1 align="center">MaskShift</h1>
+<h1 align="center">
+  <img width="720" alt="MaskShift" src="docs/brand/banner.svg">
+</h1>
 
 <p align="center">
   <strong>The full toolbox for any coding model, in one zero-dependency terminal harness.</strong><br>
@@ -14,11 +12,11 @@
 <p align="center">
   <img alt="npm version" src="https://img.shields.io/npm/v/maskshift?style=flat-square&color=cb3837">
   <img alt="npm downloads" src="https://img.shields.io/npm/dt/maskshift?style=flat-square&color=cb3837&label=downloads">
-  <img alt="Node 22+" src="https://img.shields.io/badge/node-%E2%89%A522-3ecf8e?style=flat-square">
-  <img alt="Runtime dependencies: none" src="https://img.shields.io/badge/runtime%20deps-0-4aa8ff?style=flat-square">
+  <img alt="Node 22+" src="https://img.shields.io/badge/node-%E2%89%A522-35cf8b?style=flat-square">
+  <img alt="Runtime dependencies: none" src="https://img.shields.io/badge/runtime%20deps-0-7fb8ff?style=flat-square">
   <img alt="167 tools" src="https://img.shields.io/badge/tools-167-2bd9c0?style=flat-square">
   <img alt="50 skills" src="https://img.shields.io/badge/skills-50-a78bfa?style=flat-square">
-  <img alt="GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-e5384f?style=flat-square">
+  <img alt="GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-e42a3c?style=flat-square">
 </p>
 
 ![MaskShift interface](docs/screenshots/heist.svg)

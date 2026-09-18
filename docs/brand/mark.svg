@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="MaskShift">
+  <rect width="256" height="256" rx="48" fill="#161A20"/>
+  <svg x="28" y="28" width="200" height="200" viewBox="0 0 512 512">
+    <path d="M256 26L486 256L256 486L26 256Z" fill="#E42A3C"/>
+    <path d="M256 26L428 198L78 308L26 256Z" fill="#0E1117"/>
+    <path d="M199 138L407 205L122 294Z" fill="#A8172B"/>
+    <path d="M162 154L222 198L148 226L181 274L146 303L81 250Z" fill="#F4EFE6" stroke="#F4EFE6" stroke-width="6" stroke-linejoin="round"/>
+    <path d="M350 154L290 198L364 226L331 274L366 303L431 250Z" fill="#F4EFE6" stroke="#F4EFE6" stroke-width="6" stroke-linejoin="round"/>
+    <path d="M256 174L240 198L216 206L256 266L296 206L272 198Z" fill="#F4EFE6" stroke="#F4EFE6" stroke-width="6" stroke-linejoin="round"/>
+    <path d="M256 26L486 256L256 486L26 256Z" fill="none" stroke="#F4EFE6" stroke-width="22" stroke-linejoin="round"/>
+  </svg>
+</svg>
