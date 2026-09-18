@@ -201,7 +201,14 @@ function buildPreviewFromBuffer(theme, buffer, extension, sourceKey, { maxCols, 
   }
 
   // halfblock: the universal fallback, but limited to what MaskShift can
-  // actually decode into pixels itself (see DECODERS above).
+  // actually decode into pixels itself (see DECODERS above), and only
+  // available when the terminal can render the ▀ it's built from — a
+  // non-Unicode terminal (MASKSHIFT_ASCII=1, a non-UTF-8 locale, plain
+  // cmd.exe) would otherwise get raw mojibake in place of a picture rather
+  // than a clear "can't show this here".
+  if (!theme.unicode) {
+    return { lines: [], error: "This terminal doesn't support inline images or the Unicode block characters the ASCII preview needs." };
+  }
   if (!DECODERS[extension]) {
     return { lines: [], error: `This terminal has no inline-image support MaskShift can use, and the ASCII preview can only decode PNG, JPEG and BMP (got ${extension}).` };
   }

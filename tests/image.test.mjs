@@ -165,6 +165,21 @@ test('the half-block preview never emits a raw OSC/APC byte a downstream sanitiz
   }
 });
 
+test('the half-block preview refuses cleanly on a terminal without Unicode support instead of emitting raw ▀ bytes', () => {
+  const width = 8; const height = 8;
+  const png = buildPng(width, height, (x, y) => [(x * 32) % 256, (y * 32) % 256, 128]);
+  const theme = new Theme({ depth: 24, unicode: false });
+  const file = path.join(os.tmpdir(), `maskshift-image-ascii-${process.pid}.png`);
+  fs.writeFileSync(file, png);
+  try {
+    const result = buildImagePreview(theme, file, { maxCols: 20, maxRows: 10, hexToRgb });
+    assert.equal(result.lines.length, 0);
+    assert.match(result.error, /doesn.t support inline images or the Unicode block characters/);
+  } finally {
+    fs.unlinkSync(file);
+  }
+});
+
 test('a Kitty overlay escape is treated as zero-width and untruncated by the text pipeline', async () => {
   const width = 4; const height = 4;
   const png = buildPng(width, height, (x, y) => [x * 64, y * 64, 0]);

@@ -27,6 +27,10 @@ export function render(app, region) {
   const body = [];
   let imageOverlay = null;
 
+  // The next poll (app.mjs's pollBrowserFrame) reads this to size its
+  // screenshot request — see the half-block resolution cap there.
+  app.browserRenderBudget = { cols: Math.max(1, inner), rows: Math.max(1, bodyHeight) };
+
   if (!app.browserTarget) {
     body.push(gutter(theme) + theme.paint('No browser tab selected.', { fg: theme.roles.muted, italic: true }));
     body.push(gutter(theme) + theme.paint('Press ↵ to pick one, or launch a browser from the mod shop first.', { fg: theme.roles.muted }));

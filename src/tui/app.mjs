@@ -7,6 +7,7 @@ import path from 'node:path';
 import { headerBand, hintRail, statusRail, tabStrip } from './chrome.mjs';
 import { frameColour, panel } from './box.mjs';
 import { isImagePath } from './image/render.mjs';
+import { detectImageProtocol } from './image/protocol.mjs';
 import { Keyboard } from './input.mjs';
 import { hstack, overlay as paintOverlay, split, vstack } from './layout.mjs';
 import { ConfirmOverlay, FormOverlay, PaletteOverlay, PickerOverlay, TextOverlay } from './overlays.mjs';
@@ -184,6 +185,11 @@ export class MaskShiftTui {
     this.browserTarget = null; // { instanceId, tabId } | null
     this.browserFrame = null; // { buffer, cssWidth, cssHeight, cols, rows, title, url, error }
     this.browserFrameId = 0;
+    // The view's own cell budget as of its last paint (see browser.mjs's
+    // render()) — the next poll uses it to cap how large a screenshot it
+    // asks Chrome for. Falls back to a reasonable guess before the view has
+    // painted even once.
+    this.browserRenderBudget = { cols: 100, rows: 32 };
     this.browserTyping = false;
     this.browserPollTimer = null;
     this.browserPollBusy = false;
@@ -1543,7 +1549,16 @@ export class MaskShiftTui {
     this.browserPollBusy = true;
     try {
       const { instanceId, tabId } = this.browserTarget;
-      const frame = await this.runtime.browserManager.captureFrame({ instanceId, tabId });
+      // Only the half-block fallback needs to decode this screenshot itself
+      // (Kitty passes PNG bytes straight through, iTerm2 only reads the
+      // header) — so only it needs a resolution cap to stay fast; for the
+      // other two, more pixels cost nothing here and only help crispness.
+      // Half-block samples at most two source pixel-rows per terminal row,
+      // so anything past `cols` x `rows * 2` is wasted decode work.
+      const capped = detectImageProtocol() === 'halfblock';
+      const maxWidth = capped ? Math.max(1, this.browserRenderBudget.cols) : null;
+      const maxHeight = capped ? Math.max(1, this.browserRenderBudget.rows * 2) : null;
+      const frame = await this.runtime.browserManager.captureFrame({ instanceId, tabId, maxWidth, maxHeight });
       this.browserFrameId += 1;
       this.browserPollTick += 1;
       let { title, url } = this.browserFrame || {};
