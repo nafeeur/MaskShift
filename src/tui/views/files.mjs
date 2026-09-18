@@ -1,11 +1,14 @@
 // 02 FILES — workspace map and source preview.
 
+import path from 'node:path';
 import { glyphs, panel } from '../box.mjs';
+import { buildImagePreview } from '../image/render.mjs';
 import { highlight } from '../markdown.mjs';
 import { hstack } from '../layout.mjs';
 import { split } from '../layout.mjs';
 import { LAYER, listZone, viewportZone } from '../regions.mjs';
 import { expandTabs, fit, truncate } from '../text.mjs';
+import { hexToRgb } from '../theme.mjs';
 import { SPACE } from '../tokens.mjs';
 import { columns, gutter } from '../type.mjs';
 import { filterRow, listRow, sidePane } from './catalog.mjs';
@@ -89,7 +92,38 @@ export function render(app, region) {
 
   const current = app.fileList.current;
   const previewBody = [];
-  if (app.previewError) {
+  let previewStamp = '';
+  let imageOverlay = null;
+  if (app.previewIsImage) {
+    const absolute = path.join(app.workspace.path, app.previewPath);
+    const maxCols = Math.max(1, previewWidth - 4);
+    const maxRows = Math.max(1, height - 1);
+    // Decoding and resampling only has to happen again when the file or the
+    // available box actually changes — every other repaint (scrolling,
+    // typing, an unrelated toast) reuses the same rows.
+    const cacheKey = `${absolute}:${maxCols}x${maxRows}`;
+    if (app._imagePreviewCache?.key !== cacheKey) {
+      app._imagePreviewCache = { key: cacheKey, ...buildImagePreview(theme, absolute, { maxCols, maxRows, hexToRgb }) };
+    }
+    const cached = app._imagePreviewCache;
+    if (cached.error) {
+      previewBody.push(gutter(theme) + theme.paint(cached.error, { fg: theme.roles.danger }));
+    } else {
+      previewBody.push(...cached.lines);
+      previewStamp = `${cached.lines.length} ROWS`;
+      if (cached.overlay) {
+        // previewBody[0] lands on the side pane's own line 1 (its line 0 is
+        // the title rule), one column in from its left edge (the pane's own
+        // leading-space inset) — see sidePane() in catalog.mjs.
+        imageOverlay = {
+          row: region.row + 1,
+          column: region.column + treeWidth + 1,
+          escape: cached.overlay.escape,
+          key: cached.overlay.key,
+        };
+      }
+    }
+  } else if (app.previewError) {
     previewBody.push(gutter(theme) + theme.paint(app.previewError, { fg: theme.roles.danger }));
   } else if (!app.previewLines.length) {
     previewBody.push(gutter(theme) + theme.paint('Select a file to read it here.', { fg: theme.roles.muted, italic: true }));
@@ -104,19 +138,20 @@ export function render(app, region) {
     ));
     app.preview.set(painted);
     previewBody.push(...app.preview.render(height - 1, previewWidth - 2));
+    previewStamp = `${app.previewLines.length} LINES`;
   }
 
   // No frame here: the tree's own right-hand rule already divides the two.
   const preview = sidePane(app, {
     width: previewWidth, height,
     title: app.previewPath ? truncate(app.previewPath, 40) : 'SOURCE VIEW',
-    stamp: app.previewLines.length ? `${app.previewLines.length} LINES` : '',
+    stamp: previewStamp,
     focused: app.focus === 'preview',
     body: previewBody,
   });
 
   registerRegions(app, region, { treeWidth, previewWidth, listHeight });
-  return { lines: hstack([{ lines: tree, width: treeWidth }, { lines: preview, width: previewWidth }], height), cursor: null };
+  return { lines: hstack([{ lines: tree, width: treeWidth }, { lines: preview, width: previewWidth }], height), cursor: null, imageOverlay };
 }
 
 function registerRegions(app, region, { treeWidth, previewWidth, listHeight }) {

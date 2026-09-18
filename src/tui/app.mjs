@@ -6,6 +6,7 @@
 import path from 'node:path';
 import { headerBand, hintRail, statusRail, tabStrip } from './chrome.mjs';
 import { frameColour, panel } from './box.mjs';
+import { isImagePath } from './image/render.mjs';
 import { Keyboard } from './input.mjs';
 import { hstack, overlay as paintOverlay, split, vstack } from './layout.mjs';
 import { ConfirmOverlay, FormOverlay, PaletteOverlay, PickerOverlay, TextOverlay } from './overlays.mjs';
@@ -175,6 +176,7 @@ export class MaskShiftTui {
     this.previewPath = '';
     this.previewLines = [];
     this.previewError = '';
+    this.previewIsImage = false;
     this.preview = new Viewport();
 
     // Terminal.
@@ -475,6 +477,12 @@ export class MaskShiftTui {
     const rendered = module.render(this, region);
     let body = rendered.lines;
     this.lastRegion = region;
+    // A modal draws its own curtain over the body in text, which a terminal
+    // graphics placement doesn't necessarily respect — safer to not (re)send
+    // one while anything is drawn on top, and to force a fresh send once it
+    // closes rather than trust a placement the curtain may have disturbed.
+    const imageOverlay = this.overlay ? null : rendered.imageOverlay || null;
+    if (this.overlay) this.screen.imageKey = null;
 
     if (showRail) {
       const railLines = rail.render(this, { row: 2, column: mainWidth, width: railWidth, height: bodyHeight });
@@ -530,7 +538,7 @@ export class MaskShiftTui {
       cursor = drawn.cursor;
     }
 
-    this.screen.render(frame, cursor);
+    this.screen.render(frame, cursor, imageOverlay);
     this.lastFrame = frame;
     return frame;
   }
@@ -715,6 +723,7 @@ export class MaskShiftTui {
     this.previewPath = '';
     this.previewLines = [];
     this.previewError = '';
+    this.previewIsImage = false;
   }
 
   refreshCatalogs() {
@@ -1028,6 +1037,17 @@ export class MaskShiftTui {
     const generation = ++this.previewGeneration;
     this.previewPath = relative;
     this.previewError = '';
+    // An image is decoded and rendered straight from disk at paint time (see
+    // files.mjs) rather than read as text here — there is no line content to
+    // fetch, just a file to hand to the image renderer.
+    this.previewIsImage = isImagePath(relative);
+    if (this.previewIsImage) {
+      this.previewLines = [];
+      this.preview.toTop();
+      if (!quiet) this.focus = 'preview';
+      this.requestRender();
+      return;
+    }
     try {
       const result = await this.runtime.toolRegistry.execute('fs_read', {
         path: relative, withLineNumbers: false,
