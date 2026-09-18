@@ -499,18 +499,27 @@ export class MaskShiftTui {
       this.lastFrame = frame;
       return frame;
     }
-    const bodyHeight = Math.max(4, rows - 4);
-    this.bodyRegion = { row: 2, column: 0, width: columns, height: bodyHeight };
+    // A one-column, one-row margin around the active view — the outer frame
+    // used to touch the tab strip above it and the terminal's own left/right
+    // edges directly, with the panel's content starting flush against its
+    // own border on every side. Small on purpose: a whole blank row/column
+    // reads as generous already at typical terminal cell sizes: any more
+    // would just be giving up rows a small terminal window can't spare.
+    const marginX = columns >= MIN_COLUMNS + 4 ? 1 : 0;
+    const marginY = rows >= MIN_ROWS + 2 ? 1 : 0;
+    const usableWidth = columns - marginX * 2;
+    const bodyHeight = Math.max(4, rows - 4 - marginY * 2);
+    this.bodyRegion = { row: 2 + marginY, column: marginX, width: usableWidth, height: bodyHeight };
     // Click targets describe the frame being drawn, so they are rebuilt with it.
     this.regions.clear();
 
-    const showRail = this.railVisible && columns >= 108;
+    const showRail = this.railVisible && usableWidth >= 108;
     const [mainWidth, railWidth] = showRail
-      ? split(columns, [{ weight: 3, min: 60 }, { weight: 1, min: 30, max: 46 }])
-      : [columns, 0];
+      ? split(usableWidth, [{ weight: 3, min: 60 }, { weight: 1, min: 30, max: 46 }])
+      : [usableWidth, 0];
 
     const module = this.modules.get(this.view);
-    const region = { row: 2, column: 0, width: mainWidth, height: bodyHeight };
+    const region = { row: 2 + marginY, column: marginX, width: mainWidth, height: bodyHeight };
     this.bodyRegion = region;
     this.maskBreathing = false;
     const rendered = module.render(this, region);
@@ -524,14 +533,18 @@ export class MaskShiftTui {
     if (this.overlay) this.screen.imageKey = null;
 
     if (showRail) {
-      const railLines = rail.render(this, { row: 2, column: mainWidth, width: railWidth, height: bodyHeight });
+      const railLines = rail.render(this, { row: 2 + marginY, column: marginX + mainWidth, width: railWidth, height: bodyHeight });
       body = hstack([{ lines: body, width: mainWidth }, { lines: railLines, width: railWidth }], bodyHeight);
     }
+    if (marginX) body = body.map((line) => ' '.repeat(marginX) + line + ' '.repeat(marginX));
 
+    const marginRow = ' '.repeat(columns);
     let frame = vstack([
       [headerBand(this, columns)],
       [tabStrip(this, columns)],
+      marginY ? [marginRow] : [],
       body,
+      marginY ? [marginRow] : [],
       [statusRail(this, columns)],
       [hintRail(this, columns)],
     ], rows, columns);
@@ -547,7 +560,7 @@ export class MaskShiftTui {
       const toastBottom = this.view === 'chat' && this.lastRegion && this.chatPanes
         ? this.lastRegion.row + 1 + this.chatPanes.transcriptHeight
         : rows - 3;
-      frame = paintOverlay(frame, toastLines, { row: Math.max(2, toastBottom - toastLines.length), column: columns - Math.min(58, columns - 2) }, columns);
+      frame = paintOverlay(frame, toastLines, { row: Math.max(2 + marginY, toastBottom - toastLines.length), column: columns - Math.min(58, columns - 2) }, columns);
     }
 
     if (!this.overlay && this.view === 'chat' && this.focus === 'composer' && !this.busy && this.lastRegion && this.chatPanes) {
@@ -562,7 +575,7 @@ export class MaskShiftTui {
           theme, width, height: body.length + 2, title: 'COMMANDS', body,
           colour: frameColour(theme, true), focused: true,
         });
-        frame = paintOverlay(frame, lines, { row: Math.max(2, suggestBottom - lines.length), column: 2 }, columns);
+        frame = paintOverlay(frame, lines, { row: Math.max(2 + marginY, suggestBottom - lines.length), column: 2 + marginX }, columns);
       }
     }
 
@@ -570,9 +583,9 @@ export class MaskShiftTui {
       // Confined to the body band (never the header, tab strip, status or
       // hint rows) so a tall overlay can't collide with global chrome, and
       // curtained first so nothing behind it bleeds through on either side.
-      const drawn = this.overlay.render(this, { columns, rows: bodyHeight, top: 2 });
+      const drawn = this.overlay.render(this, { columns, rows: bodyHeight, top: 2 + marginY });
       const curtain = new Array(bodyHeight).fill(' '.repeat(columns));
-      frame = paintOverlay(frame, curtain, { row: 2, column: 0 }, columns);
+      frame = paintOverlay(frame, curtain, { row: 2 + marginY, column: 0 }, columns);
       frame = paintOverlay(frame, drawn.lines, drawn.offset, columns);
       cursor = drawn.cursor;
     }

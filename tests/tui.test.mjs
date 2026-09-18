@@ -1050,13 +1050,13 @@ test('the interface routes clicks, wheels and drags to what it painted', async (
   app.focus = 'composer';
   at(4, 20);
   assert.equal(app.focus, 'transcript');
-  at(34, 20);
+  at(31, 20);
   assert.equal(app.focus, 'composer');
 
   // Rail sections are tabs now, not just a ctrl+r cycle.
-  at(2, 108);
+  at(3, 108);
   assert.equal(app.railTab, 'telemetry');
-  at(2, 100);
+  at(3, 100);
   assert.equal(app.railTab, 'plan');
 
   // The wheel scrolls the pane under the pointer without moving focus.
@@ -1071,8 +1071,8 @@ test('the interface routes clicks, wheels and drags to what it painted', async (
   assert.equal(app.focus, 'composer');
 
   // Dragging the scrollbar track jumps to that position. With the rail shown
-  // the stage is 99 columns wide, so its track sits at column 97.
-  at(3, 97);
+  // the stage is 98 columns wide, so its track sits at column 97.
+  at(4, 97);
   const top = app.transcript.offset;
   app.onMouse(decode(`${ESC}[<32;98;30M`).events[0]);
   assert.ok(app.transcript.offset > top, 'dragging the track should scroll down');
@@ -1113,9 +1113,17 @@ test('the heist view keeps the composer inside one unclipped frame', async (t) =
     app.composer.set(draft);
     app.screen.invalidate();
     const frame = app.snapshot();
-    const body = frame.slice(2, frame.length - 2).map(stripAnsi);
-    assert.ok(body.at(-1).startsWith('┗'), `frame should close, got "${body.at(-1)}"`);
-    assert.equal(body.filter((line) => line.startsWith('┏')).length, 1, 'exactly one frame opens');
+    // Trim the header/tab strip above and status/hint rail below — a blank
+    // breathing-room row can sit on either side of the panel now, so an
+    // assumed fixed offset isn't reliable, but the panel's own open/close
+    // border rows still are.
+    const stripped = frame.map(stripAnsi);
+    const openIndex = stripped.findIndex((line) => line.trimStart().startsWith('┏'));
+    const closeIndex = stripped.findIndex((line) => line.trimStart().startsWith('┗'));
+    assert.ok(openIndex >= 0 && closeIndex > openIndex, `frame should open and close, got open=${openIndex} close=${closeIndex}`);
+    const body = stripped.slice(openIndex, closeIndex + 1);
+    assert.ok(body.at(-1).trimStart().startsWith('┗'), `frame should close, got "${body.at(-1)}"`);
+    assert.equal(body.filter((line) => line.trimStart().startsWith('┏')).length, 1, 'exactly one frame opens');
     for (const line of frame) assert.equal(visibleWidth(line), 120);
   }
 });
