@@ -191,18 +191,14 @@ the right rail, and `ctrl+k` opens a fuzzy command palette over every action.
 | **06 TERMINAL** | The host shell |
 | **07 BROWSER** | A live, clickable, typeable view of a running browser tab — the same CDP connection the browser tools drive |
 
-Inline images — a Files preview, a chat screenshot result, or the live BROWSER view below —
-render through whatever the terminal actually supports, picked automatically: the Kitty graphics
+Inline images — a Files preview, a chat screenshot result, or the live BROWSER view — render
+through whatever the terminal actually supports, picked automatically: the Kitty graphics
 protocol, iTerm2's inline-image escape, or a universal Unicode half-block fallback for everything
 else, degraded further to a clear message on a terminal with no Unicode support at all. None of
 it needs a dependency: the PNG, JPEG and BMP decoders are hand-written against Node's built-in
 `zlib`.
 
 <table>
-<tr>
-<td width="50%"><img width="100%" alt="A live, clickable browser tab inside the terminal" src="docs/screenshots/browser.svg"><br><sub><b>07 BROWSER</b> — click, scroll and type into a real running tab without leaving the terminal</sub></td>
-<td width="50%"><img width="100%" alt="An image decoded and rendered inline in the Files preview" src="docs/screenshots/files-image.svg"><br><sub><b>02 FILES</b> — a raster image, decoded and rendered inline, zero dependencies</sub></td>
-</tr>
 <tr>
 <td width="50%"><img width="100%" alt="Tools and skills catalogue" src="docs/screenshots/arsenal.svg"><br><sub><b>03 ARSENAL</b> — see exactly what a run can reach before it uses it</sub></td>
 <td width="50%"><img width="100%" alt="MCP network" src="docs/screenshots/network.svg"><br><sub><b>04 NETWORK</b> — connect a server on demand</sub></td>
