@@ -120,6 +120,7 @@ export function render(app, region) {
           column: region.column + treeWidth + 1,
           escape: cached.overlay.escape,
           key: cached.overlay.key,
+          protocol: cached.overlay.protocol,
         };
       }
     }

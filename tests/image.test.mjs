@@ -4,7 +4,9 @@ import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import test from 'node:test';
-import { decodePng, readPngSize } from '../src/tui/image/png.mjs';
+import { decodeBmp } from '../src/tui/image/bmp.mjs';
+import { decodeJpeg } from '../src/tui/image/jpeg.mjs';
+import { decodePng, encodePng, readPngSize } from '../src/tui/image/png.mjs';
 import { detectImageProtocol } from '../src/tui/image/protocol.mjs';
 import { buildImagePreview, isImagePath } from '../src/tui/image/render.mjs';
 import { Theme, hexToRgb } from '../src/tui/theme.mjs';
@@ -12,6 +14,15 @@ import { fit, sanitizeTerminalLine, visibleWidth } from '../src/tui/text.mjs';
 import { detectImageResult } from '../src/tui/views/chat.mjs';
 
 const SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+// An 8x8 baseline JPEG (quality 90), four 4x4 solid-colour quadrants —
+// red/green top, blue/yellow bottom — encoded once with Pillow (libjpeg)
+// so this test has a real, independently-produced JPEG to decode rather
+// than one built by the same code under test.
+const JPEG_QUADRANTS_FIXTURE = Buffer.from(
+  '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMDAsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/wAARCAAIAAgDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDK/YJ0X/hcv/Cdfvv7H/s37D/D5/meZ9o91xjy/fOfaiiiv5N+kDRp8J+JWaZNky9lh6XseWPxW5sPSm9Z80neUm9W97LSyOTMeGcp45xU+IeIaPtsXWtzz5pQvyJQj7sJRirRjFaRV7Xd22z/2Q==',
+  'base64',
+);
 
 function crc32(buffer) {
   let crc = 0xffffffff;
@@ -212,4 +223,162 @@ test('detectImageResult stays quiet for ordinary tool output, non-tool messages,
   assert.equal(detectImageResult({ role: 'tool', content: 'node --test tests/tui.test.mjs → 12 pass, 0 fail' }, workspacePath), null);
   assert.equal(detectImageResult({ role: 'tool', content: JSON.stringify({ file: '/work/report.pdf' }) }, workspacePath), null);
   assert.equal(detectImageResult({ role: 'assistant', content: '/work/shot.png' }, workspacePath), null);
+});
+
+function assertNear(actual, expected, tolerance, message) {
+  assert.ok(Math.abs(actual - expected) <= tolerance, `${message}: expected ~${expected}, got ${actual}`);
+}
+
+test('decodeJpeg decodes a real (Pillow/libjpeg-encoded) baseline JPEG correctly', () => {
+  const decoded = decodeJpeg(JPEG_QUADRANTS_FIXTURE);
+  assert.equal(decoded.width, 8);
+  assert.equal(decoded.height, 8);
+  const pixel = (x, y) => {
+    const i = (y * 8 + x) * 4;
+    return [decoded.rgba[i], decoded.rgba[i + 1], decoded.rgba[i + 2]];
+  };
+  const quadrants = [
+    { at: [1, 1], expect: [255, 0, 0] }, // top-left: red
+    { at: [6, 1], expect: [0, 255, 0] }, // top-right: green
+    { at: [1, 6], expect: [0, 0, 255] }, // bottom-left: blue
+    { at: [6, 6], expect: [255, 255, 0] }, // bottom-right: yellow
+  ];
+  for (const { at, expect } of quadrants) {
+    const [r, g, b] = pixel(...at);
+    assertNear(r, expect[0], 20, `red at (${at})`);
+    assertNear(g, expect[1], 20, `green at (${at})`);
+    assertNear(b, expect[2], 20, `blue at (${at})`);
+  }
+});
+
+test('decodeJpeg rejects progressive and non-baseline JPEGs instead of mis-decoding them', () => {
+  // SOF2 (0xC2) is the progressive marker — swap the fixture's SOF0 (0xC0) for it.
+  const corrupted = Buffer.from(JPEG_QUADRANTS_FIXTURE);
+  const sofIndex = corrupted.indexOf(Buffer.from([0xff, 0xc0]));
+  assert.ok(sofIndex >= 0, 'fixture should contain an SOF0 marker');
+  corrupted[sofIndex + 1] = 0xc2;
+  assert.throws(() => decodeJpeg(corrupted), /[Pp]rogressive/);
+  assert.throws(() => decodeJpeg(Buffer.from([0x00, 0x01, 0x02])), /SOI/);
+});
+
+/** Build a minimal uncompressed 24-bit BMP (BITMAPINFOHEADER) by hand — the
+ *  format is simple enough that a fixture doesn't need Pillow's help. */
+function buildBmp(width, height, pixelAt) {
+  const rowSize = Math.ceil((width * 3) / 4) * 4;
+  const pixelDataSize = rowSize * height;
+  const fileSize = 14 + 40 + pixelDataSize;
+  const buffer = Buffer.alloc(fileSize);
+  buffer.write('BM', 0, 'ascii');
+  buffer.writeUInt32LE(fileSize, 2);
+  buffer.writeUInt32LE(14 + 40, 10); // pixel data offset
+  buffer.writeUInt32LE(40, 14); // header size (BITMAPINFOHEADER)
+  buffer.writeInt32LE(width, 18);
+  buffer.writeInt32LE(height, 22); // positive: bottom-up
+  buffer.writeUInt16LE(1, 26); // planes
+  buffer.writeUInt16LE(24, 28); // bits per pixel
+  buffer.writeUInt32LE(0, 30); // BI_RGB
+  for (let y = 0; y < height; y += 1) {
+    const sourceRow = height - 1 - y; // bottom-up storage
+    const rowStart = 14 + 40 + y * rowSize;
+    for (let x = 0; x < width; x += 1) {
+      const [r, g, b] = pixelAt(x, sourceRow);
+      const offset = rowStart + x * 3;
+      buffer[offset] = b; buffer[offset + 1] = g; buffer[offset + 2] = r;
+    }
+  }
+  return buffer;
+}
+
+test('decodeBmp reads an uncompressed 24-bit BMP pixel-exact', () => {
+  const bmp = buildBmp(4, 3, (x, y) => [x * 60, y * 80, 255 - x * 60]);
+  const decoded = decodeBmp(bmp);
+  assert.equal(decoded.width, 4);
+  assert.equal(decoded.height, 3);
+  for (let y = 0; y < 3; y += 1) {
+    for (let x = 0; x < 4; x += 1) {
+      const i = (y * 4 + x) * 4;
+      assert.equal(decoded.rgba[i], x * 60);
+      assert.equal(decoded.rgba[i + 1], y * 80);
+      assert.equal(decoded.rgba[i + 2], 255 - x * 60);
+      assert.equal(decoded.rgba[i + 3], 255);
+    }
+  }
+});
+
+test('decodeBmp rejects compressed and paletted BMPs instead of mis-decoding them', () => {
+  assert.throws(() => decodeBmp(Buffer.from('not a bmp')), /signature/);
+  const bmp = buildBmp(2, 2, () => [0, 0, 0]);
+  bmp.writeUInt32LE(1, 30); // claim BI_RLE8 compression
+  assert.throws(() => decodeBmp(bmp), /[Cc]ompressed/);
+});
+
+test('encodePng round-trips arbitrary RGBA pixels exactly', () => {
+  const width = 5; const height = 4;
+  const rgba = Buffer.alloc(width * height * 4);
+  for (let i = 0; i < width * height; i += 1) {
+    rgba[i * 4] = (i * 17) % 256; rgba[i * 4 + 1] = (i * 31) % 256;
+    rgba[i * 4 + 2] = (i * 53) % 256; rgba[i * 4 + 3] = i % 2 === 0 ? 255 : 128;
+  }
+  const png = encodePng(width, height, rgba);
+  const decoded = decodePng(png);
+  assert.equal(decoded.width, width);
+  assert.equal(decoded.height, height);
+  assert.deepEqual(Buffer.from(decoded.rgba), rgba);
+});
+
+test('buildImagePreview on a Kitty terminal re-encodes JPEG as PNG instead of sending raw JPEG bytes tagged f=100', () => {
+  const theme = new Theme({ depth: 24, unicode: true });
+  const file = path.join(os.tmpdir(), `maskshift-kitty-jpeg-${process.pid}.jpg`);
+  fs.writeFileSync(file, JPEG_QUADRANTS_FIXTURE);
+  const previous = process.env.MASKSHIFT_IMAGE;
+  process.env.MASKSHIFT_IMAGE = 'kitty';
+  try {
+    const result = buildImagePreview(theme, file, { maxCols: 20, maxRows: 10, hexToRgb });
+    assert.equal(result.error, undefined);
+    assert.ok(result.overlay);
+    // f=100 means "the payload is PNG data" — extract it and confirm it
+    // really is a valid, decodable PNG rather than the original JPEG bytes.
+    const match = /;([A-Za-z0-9+/=]+)\x1b\\/.exec(result.overlay.escape.split('f=100').at(-1));
+    assert.ok(match, 'expected a base64 payload after the f=100 control segment');
+    const payload = Buffer.from(match[1], 'base64');
+    const decoded = decodePng(payload);
+    assert.ok(decoded.width > 0 && decoded.height > 0);
+  } finally {
+    if (previous === undefined) delete process.env.MASKSHIFT_IMAGE; else process.env.MASKSHIFT_IMAGE = previous;
+    fs.unlinkSync(file);
+  }
+});
+
+test('buildImagePreview on a Kitty terminal refuses an undecodable format instead of sending malformed bytes', () => {
+  const theme = new Theme({ depth: 24, unicode: true });
+  const file = path.join(os.tmpdir(), `maskshift-kitty-gif-${process.pid}.gif`);
+  fs.writeFileSync(file, Buffer.from('GIF89a'));
+  const previous = process.env.MASKSHIFT_IMAGE;
+  process.env.MASKSHIFT_IMAGE = 'kitty';
+  try {
+    const result = buildImagePreview(theme, file, { maxCols: 20, maxRows: 10, hexToRgb });
+    assert.equal(result.overlay, undefined);
+    assert.match(result.error, /PNG data/);
+  } finally {
+    if (previous === undefined) delete process.env.MASKSHIFT_IMAGE; else process.env.MASKSHIFT_IMAGE = previous;
+    fs.unlinkSync(file);
+  }
+});
+
+test('buildImagePreview on iTerm2 passes any recognised image format through unmodified, format-agnostic', () => {
+  const theme = new Theme({ depth: 24, unicode: true });
+  const file = path.join(os.tmpdir(), `maskshift-iterm-gif-${process.pid}.gif`);
+  const gifBytes = Buffer.from('GIF89a-not-a-real-gif-but-iterm-does-not-care');
+  fs.writeFileSync(file, gifBytes);
+  const previous = process.env.MASKSHIFT_IMAGE;
+  process.env.MASKSHIFT_IMAGE = 'iterm';
+  try {
+    const result = buildImagePreview(theme, file, { maxCols: 20, maxRows: 10, hexToRgb });
+    assert.equal(result.error, undefined);
+    assert.ok(result.overlay);
+    assert.ok(result.overlay.escape.includes(gifBytes.toString('base64')));
+  } finally {
+    if (previous === undefined) delete process.env.MASKSHIFT_IMAGE; else process.env.MASKSHIFT_IMAGE = previous;
+    fs.unlinkSync(file);
+  }
 });

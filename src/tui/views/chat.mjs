@@ -365,6 +365,7 @@ export function render(app, region) {
         column: region.column + CONTENT_OFFSET,
         escape: block.overlay.escape,
         key: block.overlay.key,
+        protocol: block.overlay.protocol,
       };
       break;
     }
