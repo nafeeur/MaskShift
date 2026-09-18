@@ -76,6 +76,13 @@ export class Screen {
     // placement until something explicitly deletes it or the alt-screen
     // itself is torn down, so simply stopping isn't enough.
     this.imageProtocol = null;
+    // Where it was last drawn — an unchanged image that *scrolled* (same
+    // key, new row) still needs resending: Kitty's placement is a cell-
+    // coordinate overlay outside the normal text grid, so redrawing that
+    // row's text alone leaves the old placement floating at its old
+    // position instead of following the content it was anchored to.
+    this.imageRow = null;
+    this.imageColumn = null;
     // Deliberately doesn't also reset imageKey/imageProtocol: render()'s own
     // overlay diff is the one place that decides an image needs clearing
     // from the real terminal, and it can only make that call correctly if
@@ -119,6 +126,8 @@ export class Screen {
     const clearImage = this.imageProtocol === 'kitty' ? ANSI.kittyDeleteImages : '';
     this.imageKey = null;
     this.imageProtocol = null;
+    this.imageRow = null;
+    this.imageColumn = null;
     this.write(`${clearImage}${ANSI.focusOff}${ANSI.reset}${ANSI.showCursor}${ANSI.altScreenOff}${ANSI.restoreTitle}`);
     // Writing is synchronous for a TTY, but the handle itself stays referenced until told
     // otherwise, which is what kept the process alive after quitting.
@@ -181,10 +190,17 @@ export class Screen {
       changedRows += 1;
       out += `${ANSI.moveTo(row, 0)}${ANSI.clearLine}${frame[row]}${ANSI.reset}`;
     }
-    if (overlay && (overlay.key !== this.imageKey || fullRepaint)) {
+    const moved = overlay && (overlay.row !== this.imageRow || overlay.column !== this.imageColumn);
+    if (overlay && (overlay.key !== this.imageKey || moved || fullRepaint)) {
+      // Kitty's placement escape already carries its own delete-all prefix
+      // (see image/render.mjs's kittyLines), so resending it here — even
+      // for the exact same image, just scrolled to a new row — both moves
+      // it and cleans up whatever was at its old position in one write.
       out += `${ANSI.moveTo(overlay.row, overlay.column)}${overlay.escape}`;
       this.imageKey = overlay.key;
       this.imageProtocol = overlay.protocol || null;
+      this.imageRow = overlay.row;
+      this.imageColumn = overlay.column;
     } else if (!overlay && this.imageKey) {
       // The escape that drew a *new* image already carries its own
       // Kitty delete-all prefix (see image/render.mjs), so that transition
@@ -192,6 +208,8 @@ export class Screen {
       if (this.imageProtocol === 'kitty') out += ANSI.kittyDeleteImages;
       this.imageKey = null;
       this.imageProtocol = null;
+      this.imageRow = null;
+      this.imageColumn = null;
     }
     if (cursor) out += `${ANSI.moveTo(cursor.row, cursor.column)}${ANSI.showCursor}`;
     else if (this.cursor) out += ANSI.hideCursor;
