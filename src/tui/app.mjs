@@ -20,6 +20,7 @@ import { Composer, ListView, Spinner, TextField, Toasts, Viewport } from './widg
 import { columns, gutter, key as typeKey, label as sectionLabel } from './type.mjs';
 import { VERSION, runCommand, safeJsonParse } from '../core/utils.mjs';
 import { tokenCounts } from '../core/pricing.mjs';
+import { notify } from '../notify/index.mjs';
 import { VoiceInput } from '../voice/index.mjs';
 import * as chatView from './views/chat.mjs';
 import * as filesView from './views/files.mjs';
@@ -51,6 +52,7 @@ const SLASH_COMMANDS = [
   { name: 'clear', hint: 'clear the transcript' },
   { name: 'model', hint: 'switch persona/model' },
   { name: 'sessions', hint: 'browse sessions' },
+  { name: 'search', hint: 'grep every session for a phrase' },
   { name: 'workspace', hint: 'switch workspace' },
   { name: 'tools', hint: 'browse tools' },
   { name: 'skills', hint: 'browse skills' },
@@ -91,6 +93,9 @@ export class MaskShiftTui {
     // Rebuilt every frame; see regions.mjs.
     this.regions = new Regions();
     this.dragging = null;
+    // Assumed focused until a terminal that actually supports DEC 1004 says
+    // otherwise — so on one that doesn't, this just never gates anything.
+    this.terminalFocused = true;
 
     this.views = VIEWS.map((module) => module.meta);
     this.modules = new Map(VIEWS.map((module) => [module.meta.id, module]));
@@ -121,6 +126,7 @@ export class MaskShiftTui {
     this.streamingText = null;
     this.tokenHistory = [];
     this.totals = { input: 0, output: 0, cost: 0 };
+    this.costBudgetWarned = false;
     this.startedAt = null;
     this.endedAt = null;
     this.step = 0;
@@ -552,6 +558,10 @@ export class MaskShiftTui {
 
   onKey(event) {
     try {
+      // Not a keystroke — DEC 1004 focus reporting (see screen.mjs/input.mjs)
+      // arrives on the same stream. Tracked so a finished run can tell
+      // "nobody's looking at this terminal right now" before it notifies.
+      if (event.name === 'focus') { this.terminalFocused = event.focused; return; }
       if (this.overlay) {
         this.overlay.handle(this, event);
         this.requestRender();
@@ -770,6 +780,7 @@ export class MaskShiftTui {
     this.pendingCalls.clear();
     this.tokenHistory = [];
     this.totals = { input: 0, output: 0, cost: latest?.meta?.costEstimate?.cost || 0 };
+    this.costBudgetWarned = false;
     for (const message of this.messages) {
       const usage = message.meta?.usage;
       if (!usage) continue;
@@ -818,6 +829,7 @@ export class MaskShiftTui {
     this.capabilitySnapshot = null;
     this.activeCapabilities.clear();
     this.totals = { input: 0, output: 0, cost: 0 };
+    this.costBudgetWarned = false;
     this.tokenHistory = [];
     this.step = 0;
     this.startedAt = null;
@@ -900,6 +912,32 @@ export class MaskShiftTui {
     if (!this.runId) return;
     this.runtime.engine.cancel(this.runId);
     this.toast('Retreat signalled', 'warn');
+  }
+
+  /** A desktop notification for a run that just finished while the operator
+   *  was looking elsewhere — gated on focus (best-effort; see screen.mjs),
+   *  on the setting being turned on, and on the run having actually taken
+   *  a while, so a two-second lookup doesn't also ping the desktop. */
+  notifyRunFinished(label, run) {
+    const config = this.runtime.config.get().notifications || {};
+    if (!config.enabled || this.terminalFocused) return;
+    const duration = this.startedAt ? Date.now() - this.startedAt : 0;
+    if (duration < (config.minDurationMs ?? 15_000)) return;
+    notify({
+      title: `MaskShift — ${label}`,
+      message: oneLine(this.sessionTitle || run?.prompt || 'Run finished', 120),
+      command: config.command,
+    }, { onError: (error) => this.runtime.logger?.warn?.(`Desktop notification failed: ${error.message}`) });
+  }
+
+  /** A soft spend guardrail: never blocks a run, just makes the header cost
+   *  chip read as a warning and says so once per session when it's first
+   *  crossed, rather than staying silent about it forever after. */
+  checkCostBudget() {
+    const budget = this.runtime.config.get().costBudget?.session;
+    if (!budget || this.totals.cost < budget || this.costBudgetWarned) return;
+    this.costBudgetWarned = true;
+    this.toast(`Session cost $${this.totals.cost.toFixed(2)} has crossed the $${budget.toFixed(2)} budget`, 'warn');
   }
 
   // ------------------------------------------------------------- event bridge
@@ -987,6 +1025,8 @@ export class MaskShiftTui {
         this.sessionTitle = session?.title || this.sessionTitle;
         const outcome = HEIST_OUTCOME[event.type] || { tone: 'error', label: event.type.replace('run.', '').toUpperCase() };
         this.toast(`${outcome.label}${payload.error ? ` — ${oneLine(payload.error, 90)}` : ''}`, outcome.tone);
+        this.notifyRunFinished(outcome.label, run);
+        this.checkCostBudget();
         void this.refreshGit();
         if (this.promptQueue.length) setImmediate(() => void this.drainPromptQueue());
         break;
@@ -1591,6 +1631,34 @@ export class MaskShiftTui {
     });
   }
 
+  /** Grep every session in this workspace's history for a phrase — "when did
+   *  I ask about X" — rather than only the currently open one. Selecting a
+   *  result switches to the session it was found in. */
+  openSearchResults(query) {
+    const trimmed = String(query || '').trim();
+    if (!trimmed) { this.toast('Usage: /search <text>', 'warn'); return; }
+    const results = this.runtime.store.searchMessages(trimmed, { workspaceId: this.workspaceId, limit: 60 });
+    if (!results.length) { this.toast(`No messages matching "${trimmed}"`, 'info'); return; }
+    const needle = trimmed.toLowerCase();
+    this.overlay = new PickerOverlay({
+      title: `SEARCH: ${trimmed.toUpperCase()}`,
+      placeholder: 'Filter results…',
+      footer: `${results.length} message${results.length === 1 ? '' : 's'} across this target's history`,
+      items: results.map((result) => {
+        const flat = result.content.replace(/\s+/g, ' ').trim();
+        const at = flat.toLowerCase().indexOf(needle);
+        const around = at < 0 ? flat.slice(0, 96) : flat.slice(Math.max(0, at - 32), at + needle.length + 64);
+        return {
+          id: result.messageId, sessionId: result.sessionId,
+          label: `${at < 0 ? '' : '… '}${around}${flat.length > around.length ? ' …' : ''}`,
+          detail: `${result.sessionTitle || 'Untitled'} · ${result.role} · ${this.stamp(result.createdAt)}`,
+          tone: result.sessionId === this.sessionId ? this.theme.roles.primary : undefined,
+        };
+      }),
+      onSelect: (item) => this.requestSessionLoad(item.sessionId),
+    });
+  }
+
   openModelPicker() {
     const items = [];
     for (const provider of this.providers) {
@@ -1737,6 +1805,19 @@ export class MaskShiftTui {
           name: 'voiceRecordCommand', label: 'voice record command (optional)', value: config.voice?.recordCommand || '',
           hint: 'blank uses ffmpeg\'s default microphone input for this OS',
         },
+        { name: 'notifyEnabled', label: 'desktop notification on finish', type: 'toggle', value: config.notifications?.enabled === true },
+        {
+          name: 'notifyCommand', label: 'notification command (optional)', value: config.notifications?.command || '',
+          hint: 'blank uses this OS\'s own notifier (osascript/notify-send/PowerShell)',
+        },
+        {
+          name: 'notifyMinDuration', label: 'notify only past (seconds)', value: String(Math.round((config.notifications?.minDurationMs ?? 15_000) / 1000)),
+          hint: 'skips the notification for a run shorter than this',
+        },
+        {
+          name: 'costBudget', label: 'session cost budget (optional)', value: config.costBudget?.session != null ? String(config.costBudget.session) : '',
+          hint: 'e.g. 5 — warns once this session\'s cost crosses $5, blank disables it',
+        },
       ],
       onSubmit: async (values) => {
         const voice = {
@@ -1745,6 +1826,14 @@ export class MaskShiftTui {
           transcribeCommand: values.voiceTranscribeCommand?.trim() || null,
           recordCommand: values.voiceRecordCommand?.trim() || null,
         };
+        const notifications = {
+          ...(config.notifications || {}),
+          enabled: values.notifyEnabled,
+          command: values.notifyCommand?.trim() || null,
+          minDurationMs: Math.max(0, Number(values.notifyMinDuration) || 0) * 1000,
+        };
+        const budgetValue = values.costBudget?.trim();
+        const costBudget = { ...(config.costBudget || {}), session: budgetValue ? Number(budgetValue) || null : null };
         await this.runtime.config.update({
           defaultModel: values.defaultModel,
           permissionMode: values.permissionMode,
@@ -1755,10 +1844,13 @@ export class MaskShiftTui {
           autoLoadCapabilities: values.autoLoadCapabilities,
           ui: { ...(config.ui || {}), mouse: values.mouse },
           voice,
+          notifications,
+          costBudget,
         });
         this.autoLoad = values.autoLoadCapabilities;
         this.screen.setMouse(values.mouse);
         this.voice = new VoiceInput(voice);
+        this.costBudgetWarned = false;
         this.toast('Settings saved', 'success');
       },
     });
@@ -2061,6 +2153,7 @@ export class MaskShiftTui {
         else this.openModelPicker();
         break;
       case 'sessions': this.openSessionPicker(); break;
+      case 'search': this.openSearchResults(argument); break;
       case 'workspace': this.openWorkspaceDialog(); break;
       case 'tools': this.switchView(2); this.arsenalTab = 'tools'; if (argument) this.arsenalFilter.set(argument); break;
       case 'skills': this.switchView(2); this.arsenalTab = 'skills'; if (argument) this.arsenalFilter.set(argument); break;

@@ -21,6 +21,15 @@ export const ANSI = {
   reset: `${CSI}0m`,
   bracketedPasteOn: `${CSI}?2004h`,
   bracketedPasteOff: `${CSI}?2004l`,
+  // DEC 1004 focus reporting: the terminal sends CSI I / CSI O (see
+  // input.mjs) when it gains or loses focus. Used to gate the desktop
+  // notification on a finished run to "the operator actually isn't looking
+  // right now" rather than firing every time regardless. A terminal that
+  // doesn't support it just never sends those bytes — MaskShift then treats
+  // focus as unknown and simply never suppresses the notification on that
+  // account, the same graceful-ignore every other DEC private mode gets.
+  focusOn: `${CSI}?1004h`,
+  focusOff: `${CSI}?1004l`,
   // DEC 2026 "synchronized output": tells a supporting terminal to buffer everything between
   // these two and present it as one atomic screen update, instead of painting each rewritten row
   // as its write arrives. Without it, a multi-row repaint over a slow link (SSH, tmux) or during
@@ -79,7 +88,7 @@ export class Screen {
     this.active = true;
     this.previous = [];
     this.output.ref?.();
-    this.write(`${ANSI.saveTitle}${ANSI.altScreenOn}${ANSI.hideCursor}${ANSI.clear}`);
+    this.write(`${ANSI.saveTitle}${ANSI.altScreenOn}${ANSI.hideCursor}${ANSI.clear}${ANSI.focusOn}`);
     this.applyMouse();
     this.output.on('resize', this.handleResize);
   }
@@ -89,7 +98,7 @@ export class Screen {
     this.active = false;
     this.output.off('resize', this.handleResize);
     if (this.mouseActive) { this.write(ANSI.mouseOff); this.mouseActive = false; }
-    this.write(`${ANSI.reset}${ANSI.showCursor}${ANSI.altScreenOff}${ANSI.restoreTitle}`);
+    this.write(`${ANSI.focusOff}${ANSI.reset}${ANSI.showCursor}${ANSI.altScreenOff}${ANSI.restoreTitle}`);
     // Writing is synchronous for a TTY, but the handle itself stays referenced until told
     // otherwise, which is what kept the process alive after quitting.
     this.output.unref?.();

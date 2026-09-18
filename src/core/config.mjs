@@ -179,6 +179,21 @@ export function defaultConfig() {
       transcribeCommand: process.env.MASKSHIFT_VOICE_TRANSCRIBE_COMMAND || null,
       transcribeTimeoutMs: Number(process.env.MASKSHIFT_VOICE_TRANSCRIBE_TIMEOUT_MS || 120_000),
     },
+    // Desktop notification when a run finishes while the terminal is out of
+    // focus (see tui/input.mjs's DEC 1004 focus tracking). Off by default
+    // for the same reason voice is: it's an external command running on the
+    // operator's machine, not something to fire without being asked.
+    notifications: {
+      enabled: false,
+      command: process.env.MASKSHIFT_NOTIFY_COMMAND || null,
+      minDurationMs: Number(process.env.MASKSHIFT_NOTIFY_MIN_MS || 15_000),
+    },
+    // A running-total spend guardrail. `session` warns once the current
+    // session's own cost total crosses it; both are soft — MaskShift never
+    // blocks a run over it, only surfaces it (header tint, one toast).
+    costBudget: {
+      session: null,
+    },
     // Terminal interface preferences.
     ui: {
       density: 'maximal',

@@ -224,11 +224,19 @@ export function statusRail(app, width) {
   const state = statusOf(status);
   const tone = theme.role(state.tone);
 
+  // A soft spend guardrail (see app.mjs's checkCostBudget): the chip itself
+  // is the standing reminder once a session has crossed its budget, so the
+  // one-time toast that fired when it first crossed isn't the only sign.
+  const budget = app.runtime.config.get().costBudget?.session;
+  const costTone = budget && app.totals.cost >= budget ? theme.roles.danger
+    : budget && app.totals.cost >= budget * 0.8 ? theme.roles.warning
+      : undefined;
+
   const metrics = [
     stat(theme, 'TURN', String(app.metrics.step).padStart(2, '0')),
     stat(theme, 'TIME', app.metrics.elapsed),
     stat(theme, 'TOKENS', app.metrics.tokens),
-    stat(theme, 'COST', app.metrics.cost),
+    stat(theme, 'COST', app.metrics.cost, costTone),
   ].join(divider(theme));
 
   const lead = theme.paint(`${statusGlyph(theme, status)} `, { fg: tone })
