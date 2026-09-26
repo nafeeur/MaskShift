@@ -34,7 +34,7 @@ function isAbort(error, signal) {
 export class AgentEngine {
   constructor({
     store, config, logger, eventBus, hooks, providerManager, workspaceManager,
-    indexer, toolRegistry, capabilityController, promptBuilder, contextBuilder, mcpManager, intelligenceRouter,
+    indexer, toolRegistry, capabilityController, promptBuilder, contextBuilder, mcpManager, intelligenceRouter, personaManager,
   }) {
     this.store = store;
     this.config = config;
@@ -50,6 +50,7 @@ export class AgentEngine {
     this.contextBuilder = contextBuilder;
     this.mcpManager = mcpManager;
     this.intelligenceRouter = intelligenceRouter;
+    this.personaManager = personaManager;
     this.active = new Map();
     this.recentCompletions = new Map();
   }
@@ -211,17 +212,22 @@ export class AgentEngine {
       });
       workspaceId = isolation.workspace.id;
     }
+    const persona = args.persona ? await this.personaManager?.load(args.persona).catch(() => null) : null;
     const task = [
-      `You are a delegated MaskShift subagent. Focus only on this task:\n\n${args.task}`,
+      persona ? persona.body : `You are a delegated MaskShift subagent. Focus only on this task:`,
+      persona ? `Your task:\n\n${args.task}` : args.task,
       args.mode === 'edit' ? 'Implement and verify the requested changes.' : 'Inspect, reason, and report findings. Do not modify files unless necessary to verify.',
       `Parent run: ${parentContext.runId}`,
     ].join('\n\n');
-    const session = this.createSession({ workspaceId, title: `Subagent: ${titleFromPrompt(args.task)}`, modelRef: args.model || parent?.model_id });
+    const session = this.createSession({
+      workspaceId, title: `${persona ? `${persona.name}: ` : 'Subagent: '}${titleFromPrompt(args.task)}`,
+      modelRef: args.model || persona?.model || parent?.model_id,
+    });
     const run = await this.startRun({
-      sessionId: session.id, workspaceId, prompt: task, modelRef: args.model || parent?.model_id,
+      sessionId: session.id, workspaceId, prompt: task, modelRef: args.model || persona?.model || parent?.model_id,
       options: { parentRunId: parentContext.runId, depth, source: 'subagent', isolated: Boolean(args.isolated), skipCheckpoint: Boolean(args.isolated) },
     });
-    this.eventBus.emit('subagent.started', { childRunId: run.id, task: args.task, isolated: Boolean(args.isolated) }, parentContext.scope);
+    this.eventBus.emit('subagent.started', { childRunId: run.id, task: args.task, persona: persona?.name || null, isolated: Boolean(args.isolated) }, parentContext.scope);
     const completed = await this.waitForRun(run.id);
     const messages = this.store.listMessages(session.id, 500);
     const final = [...messages].reverse().find((message) => message.role === 'assistant' && message.content)?.content || '';
@@ -232,6 +238,7 @@ export class AgentEngine {
     }
     const response = {
       task: args.task, runId: run.id, sessionId: session.id, workspaceId, status: completed?.status,
+      persona: persona?.name || null,
       final: truncate(final, 80_000), isolation: isolation ? { path: isolation.path, branch: isolation.branch, workspaceId } : null,
       diff: truncate(diff || '', 100_000), error: completed?.error || null,
     };
@@ -256,6 +263,7 @@ export class AgentEngine {
       deadlineMs,
     );
     deadlineTimer.unref?.();
+    let sessionEndOutcome = null;
 
     try {
       await this.hooks?.run('SessionStart', { ...scope, workspacePath, prompt: run.prompt });
@@ -316,6 +324,7 @@ export class AgentEngine {
             this.#event(run.id, 'context-trimmed', { omittedTurns: fitted.omitted, contextTokens }, scope);
             const newlyDropped = fitted.droppedTurns.slice(compaction.coveredTurns);
             if (newlyDropped.length) {
+              await this.hooks?.run('PreCompact', { ...scope, workspacePath, omittedTurns: fitted.omitted, droppedTurns: newlyDropped, previousSummary: compaction.summary });
               const compacted = await compactTurns(this.providerManager, {
                 modelRef: currentRun.model_id, newlyDropped, previousSummary: compaction.summary, signal,
               });
@@ -403,6 +412,7 @@ export class AgentEngine {
           this.#event(run.id, 'completed', { final: finalContent, steps: step, capabilities: meta.capabilities }, scope);
           await this.hooks?.run('Stop', { ...scope, workspacePath, status: 'completed', final: finalContent });
           await this.hooks?.run('RunCompleted', { ...scope, workspacePath, status: 'completed', final: finalContent });
+          sessionEndOutcome = { status: 'completed', final: finalContent };
           if (run.workspace_id && this.config.get().autoIndex) void this.indexer.index(run.workspace_id, { force: true })
             .then(() => this.config.get().codeGraph?.enabled !== false ? this.contextBuilder.codeGraph?.build(run.workspace_id) : null)
             .catch(() => {});
@@ -441,6 +451,7 @@ export class AgentEngine {
       this.store.updateSession(session.id, { status: 'idle' });
       this.#event(run.id, 'max-steps', { message, final: finalContent }, scope);
       await this.hooks?.run('Stop', { ...scope, workspacePath, status: 'max_steps', final: finalContent });
+      sessionEndOutcome = { status: 'max_steps', final: finalContent };
       return completed;
     } catch (error) {
       const cancelled = isAbort(error, signal);
@@ -453,9 +464,13 @@ export class AgentEngine {
       this.store.updateSession(session.id, { status: 'idle' });
       this.#event(run.id, status, { error: error.message, stack: this.config.get().permissionMode === 'overdrive' ? error.stack : undefined }, scope);
       await this.hooks?.run('Stop', { ...scope, workspacePath, status, error: error.message }).catch(() => {});
+      sessionEndOutcome = { status, error: error.message };
       return failed;
     } finally {
       clearTimeout(deadlineTimer);
+      if (sessionEndOutcome) {
+        await this.hooks?.run('SessionEnd', { ...scope, workspacePath, ...sessionEndOutcome }).catch(() => {});
+      }
     }
   }
 

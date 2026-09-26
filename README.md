@@ -4,7 +4,7 @@
 
 <p align="center">
   <strong>The full toolbox for any coding model, in one zero-dependency terminal harness.</strong><br>
-  167 tools, 50 skills, persistent code-graph intelligence, a live clickable browser view and
+  168 tools, 50 skills, persistent code-graph intelligence, a live clickable browser view and
   worktree-isolated multi-agent orchestration — but only what the current step needs ever
   touches the model's context.
 </p>
@@ -14,7 +14,7 @@
   <img alt="npm downloads" src="https://img.shields.io/npm/dt/maskshift?style=flat-square&color=cb3837&label=downloads">
   <img alt="Node 22+" src="https://img.shields.io/badge/node-%E2%89%A522-35cf8b?style=flat-square">
   <img alt="Runtime dependencies: none" src="https://img.shields.io/badge/runtime%20deps-0-7fb8ff?style=flat-square">
-  <img alt="167 tools" src="https://img.shields.io/badge/tools-167-2bd9c0?style=flat-square">
+  <img alt="168 tools" src="https://img.shields.io/badge/tools-168-2bd9c0?style=flat-square">
   <img alt="50 skills" src="https://img.shields.io/badge/skills-50-a78bfa?style=flat-square">
   <img alt="GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-e42a3c?style=flat-square">
 </p>
@@ -41,9 +41,9 @@ out of context until a step actually needs it.
 | Model support | Any provider — Ollama, OpenAI, Anthropic, Gemini, OpenRouter, LM Studio, vLLM — plus a text protocol for models with no tool API | Anthropic's Claude family | Any provider, 75+ models | OpenAI's GPT family, via ChatGPT plan or API key | Any provider — Nous Portal, OpenRouter, OpenAI, custom endpoints |
 | License | GPL-3.0, open source | Proprietary (Commercial Terms of Service) | MIT, open source | Apache-2.0, open source | MIT, open source |
 | Runtime dependencies | 0 — Node.js built-ins only | npm dependency tree | Go binary + provider SDKs | Rust binary, containerized sandbox by default | Python 3.11 + Node.js, ripgrep, ffmpeg |
-| Native tool surface | 167 tools — shell, LSP, browsers, containers, Kubernetes, SSH, databases, PDFs, images, MCP | Built-in file/shell/web tools, plus MCP | File/shell tools plus per-language LSP and MCP | File/shell/sandboxed-exec tools, plus MCP | 40+ tools, plus MCP over the agentskills.io standard |
+| Native tool surface | 168 tools — shell, LSP, browsers, containers, Kubernetes, SSH, databases, PDFs, images, MCP | Built-in file/shell/web tools, plus MCP | File/shell tools plus per-language LSP and MCP | File/shell/sandboxed-exec tools, plus MCP | 40+ tools, plus MCP over the agentskills.io standard |
 | Codebase intelligence | Persistent file/symbol/call graph with reverse change-impact analysis | Ad hoc search and grep | Per-language LSP (go-to-definition, references) | Ad hoc search and grep | General-purpose tool search, not code-graph specific |
-| Multi-agent orchestration | Executable dependency DAGs, worktree-isolated by default, bounded parallel waves | Subagents (Explore, Plan, general-purpose) | Multiple parallel sessions | Native subagents, sandboxed | Isolated subagents, each with its own conversation and terminal |
+| Multi-agent orchestration | Executable dependency DAGs, worktree-isolated by default, bounded parallel waves, named personas (`agent_persona_list`) that frame a subagent's system prompt for a role | Subagents (Explore, Plan, general-purpose) | Multiple parallel sessions | Native subagents, sandboxed | Isolated subagents, each with its own conversation and terminal |
 | Interface | Full-screen, zero-dependency TUI — eight views including a live, clickable browser tab and a dedicated Git view, mouse and keyboard — plus an MCP server so any MCP client can drive it | Chat-style terminal interface, plus IDE and desktop apps | Terminal-first TUI, plus desktop and IDE extensions | Terminal chat, plus a VS Code extension | Full TUI, plus Telegram, Discord, Slack and other surfaces |
 | Primary focus | A coding harness — any model, the whole tool catalog | Coding agent | Coding agent | Coding agent | General-purpose autonomous assistant; coding is one surface among many |
 
@@ -63,8 +63,9 @@ lands.
 
 | | |
 |---|---|
-| **167 native tools** | Filesystem, shell and process control, search and indexing, Git worktrees and checkpoints, LSP, browsers over CDP, containers and Kubernetes, SSH and rsync, databases, runtimes, images, PDF and Jupyter, web retrieval, plugins, automations, memory and orchestration. → [tool inventory](docs/TOOLS.md) |
+| **168 native tools** | Filesystem, shell and process control, search and indexing, Git worktrees and checkpoints, LSP, browsers over CDP, containers and Kubernetes, SSH and rsync, databases, runtimes, images, PDF and Jupyter, web retrieval, plugins, automations, memory and orchestration. → [tool inventory](docs/TOOLS.md) |
 | **50 bundled skills** | Loaded lazily by description, including 14 Apache-2.0 skills imported from Anthropic, alongside skills from Claude, Codex, Copilot and workspace directories. → [skills](docs/SKILLS.md) |
+| **Named subagent personas** | Bundled `agents/*.md` files (code reviewer, security reviewer, build-error resolver, planner) give `agent_delegate` a role-specific system prompt instead of a generic one; drop project or user personas into `.claude/agents` or `.maskshift/agents` to add your own. |
 | **Lazy MCP fabric** | stdio and Streamable HTTP, stateless and legacy initialization, resources, prompts, qualified tools, imported configs, and the live official MCP Registry. Servers connect on demand, so the catalog never floods the context window. MaskShift is also an MCP server itself — `maskshift mcp serve` exposes its native tool catalog over stdio to Claude Desktop, Claude Code, an IDE, or another MaskShift instance. → [MCP config](docs/CONFIGURATION.md#mcp-definitions) |
 | **Any model** | Ollama, OpenAI Responses, OpenAI-compatible servers, Anthropic, Gemini, OpenRouter, LM Studio and vLLM — with a text protocol that gives models *without* a native tool API the full tool surface. → [providers](docs/CONFIGURATION.md#providers) |
 | **Codebase intelligence** | Persistent file/symbol/import/call graph, reverse change-impact analysis, likely-test discovery, and budgeted context selection with decision metadata. → [architecture](docs/ARCHITECTURE.md) |

@@ -1,6 +1,6 @@
 # Native Tool Inventory
 
-Generated from the MaskShift 1.4.1 runtime. **167 native tools** are available before plugins or MCP servers add more capabilities.
+Generated from the MaskShift 1.4.1 runtime. **168 native tools** are available before plugins or MCP servers add more capabilities.
 
 Only activated descriptors enter a model request; this document is the complete local catalog.
 
@@ -163,14 +163,15 @@ Only activated descriptors enter a model request; this document is the complete 
 | `memory_save` | write | write | Save a durable project or global fact, architectural decision, convention, result, or reusable lesson. Automatically merges into an existing memory with the same title in the same scope instead of creating a duplicate, unless dedupe is set to false. |
 | `memory_search` | read | normal | Search project and global long-term memory, ranked by a blend of text relevance, importance, and recency (older, untouched memories decay in rank without being deleted). |
 
-## orchestration (13)
+## orchestration (14)
 
 | Tool | Access | Risk | Description |
 |---|---|---|---|
 | `agent_cancel` | write | agent | Cancel a running subagent or other active MaskShift run. |
 | `agent_dag_execute` | write | agent | Execute the current dependency DAG in bounded parallel waves. Edit nodes default to isolated Git worktrees; failed dependencies block downstream work. |
-| `agent_delegate` | write | agent | Run a focused subagent with its own session and capability context. Optionally isolate editing in a Git worktree and branch. |
-| `agent_parallel` | write | agent | Delegate multiple independent research, review, test, or implementation tasks concurrently and aggregate their final results. |
+| `agent_delegate` | write | agent | Run a focused subagent with its own session and capability context. Optionally give it a named persona (see agent_persona_list) to frame its system prompt, and optionally isolate editing in a Git worktree and branch. |
+| `agent_parallel` | write | agent | Delegate multiple independent research, review, test, or implementation tasks concurrently and aggregate their final results. Each task may set its own persona. |
+| `agent_persona_list` | read | normal | List named personas (bundled and project-defined) that can be passed as agent_delegate's persona argument to frame a subagent's system prompt for a specific role, such as reviewing code or resolving a build failure. |
 | `agent_route` | read | normal | Recommend an available external coding-agent bridge or internal subagent based on the task profile. |
 | `agent_run_status` | read | normal | Inspect active and recent agent runs, including parent/subagent relationships. |
 | `capability_activate` | write | dynamic-load | Load selected capabilities into the current model context. Local tools add schemas, skills add instructions, and MCP servers connect lazily and expose their tools. |

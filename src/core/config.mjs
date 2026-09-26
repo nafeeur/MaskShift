@@ -159,6 +159,12 @@ export function defaultConfig() {
       path.join(os.homedir(), '.claude', 'skills'),
       path.join(os.homedir(), '.copilot', 'skills'),
     ],
+    agentsDirs: [
+      path.join(home, 'agents'),
+      path.join(process.cwd(), '.maskshift', 'agents'),
+      path.join(process.cwd(), '.claude', 'agents'),
+      path.join(os.homedir(), '.claude', 'agents'),
+    ],
     contextFiles: [
       'AGENTS.md',
       'CLAUDE.md',
@@ -257,8 +263,10 @@ function mergeConfig(base, override) {
   merged.auditFile = absolutePath(override?.auditFile || path.join(merged.home, 'logs', 'audit.jsonl'));
   const skills = explicit(override, 'skillsDirs') ? override.skillsDirs : base.skillsDirs;
   const plugins = explicit(override, 'pluginDirs') ? override.pluginDirs : base.pluginDirs;
+  const agentsDirs = explicit(override, 'agentsDirs') ? override.agentsDirs : base.agentsDirs;
   merged.skillsDirs = [...new Set((skills || []).map((item) => rebase(item, 'skills')))];
   merged.pluginDirs = [...new Set((plugins || []).map((item) => rebase(item, 'plugins')))];
+  merged.agentsDirs = [...new Set((agentsDirs || []).map((item) => rebase(item, 'agents')))];
   const profileExplicit = explicit(override?.browser, 'profilesDir');
   const profileValue = profileExplicit ? override.browser.profilesDir : (base.browser?.profilesDir || path.join(baseHome, 'browser', 'profiles'));
   merged.browser.profilesDir = profileExplicit

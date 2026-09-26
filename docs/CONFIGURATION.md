@@ -402,15 +402,27 @@ Hooks are lifecycle actions keyed by event name. A hook may execute shell, HTTP,
 ```json
 {
   "hooks": {
-    "run.completed": [
+    "SessionEnd": [
       {
-        "type": "shell",
-        "command": "printf '%s\\n' 'MaskShift run completed'"
+        "type": "command",
+        "command": "printf '%s\\n' 'MaskShift session ended'"
       }
     ]
   }
 }
 ```
+
+| Event | Fires |
+|---|---|
+| `SessionStart` | Once, before the first model turn of a run. |
+| `UserPromptSubmit` | Right after `SessionStart`, with the run's prompt. |
+| `PreToolUse` | Before each tool call executes. |
+| `PostToolUse` | After a tool call succeeds. |
+| `PostToolUseFailure` | After a tool call throws. |
+| `PreCompact` | Before context compaction summarizes turns dropped to fit a smaller context window — the last point to persist state ahead of a lossy summarization. |
+| `Stop` | When a run finishes, for any reason (completed, hit `max_steps`, failed, or cancelled). |
+| `RunCompleted` | When a run finishes successfully (a narrower companion to `Stop`). |
+| `SessionEnd` | After a run's outcome is finalized, once — the counterpart to `SessionStart`; a good place for hooks that persist or clean up session state, since it always fires exactly once per run regardless of outcome. |
 
 ## UI
 

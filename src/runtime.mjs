@@ -7,6 +7,7 @@ import { WorkspaceManager } from './workspace/manager.mjs';
 import { RepositoryIndexer } from './indexer/repository-indexer.mjs';
 import { CodeGraph } from './indexer/code-graph.mjs';
 import { SkillManager } from './agent/skills.mjs';
+import { PersonaManager } from './agent/personas.mjs';
 import { ProviderManager } from './agent/providers.mjs';
 import { McpManager } from './mcp/manager.mjs';
 import { LspManager } from './lsp/manager.mjs';
@@ -39,6 +40,8 @@ export async function createRuntime({ configPath, configOverrides = {}, workspac
   const contextPlanner = new ContextPlanner({ config, logger });
   const skillManager = new SkillManager({ config, logger, eventBus });
   await skillManager.setWorkspace(workspacePath);
+  const personaManager = new PersonaManager({ config, logger, eventBus });
+  await personaManager.setWorkspace(workspacePath);
   const providerManager = new ProviderManager({ config, logger, eventBus });
   const mcpManager = new McpManager({ config, logger, eventBus, workspaceManager });
   await mcpManager.init(workspacePath);
@@ -52,7 +55,7 @@ export async function createRuntime({ configPath, configOverrides = {}, workspac
   const contextBuilder = new ContextBuilder({ workspaceManager, indexer, codeGraph, contextPlanner, store, config, logger });
   let engine;
   const managerDependencies = {
-    config, store, logger, eventBus, hooks, workspaceManager, indexer, codeGraph, contextPlanner, contextBuilder, intelligenceRouter, skillManager,
+    config, store, logger, eventBus, hooks, workspaceManager, indexer, codeGraph, contextPlanner, contextBuilder, intelligenceRouter, skillManager, personaManager,
     providerManager, mcpManager, lspManager, processManager, bridgeManager, browserManager,
     toolRegistry, capabilityController, getEngine: () => engine,
   };
@@ -66,7 +69,7 @@ export async function createRuntime({ configPath, configOverrides = {}, workspac
   managerDependencies.pluginManager = pluginManager;
   managerDependencies.automationScheduler = automationScheduler;
   registerAllTools(toolRegistry, {
-    config, store, logger, eventBus, hooks, workspaceManager, indexer, codeGraph, contextPlanner, contextBuilder, intelligenceRouter, skillManager,
+    config, store, logger, eventBus, hooks, workspaceManager, indexer, codeGraph, contextPlanner, contextBuilder, intelligenceRouter, skillManager, personaManager,
     providerManager, mcpManager, lspManager, processManager, bridgeManager, browserManager,
     pluginManager, automationScheduler, capabilityController,
     getEngine: () => engine,
@@ -75,12 +78,12 @@ export async function createRuntime({ configPath, configOverrides = {}, workspac
   const promptBuilder = new PromptBuilder({ config, capabilityController });
   engine = new AgentEngine({
     store, config, logger, eventBus, hooks, providerManager, workspaceManager, intelligenceRouter,
-    indexer, toolRegistry, capabilityController, promptBuilder, contextBuilder, mcpManager,
+    indexer, toolRegistry, capabilityController, promptBuilder, contextBuilder, mcpManager, personaManager,
   });
   automationScheduler.start();
 
   const runtime = {
-    config, eventBus, logger, store, hooks, workspaceManager, indexer, codeGraph, contextPlanner, intelligenceRouter, skillManager,
+    config, eventBus, logger, store, hooks, workspaceManager, indexer, codeGraph, contextPlanner, intelligenceRouter, skillManager, personaManager,
     providerManager, mcpManager, lspManager, bridgeManager, browserManager, pluginManager,
     automationScheduler, processManager, toolRegistry, capabilityController,
     contextBuilder, promptBuilder, engine,
