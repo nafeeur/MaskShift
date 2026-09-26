@@ -8,7 +8,7 @@ The full example is [`maskshift.config.example.json`](../maskshift.config.exampl
 
 | Field | Default | Meaning |
 |---|---:|---|
-| `permissionMode` | `overdrive` | Routing/display mode; overdrive does not prompt per command. |
+| `permissionMode` | `overdrive` | `overdrive` never prompts. `balanced` requires interactive confirmation (in the TUI) before a high-risk tool call — one whose `risk` tier is `destructive`, `host-exec`, `remote-exec`, `secrets`, `install`, `database-write`, `persistent-exec`, `dynamic-load`, or `external-action`. `review` requires confirmation before any non-`readOnly` tool call. See [`docs/PERMISSIVE_MODE.md`](PERMISSIVE_MODE.md#balanced-and-review-modes). |
 | `filesystemScope` | `host` | Native file tools may resolve host paths. |
 | `networkAccess` | `unrestricted` | Declares network intent for prompts and telemetry. |
 | `maxAgentSteps` | `96` | Maximum model/tool turns in a run. |

@@ -266,6 +266,32 @@ export class MaskShiftTui {
     this.previewGeneration = 0;
     this.registryGeneration = 0;
     this.processHandlers = null;
+    // Serializes confirmation dialogs: a run can fire several gated tool calls
+    // back to back (or two concurrent subagents can each want one), but only
+    // one ConfirmOverlay can be on screen at a time.
+    this.confirmationQueue = Promise.resolve();
+    this.runtime.toolRegistry.confirmHandler = (details) => this.requestToolConfirmation(details);
+  }
+
+  // Returns a Promise<boolean> resolved once the operator answers the
+  // ConfirmOverlay this opens — true for YES, false for NO/escape/closing it
+  // any other way. See ToolRegistry#authorize (src/tools/registry.mjs), which
+  // this is wired to via confirmHandler above.
+  requestToolConfirmation({ name, tool }) {
+    const run = () => new Promise((resolve) => {
+      let settled = false;
+      const finish = (value) => { if (settled) return; settled = true; resolve(value); };
+      const originalClose = this.closeOverlay.bind(this);
+      this.closeOverlay = () => { this.closeOverlay = originalClose; originalClose(); finish(false); };
+      this.overlay = new ConfirmOverlay({
+        title: 'CONFIRM TOOL CALL', danger: true,
+        message: `Allow "${tool?.title || name}" (${tool?.risk || 'normal'} risk) under permission mode "${this.runtime.config.get().permissionMode}"?`,
+        onConfirm: () => finish(true),
+      });
+      this.requestRender();
+    });
+    this.confirmationQueue = this.confirmationQueue.then(run, run);
+    return this.confirmationQueue;
   }
 
   // ---------------------------------------------------------------- lifecycle

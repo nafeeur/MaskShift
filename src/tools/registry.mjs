@@ -1,4 +1,5 @@
 import { textScore, truncate } from '../core/utils.mjs';
+import { requiresConfirmation } from './permissions.mjs';
 
 export class ToolRegistry {
   constructor({ logger, eventBus, hooks = null, config }) {
@@ -7,6 +8,12 @@ export class ToolRegistry {
     this.hooks = hooks;
     this.config = config;
     this.tools = new Map();
+    // Set by an interactive surface (the TUI, an interactive CLI prompt) to
+    // gate tool calls under permissionMode "balanced"/"review". Left null in
+    // headless contexts (automations, `mcp serve`, plugin-driven runs), where
+    // a gated call fails closed rather than executing unattended with no one
+    // to ask — see #authorize below.
+    this.confirmHandler = null;
   }
 
   register(tool) {
@@ -74,8 +81,9 @@ export class ToolRegistry {
   async execute(name, args, context = {}) {
     const tool = this.get(name);
     if (!tool) throw new Error(`Unknown tool: ${name}`);
-    const started = Date.now();
     const scope = { runId: context.runId, sessionId: context.sessionId, workspaceId: context.workspaceId };
+    await this.#authorize(tool, name, args, context, scope);
+    const started = Date.now();
     const event = { tool: name, args, category: tool.category, risk: tool.risk };
     this.eventBus.emit('tool.started', event, scope);
     this.logger.audit('tool.start', { ...scope, tool: name, args });
@@ -97,5 +105,26 @@ export class ToolRegistry {
       await this.hooks?.run('PostToolUseFailure', { ...event, ...scope, durationMs, error: error.message, workspacePath: context.workspacePath });
       throw error;
     }
+  }
+
+  async #authorize(tool, name, args, context, scope) {
+    const permissionMode = this.config.get().permissionMode || 'overdrive';
+    if (!requiresConfirmation(tool, permissionMode)) return;
+    let allowed = false;
+    let reason = 'declined';
+    if (!this.confirmHandler) {
+      reason = 'no-confirm-handler';
+    } else {
+      allowed = await this.confirmHandler({ name, tool: this.descriptor(name), args, context });
+    }
+    if (allowed) return;
+    this.logger.audit('tool.blocked', { ...scope, tool: name, risk: tool.risk, permissionMode, reason });
+    this.eventBus.emit('tool.blocked', { tool: name, risk: tool.risk, permissionMode, reason }, scope);
+    const detail = reason === 'no-confirm-handler'
+      ? 'no confirmation handler is available in this context (a headless automation, plugin, or `mcp serve` run) — switch to "overdrive" or run it where a human can confirm'
+      : 'the confirmation was declined';
+    const error = new Error(`"${name}" requires confirmation under permission mode "${permissionMode}", and ${detail}.`);
+    error.code = 'PERMISSION_DENIED';
+    throw error;
   }
 }

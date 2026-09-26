@@ -288,7 +288,23 @@ export function registerPlatformTools(registry, { config }) {
     name: 'port_inspect', title: 'Inspect network ports', description: 'Inspect listening sockets and processes using ss, netstat, or lsof.',
     category: 'system', readOnly: true,
     inputSchema: { type: 'object', properties: { port: { type: 'integer', minimum: 1, maximum: 65535 }, protocol: { type: 'string', enum: ['tcp', 'udp', 'all'], default: 'all' } } },
-    execute: async (args) => { const ss = await commandExists('ss'); const lsof = await commandExists('lsof'); const command = ss ? `${shellQuote(ss)} -lntup ${args.port ? `'( sport = :${Number(args.port)} )'` : ''}` : lsof ? `${shellQuote(lsof)} -nP -i${args.protocol === 'tcp' ? 'TCP' : args.protocol === 'udp' ? 'UDP' : ''}${args.port ? `:${Number(args.port)}` : ''}` : 'netstat -anp'; return runCommand(command, { timeoutMs: 20_000, maxOutputChars: 80_000 }); },
+    execute: async (args) => {
+      const ss = await commandExists('ss');
+      const lsof = !ss && await commandExists('lsof');
+      const command = ss
+        ? `${shellQuote(ss)} -lntup ${args.port ? `'( sport = :${Number(args.port)} )'` : ''}`
+        : lsof
+          ? `${shellQuote(lsof)} -nP -i${args.protocol === 'tcp' ? 'TCP' : args.protocol === 'udp' ? 'UDP' : ''}${args.port ? `:${Number(args.port)}` : ''}`
+          : 'netstat -anp';
+      const result = await runCommand(command, { timeoutMs: 20_000, maxOutputChars: 80_000 });
+      // lsof's documented convention is exit code 1 for "no matching sockets found" — unlike
+      // ss/netstat, which both exit 0 for the same empty result. Left unnormalized, "nothing is
+      // listening on this port" would be indistinguishable from "the command failed".
+      if (lsof && result.code === 1 && !result.stdout.trim() && !result.stderr.trim()) {
+        return { ...result, code: 0 };
+      }
+      return result;
+    },
   });
 
   registry.register({

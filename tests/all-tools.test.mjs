@@ -312,6 +312,8 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
     context.runId = null; // Manual CLI tools have no parent run.
     await call('agent_delegate', { task: 'Return marker', model: 'fixture:local' }, r => { assert.equal(r.status, 'completed'); assert.equal(r.final, 'FIXTURE_AGENT_OK'); }, 'local model fixture');
     await call('agent_parallel', { tasks: [{ task: 'one', model: 'fixture:local' }, { task: 'two', model: 'fixture:local' }] }, r => { assert.equal(r.length, 2); assert.ok(r.every(x => x.status === 'completed')); }, 'local model fixture');
+    await call('agent_persona_list', {}, r => assert.ok(r.some(persona => persona.name === 'code-reviewer')), 'bundled persona catalog');
+    await call('agent_delegate', { task: 'Return marker', model: 'fixture:local', persona: 'code-reviewer' }, r => { assert.equal(r.status, 'completed'); assert.equal(r.persona, 'code-reviewer'); }, 'local model fixture');
     const run = await runtime.engine.startRun({ workspaceId: workspace.id, prompt: 'cancel fixture', modelRef: 'fixture:local' });
     await call('agent_run_status', { runId: run.id }, r => assert.equal(r.id, run.id), 'local model fixture');
     await call('agent_cancel', { runId: run.id }, r => assert.equal(r.cancelled, true), 'local model fixture');
