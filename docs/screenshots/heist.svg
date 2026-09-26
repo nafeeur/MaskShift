@@ -8,15 +8,15 @@
 <text x="133.60" y="30.00" fill="#7a8494" textLength="50.40" lengthAdjust="spacingAndGlyphs">TARGET</text>
 <text x="192.40" y="30.00" fill="#ece8e0" textLength="75.60" lengthAdjust="spacingAndGlyphs" font-weight="700">MaskShift</text>
 <text x="276.40" y="30.00" fill="#ece8e0" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">·</text>
-<text x="293.20" y="30.00" fill="#ece8e0" textLength="243.60" lengthAdjust="spacingAndGlyphs" font-weight="700">claude/brave-albattani-8qj8dg</text>
-<text x="545.20" y="30.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="562.00" y="30.00" fill="#7a8494" textLength="58.80" lengthAdjust="spacingAndGlyphs">PERSONA</text>
-<text x="629.20" y="30.00" fill="#ece8e0" textLength="92.40" lengthAdjust="spacingAndGlyphs" font-weight="700">ollama:auto</text>
+<text x="293.20" y="30.00" fill="#ece8e0" textLength="159.60" lengthAdjust="spacingAndGlyphs" font-weight="700">claude/tui-upgrades</text>
+<text x="461.20" y="30.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="478.00" y="30.00" fill="#7a8494" textLength="58.80" lengthAdjust="spacingAndGlyphs">PERSONA</text>
+<text x="545.20" y="30.00" fill="#ece8e0" textLength="92.40" lengthAdjust="spacingAndGlyphs" font-weight="700">ollama:auto</text>
 <text x="746.80" y="30.00" fill="#7a8494" textLength="33.60" lengthAdjust="spacingAndGlyphs">MODE</text>
 <text x="788.80" y="30.00" fill="#f7c948" textLength="75.60" lengthAdjust="spacingAndGlyphs" font-weight="700">OVERDRIVE</text>
 <text x="872.80" y="30.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
 <text x="889.60" y="30.00" fill="#7a8494" textLength="42.00" lengthAdjust="spacingAndGlyphs">TOOLS</text>
-<text x="940.00" y="30.00" fill="#2bd9c0" textLength="25.20" lengthAdjust="spacingAndGlyphs" font-weight="700">167</text>
+<text x="940.00" y="30.00" fill="#2bd9c0" textLength="25.20" lengthAdjust="spacingAndGlyphs" font-weight="700">168</text>
 <text x="973.60" y="30.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
 <text x="990.40" y="30.00" fill="#7a8494" textLength="25.20" lengthAdjust="spacingAndGlyphs">MCP</text>
 <text x="1024.00" y="30.00" fill="#3d8bf5" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">8</text>
@@ -67,7 +67,7 @@
 <text x="24.40" y="102.00" fill="#67202d" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
 <text x="41.20" y="102.00" fill="#e9a227" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
 <text x="58.00" y="102.00" fill="#e9a227" textLength="67.20" lengthAdjust="spacingAndGlyphs" font-weight="700">OPERATOR</text>
-<text x="763.60" y="102.00" fill="#3f4653" textLength="42.00" lengthAdjust="spacingAndGlyphs">12:21</text>
+<text x="763.60" y="102.00" fill="#3f4653" textLength="42.00" lengthAdjust="spacingAndGlyphs">22:24</text>
 <text x="839.20" y="102.00" fill="#67202d" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
 <text x="872.80" y="102.00" fill="#929baa" textLength="33.60" lengthAdjust="spacingAndGlyphs">Diff</text>
 <text x="914.80" y="102.00" fill="#929baa" textLength="50.40" lengthAdjust="spacingAndGlyphs">frames</text>
@@ -108,7 +108,7 @@
 <text x="58.00" y="174.00" fill="#e32c40" textLength="75.60" lengthAdjust="spacingAndGlyphs" font-weight="700">MASKSHIFT</text>
 <text x="142.00" y="174.00" fill="#7a8494" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
 <text x="158.80" y="174.00" fill="#7a8494" textLength="151.20" lengthAdjust="spacingAndGlyphs">ollama:qwen3-coder</text>
-<text x="763.60" y="174.00" fill="#3f4653" textLength="42.00" lengthAdjust="spacingAndGlyphs">12:21</text>
+<text x="763.60" y="174.00" fill="#3f4653" textLength="42.00" lengthAdjust="spacingAndGlyphs">22:24</text>
 <text x="839.20" y="174.00" fill="#67202d" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
 <text x="24.40" y="192.00" fill="#67202d" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
 <text x="41.20" y="192.00" fill="#c6293b" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
@@ -298,7 +298,7 @@
 <text x="24.40" y="534.00" fill="#67202d" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
 <text x="41.20" y="534.00" fill="#e32c40" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
 <text x="58.00" y="534.00" fill="#e32c40" textLength="75.60" lengthAdjust="spacingAndGlyphs" font-weight="700">MASKSHIFT</text>
-<text x="763.60" y="534.00" fill="#3f4653" textLength="42.00" lengthAdjust="spacingAndGlyphs">12:21</text>
+<text x="763.60" y="534.00" fill="#3f4653" textLength="42.00" lengthAdjust="spacingAndGlyphs">22:24</text>
 <text x="839.20" y="534.00" fill="#67202d" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
 <text x="24.40" y="552.00" fill="#67202d" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
 <text x="41.20" y="552.00" fill="#c6293b" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
@@ -351,6 +351,11 @@
 <text x="100.00" y="678.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="125.20" y="678.00" fill="#b8c0cb" textLength="67.20" lengthAdjust="spacingAndGlyphs">RENDERER</text>
 <text x="200.80" y="678.00" fill="#b8c0cb" textLength="67.20" lengthAdjust="spacingAndGlyphs">REFACTOR</text>
+<text x="427.60" y="678.00" fill="#7a8494" textLength="25.20" lengthAdjust="spacingAndGlyphs">CTX</text>
+<text x="461.20" y="678.00" fill="#35cf8b" textLength="16.80" lengthAdjust="spacingAndGlyphs">━━</text>
+<text x="478.00" y="678.00" fill="#2e343f" textLength="50.40" lengthAdjust="spacingAndGlyphs">──────</text>
+<text x="536.80" y="678.00" fill="#ece8e0" textLength="84.00" lengthAdjust="spacingAndGlyphs" font-weight="700">41.2k/200k</text>
+<text x="629.20" y="678.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
 <text x="646.00" y="678.00" fill="#7a8494" textLength="33.60" lengthAdjust="spacingAndGlyphs">TURN</text>
 <text x="688.00" y="678.00" fill="#ece8e0" textLength="16.80" lengthAdjust="spacingAndGlyphs" font-weight="700">09</text>
 <text x="713.20" y="678.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>

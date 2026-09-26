@@ -28,7 +28,7 @@ function messageTokens(message) {
  * a plain user/assistant message, or an assistant tool-call message plus its immediate
  * tool-result messages.
  */
-function groupTurns(history) {
+export function groupTurns(history) {
   const turns = [];
   for (let i = 0; i < history.length; i++) {
     const message = history[i];

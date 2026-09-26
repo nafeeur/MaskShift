@@ -140,7 +140,22 @@ test('a provider that is native-mode salvaged (writes its call as text) never st
     modelRef: 'p:m', messages: [{ role: 'user', content: 'go' }], tools: [{ name: 'fs_read', inputSchema: {} }],
     onDelta: (content) => seen.push(content),
   });
-  assert.deepEqual(seen, [], 'text-protocol mode must never forward a delta');
+  assert.deepEqual(seen, [], 'a reply that is only a tool call has no prose to stream');
   assert.equal(result.toolCalls[0].name, 'fs_read');
   assert.equal(result.content, '');
+});
+
+test('text-protocol mode streams the prose and holds back tool-call markup', async (t) => {
+  const server = await jsonServer(t, (request, response) => {
+    respondOpenAIChatSSE(response, { content: 'Reading the file first.\n<tool_call>{"name":"fs_read","arguments":{"path":"x"}}</tool_call>', finishReason: 'stop' });
+  });
+  const seen = [];
+  const result = await manager([{ id: 'p', type: 'openai-compatible', baseUrl: server.url, enabled: true, toolProtocol: 'text', models: [{ id: 'm' }] }]).complete({
+    modelRef: 'p:m', messages: [{ role: 'user', content: 'go' }], tools: [{ name: 'fs_read', inputSchema: {} }],
+    onDelta: (content) => seen.push(content),
+  });
+  assert.ok(seen.length > 0, 'prose streams in text mode');
+  assert.equal(seen.at(-1), 'Reading the file first.');
+  assert.ok(seen.every((content) => !content.includes('<tool_call') && !content.includes('fs_read')));
+  assert.equal(result.toolCalls[0].name, 'fs_read');
 });

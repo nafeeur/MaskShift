@@ -1,7 +1,7 @@
 import { nowIso, runCommand, sha256, truncate } from '../core/utils.mjs';
 import { estimateUsageCost, summarizeCosts } from '../core/pricing.mjs';
 import { repairPrompt } from './tool-protocol.mjs';
-import { elideStaleToolResults, estimateHistoryTokens, fitHistory, historyBudget } from './context-budget.mjs';
+import { elideStaleToolResults, estimateHistoryTokens, fitHistory, groupTurns, historyBudget } from './context-budget.mjs';
 import { compactTurns } from './compaction.mjs';
 
 // Bounded so a model that cannot produce valid syntax ends the run instead of looping on it.
@@ -117,6 +117,8 @@ export class AgentEngine {
       status: 'queued', startedAt: Date.now(), capabilityState: null,
       planState: { summary: '', steps: [], updatedAt: nowIso() },
       options,
+      // Operator messages sent while the run is working; delivered at the next step.
+      steering: [],
     };
     this.active.set(run.id, entry);
     const promise = this.#execute(run, session, entry)
@@ -220,6 +222,51 @@ export class AgentEngine {
     this.store.updateSession(run.session_id, { status: 'idle' });
     this.#event(runId, 'reconciled', { note }, { runId, sessionId: run.session_id, workspaceId: run.workspace_id });
     return updated;
+  }
+
+  /**
+   * Summarizes a session's older turns now (the TUI's /compact), keeping the most recent ones
+   * verbatim. Later runs send the summary in place of the turns it covers.
+   */
+  async compactSession(sessionId, { modelRef = null, keepRecentTurns = 2, signal } = {}) {
+    const session = this.store.getSession(sessionId);
+    if (!session) throw new Error(`Unknown session: ${sessionId}`);
+    if ([...this.active.values()].some((entry) => entry.sessionId === sessionId && !['completed', 'failed', 'cancelled'].includes(entry.status))) {
+      throw new Error('Wait for the running heist to finish before compacting it');
+    }
+    const saved = session.meta?.compaction || {};
+    const rows = this.store.listMessages(sessionId, HISTORY_LOAD_LIMIT);
+    const start = saved.throughMessageId ? rows.findIndex((row) => row.id === saved.throughMessageId) + 1 : 0;
+    const ids = new WeakMap();
+    const pending = rows.slice(start).map((row) => { const message = messageForProvider(row); ids.set(message, row.id); return message; });
+    const turns = groupTurns(pending);
+    if (turns.length <= keepRecentTurns) return { compacted: false, turns: 0, reason: 'Nothing old enough to summarize yet' };
+    const toSummarize = turns.slice(0, turns.length - keepRecentTurns);
+    const model = modelRef || session.model_id;
+    const profile = await this.providerManager.modelProfile(model).catch(() => null);
+    const result = await compactTurns(this.providerManager, {
+      modelRef: model, newlyDropped: toSummarize, previousSummary: saved.summary || null, signal,
+      maxSummaryTokens: Math.max(400, Math.min(2_000, Math.floor((profile?.contextWindow || 32_768) * 0.03))),
+    });
+    if (!result.usage || !result.summary) throw new Error('The model could not produce a summary; try again or switch models');
+    const compaction = { summary: result.summary, throughMessageId: ids.get(toSummarize.at(-1).at(-1)), forced: true, updatedAt: nowIso() };
+    this.store.updateSession(sessionId, { meta: { ...(session.meta || {}), compaction } });
+    this.eventBus.emit('session.compacted', { sessionId, turns: toSummarize.length }, { sessionId });
+    return { compacted: true, turns: toSummarize.length, summary: result.summary };
+  }
+
+  /**
+   * Adds an operator message to a run that is still working. It reaches the model at the next
+   * step boundary — after any tool call already in flight — instead of waiting for the run to
+   * finish the way a queued prompt does.
+   */
+  steer(runId, text) {
+    const entry = this.active.get(runId);
+    const message = String(text || '').trim();
+    if (!entry || !message || ['completed', 'failed', 'cancelled'].includes(entry.status)) return { accepted: false };
+    entry.steering.push(message);
+    this.#event(runId, 'steer-queued', { message, pending: entry.steering.length }, { runId, sessionId: entry.sessionId, workspaceId: entry.workspaceId });
+    return { accepted: true, pending: entry.steering.length };
   }
 
   async delegate(args, parentContext) {
@@ -327,7 +374,14 @@ export class AgentEngine {
         history.push(message);
         if (stored?.id) { messageIds.set(message, stored.id); positions.set(stored.id, history.length - 1); }
       };
-      for (const row of this.store.listMessages(session.id, HISTORY_LOAD_LIMIT)) remember(messageForProvider(row), row);
+      const savedCompaction = this.store.getSession(session.id)?.meta?.compaction || {};
+      const rows = this.store.listMessages(session.id, HISTORY_LOAD_LIMIT);
+      // A summary the operator asked for (/compact) replaces the turns it covers outright, even
+      // when they would still fit; an automatic one only stands in for turns that do not.
+      const forcedCut = savedCompaction.forced && savedCompaction.throughMessageId
+        ? rows.findIndex((row) => row.id === savedCompaction.throughMessageId)
+        : -1;
+      for (const row of rows.slice(forcedCut + 1)) remember(messageForProvider(row), row);
       const maxSteps = entry.options.maxSteps || this.config.get().maxAgentSteps;
       let finalContent = '';
       let step = 0;
@@ -339,16 +393,23 @@ export class AgentEngine {
       // rather than re-summarizing the whole drop set from scratch every time it grows.
       // Saved on the session, so the next prompt in a long session starts from this summary
       // instead of losing it when the run ends.
-      const savedCompaction = this.store.getSession(session.id)?.meta?.compaction || {};
       const compaction = {
         summary: savedCompaction.summary || null,
         throughMessageId: savedCompaction.throughMessageId || null,
+        forced: Boolean(savedCompaction.forced && forcedCut >= 0),
         lastFailedStep: -Infinity,
       };
       let overflowRetries = 0;
 
       while (step < maxSteps) {
         if (signal.aborted) throw signal.reason || new Error('Run cancelled');
+        while (entry.steering.length) {
+          const text = entry.steering.shift();
+          remember({ role: 'user', content: text }, this.store.addMessage({
+            sessionId: session.id, role: 'user', content: text, meta: { runId: run.id, source: 'steer' },
+          }));
+          this.#event(run.id, 'steered', { message: text }, scope);
+        }
         step += 1;
         this.store.updateRun(run.id, { step_count: step });
         const currentRun = this.store.getRun(run.id);
@@ -388,7 +449,7 @@ export class AgentEngine {
                 compaction.throughMessageId = messageIds.get(newlyDropped.at(-1).at(-1)) || compaction.throughMessageId;
                 const sessionMeta = this.store.getSession(session.id)?.meta || {};
                 this.store.updateSession(session.id, {
-                  meta: { ...sessionMeta, compaction: { summary: compaction.summary, throughMessageId: compaction.throughMessageId, updatedAt: nowIso() } },
+                  meta: { ...sessionMeta, compaction: { summary: compaction.summary, throughMessageId: compaction.throughMessageId, forced: compaction.forced, updatedAt: nowIso() } },
                 });
                 usage.push(compacted.usage);
                 costs.push(estimateUsageCost(this.config.get(), compacted.providerId, compacted.providerType, compacted.model, compacted.usage));
@@ -406,6 +467,8 @@ export class AgentEngine {
                 ...fitted.history.slice(1),
               ];
             }
+          } else if (compaction.forced && compaction.summary) {
+            outboundHistory = [{ role: 'user', content: `[Summary of this session's earlier turns]\n\n${compaction.summary}` }, ...fitted.history];
           }
         }
         // Throttled rather than forwarded 1:1: a fast provider can emit dozens of fragments a
@@ -475,6 +538,9 @@ export class AgentEngine {
           this.#event(run.id, 'tool-call-repair', { attempt: repairAttempts, errors: response.parseErrors }, scope);
           continue;
         }
+
+        // The model thinks it is done, but the operator said something it has not seen yet.
+        if (!response.toolCalls?.length && entry.steering.length) continue;
 
         if (!response.toolCalls?.length) {
           const meta = {

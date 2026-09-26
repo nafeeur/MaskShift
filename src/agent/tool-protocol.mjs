@@ -215,6 +215,38 @@ export function parseToolCalls(rawContent) {
   return { content: content.replace(/\n{3,}/g, '\n\n').trim(), toolCalls, parseErrors };
 }
 
+/**
+ * The part of a still-streaming text-protocol reply that is safe to show: finished tool-call
+ * blocks are removed, and anything from an opening tag (or the first characters of one) to the
+ * end is held back until it either closes or turns out to be prose. Lets a model with no native
+ * tool API stream its prose like any other instead of showing nothing until the reply ends.
+ */
+export function visibleStreamingText(raw) {
+  let text = String(raw || '')
+    .replace(tagPattern(), (match) => (/<\s*\/\s*[a-z_-]+\s*>\s*$/i.test(match) ? '' : match))
+    .replace(/```(?:tool_call|tool|function_call)\s*[\s\S]*?```/gi, '')
+    .replace(/<\s*function\s*=\s*[A-Za-z0-9_.:-]+\s*>[\s\S]*?<\s*\/\s*function\s*>/gi, '');
+  const openers = [
+    ...OPEN_TAGS.map((tag) => new RegExp(`<\\s*${tag}\\b`, 'i')),
+    /<\s*function\s*=/i,
+    /```(?:tool_call|tool|function_call)/i,
+  ];
+  let cut = text.length;
+  for (const opener of openers) {
+    const match = opener.exec(text);
+    if (match && match.index < cut) cut = match.index;
+  }
+  text = text.slice(0, cut);
+  // A lone "<too" or "```to" at the very end may be the start of a block still arriving.
+  const tail = text.match(/(<[a-z_=\s-]{0,14}|`{1,3}[a-z_]{0,13})$/i);
+  if (tail) {
+    const fragment = tail[0].replace(/^<\s*|^`+/, '').toLowerCase();
+    const names = [...OPEN_TAGS, 'function', 'function=', 'tool_call', 'tool', 'function_call'];
+    if (!fragment || names.some((name) => name.startsWith(fragment.replace(/\s+/g, '')))) text = text.slice(0, tail.index);
+  }
+  return stripStrayTags(text).replace(/\n{3,}/g, '\n\n').trimEnd();
+}
+
 export function renderToolCall(call) {
   return `<${TOOL_CALL_TAG}>\n${JSON.stringify({ name: call.name, arguments: call.args || {} })}\n</${TOOL_CALL_TAG}>`;
 }

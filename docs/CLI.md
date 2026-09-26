@@ -20,6 +20,7 @@ maskshift mcp connect playwright           # scripted capability control
 | `--config PATH` | Configuration file to load instead of `$MASKSHIFT_HOME/config.json`. |
 | `--json` | Emit machine-readable JSON instead of styled output. Every command supports it. |
 | `--no-color` | Disable colour. `NO_COLOR` and `MASKSHIFT_COLOR=off` do the same. |
+| `--plain` | With no command (or `tui`): a line-by-line session instead of the full-screen interface — for screen readers, logs and slow links. `MASKSHIFT_PLAIN=1` does the same. See [TUI.md](TUI.md#plain-mode). |
 | `-h, --help` | Help for MaskShift or for one command group. |
 | `-v, --version` | Print the version. |
 
@@ -30,7 +31,7 @@ doctor), `2` the command line itself was wrong.
 
 | Command | Description |
 |---|---|
-| `tui [PROMPT]` | Open the full-screen interface. The default when no command is given. |
+| `tui [PROMPT]` | Open the full-screen interface. The default when no command is given. With `--plain`, a line-by-line session instead. |
 | `run "PROMPT"` | Execute one agent run, streaming turns, tool calls and results. |
 | `exec "COMMAND"` | Run a shell command through the MaskShift tool layer. |
 | `doctor [--json]` | Check the environment, providers and capability counts. |

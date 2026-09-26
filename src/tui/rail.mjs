@@ -59,11 +59,38 @@ function planLines(app, width) {
   return lines;
 }
 
+// Where the window size came from, in the words an operator would use.
+const CONTEXT_SOURCES = {
+  config: 'set in config', provider: 'reported by the provider', family: 'from the model family',
+  learned: 'learned from an overflow', default: 'assumed (model unknown)',
+};
+
+function compactTokens(value) {
+  if (!value) return '—';
+  return value >= 1000 ? `${Math.round(value / 100) / 10}k` : String(value);
+}
+
 function telemetryLines(app, width) {
   const { theme } = app;
   const snapshot = app.capabilitySnapshot;
   const text = Math.max(6, width - SPACE.gutter);
   const lines = [];
+  const context = app.contextState;
+  if (context) {
+    const tone = theme.role(context.tone);
+    lines.push(heading(theme, 'Context', width, String(context.tier || '').toUpperCase()));
+    lines.push(gutter(theme) + spread(
+      theme.paint(`${Math.round(context.ratio * 100)}%`, { fg: tone, bold: true }),
+      theme.paint(context.label, { fg: theme.roles.text }),
+      text,
+    ));
+    lines.push(gutter(theme) + meter(theme, context.used, context.window, text, { colour: tone }));
+    const origin = CONTEXT_SOURCES[context.source] || context.source || 'unknown';
+    for (const piece of wrap(`Window ${origin}. Replies up to ${compactTokens(context.maxOutputTokens)} tokens.`, text)) {
+      lines.push(gutter(theme) + theme.paint(piece, { fg: theme.roles.muted }));
+    }
+    lines.push('');
+  }
   const gauges = [
     ['TOOLS', snapshot?.tools?.length ?? 0, app.counts.tools, theme.roles.tool],
     ['SKILLS', snapshot?.skills?.length ?? 0, app.counts.skills, theme.roles.skill],

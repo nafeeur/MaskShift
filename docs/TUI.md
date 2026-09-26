@@ -131,6 +131,21 @@ buried behind a key you have to memorise:
 
 ![Command palette](screenshots/palette.svg)
 
+In `balanced` and `review` modes, a gated tool call shows what it will do before
+it runs (see [Approving tool calls](#approving-tool-calls)):
+
+![Approving a tool call](screenshots/approval.svg)
+
+`ctrl+d` reviews everything the last run changed, diffed against the checkpoint
+taken before it, and `u` undoes it:
+
+![Run changes](screenshots/changes.svg)
+
+`ctrl+p` switches heists, previewing each one's goal, open issues and last
+request from its saved summary:
+
+![Heist archive](screenshots/sessions.svg)
+
 `f2` tunes the core engine — default model, permission mode, agent turn and subagent limits,
 indexing and checkpoint behaviour — without editing `config.json` by hand:
 
@@ -204,6 +219,8 @@ default.
 | `f1` or `?` | Key reference |
 | `f2` | Settings, including the mouse mode |
 | `f5` | Refresh everything |
+| `ctrl+d` | Review what the last run changed (file list and diffs) |
+| `ctrl+z` | Undo the last run's file changes (asks first, listing every file) |
 | `ctrl+c` | Cancel a running heist; press again to quit |
 | `ctrl+q` | Quit immediately |
 
@@ -211,15 +228,44 @@ default.
 
 | Key | Action |
 |---|---|
-| `enter` | Execute the prompt |
-| `ctrl+j` | Newline inside the composer |
+| `enter` | Execute the prompt (queue it, while a heist is running) |
+| `ctrl+t` | While a heist is running: send the composer's text to it now, delivered at its next step |
+| `ctrl+j` / `alt+enter` | Newline inside the composer |
 | `tab` | Move between transcript and composer |
 | `t` | Expand or collapse tool output |
+| `s` | Read the session summary (transcript focus, once older turns have been summarized) |
 | `esc` | Retreat from the running heist |
 | `f1`–`f3` | Fill the composer from a starter prompt (empty transcript only) |
 
 Prompts submitted while a heist is running enter a visible FIFO queue and run
-one at a time in the same session. Switching heists or workspaces while a run,
+one at a time in the same session. `ctrl+t` steers instead: the message joins the
+run in progress at its next step (after any tool call already in flight), and is
+marked *steered mid-run* in the transcript.
+
+When older turns are summarized to fit the model's window, a rule in the
+transcript marks exactly where the summary ends. After a run changes files, a
+line under the transcript names them, with `^D` to review the diffs and `^Z` to
+undo the run. Undo restores modified and deleted files from the checkpoint taken
+before the run and removes files the run created; files that were already
+there, untracked, before the run are left alone.
+
+### Context meter
+
+The status rail's `CTX` meter shows how much of the model's context window the
+last request used, turning amber at 60% and red at 85% — the range in which
+older turns start being summarized. The rail's LOADOUT section repeats it with
+the model's tier, where the window size came from (config, the provider, the
+model family, a learned overflow, or an assumed default) and the reply cap. See
+[Model adaptation](CONFIGURATION.md#model-adaptation).
+
+### Approving tool calls
+
+In `balanced` and `review` permission modes a gated call opens an approval
+dialog showing what it will actually do: the command and its directory, a file's
+new contents, or an edit as a coloured diff. Answer `y`, `n`, or `a` to approve
+the tool for the rest of the heist. Enter defaults to NO for anything that can
+reach outside the workspace (host or remote execution, installs, secrets,
+destructive calls) and to YES for plain edits. Switching heists or workspaces while a run,
 queue or draft exists requires an explicit confirmation so work cannot silently
 cross session or workspace boundaries.
 
@@ -263,15 +309,45 @@ it does not go through the agent-facing tool registry.
 
 Typed into the composer:
 
-`/new` `/clear` `/model [REF]` `/sessions` `/workspace` `/tools [QUERY]`
-`/skills [QUERY]` `/mcp [QUERY]` `/mods` `/files` `/terminal` `/browser` `/git`
-`/doctor` `/logs` `/settings` `/help` `/quit`
+`/new` `/clear` `/model [REF]` `/sessions` `/search TEXT` `/workspace`
+`/tools [QUERY]` `/skills [QUERY]` `/mcp [QUERY]` `/mods` `/themes` `/files`
+`/terminal` `/browser` `/git` `/doctor` `/logs` `/settings` `/help` `/quit`
+
+| Command | What it does |
+|---|---|
+| `/context [PROMPT]` | What went into the last request and why — model window and tier, which files were retrieved and their relevance, memories used or left out as stale. With a prompt, shows what that prompt would send. |
+| `/compact` | Summarize older turns now, keeping the last two verbatim; later requests send the summary in their place |
+| `/summary` | Read the session summary |
+| `/cost` | Spend per run in this heist, with a total and a note on any unpriced model |
+| `/changes` | Review what the last run changed (same as `ctrl+d`) |
+| `/undo` | Undo the last run's file changes (same as `ctrl+z`) |
+| `/steer TEXT` | Send text to the running heist now (same as `ctrl+t`) |
+
+### Custom commands
+
+Any Markdown file in `.maskshift/commands/` or `.claude/commands/` (in the
+workspace), `~/.maskshift/commands/` or `~/.claude/commands/` becomes a slash
+command named after the file. Its body is the prompt; `$ARGUMENTS` is replaced
+with whatever follows the command, or the arguments are appended when the body
+has no placeholder. An optional `description:` in YAML front matter is shown as
+the hint. Project commands shadow personal ones; built-in commands cannot be
+replaced. Custom commands are tagged `custom` in the suggestion list.
+
+```markdown
+---
+description: Review a pull request
+---
+Review pull request $ARGUMENTS: correctness first, then tests, then style.
+```
 
 ## Terminal requirements
 
 A TTY, 80×24 or larger, and UTF-8 for the full glyph set. MaskShift detects
 colour depth from `COLORTERM`, `TERM` and `TERM_PROGRAM`; override it with
-`MASKSHIFT_COLOR=off|basic|full`. Bracketed paste is enabled, so pasting a long
+`MASKSHIFT_COLOR=off|basic|full`. [`NO_COLOR`](https://no-color.org) turns colour
+off and wins over a colour depth saved in the settings; without colour, the
+active tab and the selected button are drawn in brackets (`[01 HEIST]`,
+`[YES]`) so they stay visible. `MASKSHIFT_ASCII=1` swaps every glyph for ASCII. Bracketed paste is enabled, so pasting a long
 prompt arrives as one event rather than a thousand keystrokes.
 
 Mouse support uses SGR reporting (`?1006`), which every terminal released this
@@ -280,5 +356,17 @@ column 223. The legacy X10 encoding is still decoded as a fallback. Tracking is
 switched off whenever the alternate screen is left, so quitting or crashing
 cannot strand the terminal in reporting mode.
 
+### Plain mode
+
+`maskshift --plain` (or `MASKSHIFT_PLAIN=1`) runs the same agent without the
+full-screen interface: each event is printed once, as an ordinary line, and the
+next request is read from a normal prompt. Nothing is redrawn and no escape
+codes are sent when colour is off, which suits screen readers, logging through
+`script`/`tee`, and slow links. Plain mode uses ASCII marks and words (`call`,
+`ok`, `error`) instead of symbols. Typing while a run is working steers it;
+`/new` starts a fresh session and `/quit` leaves. In `balanced`/`review` modes,
+approvals are asked inline with the same preview the interface shows, answered
+with `y`, `n` or `a`.
+
 Without a TTY, `maskshift` refuses to start the interface and points at
-`maskshift run` — see [CLI.md](CLI.md).
+`maskshift --plain` and `maskshift run` — see [CLI.md](CLI.md).
