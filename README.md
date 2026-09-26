@@ -47,9 +47,6 @@ out of context until a step actually needs it.
 | IDE or desktop app | ❌ | ✅ | ✅ | ✅ | ❌ |
 | Sandboxed by default | ❌ | ❌ | ❌ | ✅ | ❌ |
 
-Not a knock on any of them — they make different tradeoffs on purpose. This is where MaskShift
-lands.
-
 ---
 
 ## Contents
