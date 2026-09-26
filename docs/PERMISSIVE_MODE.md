@@ -17,6 +17,15 @@ The model can call the enabled native tool set without an approval dialog for ea
 
 MaskShift does not attempt to translate every Unix action into a restrictive policy rule. The daemon has the effective authority of the operating-system account that launched it.
 
+## `balanced` and `review` modes
+
+`permissionMode` also accepts `balanced` and `review`. Both are enforced — a gated tool call is blocked (and audited as `tool.blocked`) unless it is explicitly confirmed:
+
+- **`balanced`** requires interactive confirmation only for the tiers that can reach outside the workspace or beyond an automatic checkpoint's undo: shell/host execution, remote (SSH) execution, secrets access, package installs, database writes, persistent background processes, dynamically loaded plugin code, and other "external action" tools. Plain file edits, git operations, reads, and everything else `readOnly` still run without a prompt.
+- **`review`** requires interactive confirmation before every tool call that isn't `readOnly` — the strictest mode.
+
+Confirmation currently has one working surface: the TUI, which pauses the run and shows a confirm dialog naming the tool and its risk tier. A headless context with no one to ask — `maskshift run` (the scripted CLI), an armed automation, a plugin-driven call, or an MCP server request — has no confirmation handler wired up, so a gated call in `balanced`/`review` mode fails there with a clear "no confirmation handler is available" error rather than running unattended or silently allowing it. Use `overdrive` for those unattended contexts; `balanced`/`review` are for a human sitting at the TUI.
+
 ## What remains observable
 
 Permissive is not invisible. MaskShift records and exposes:
