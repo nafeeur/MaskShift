@@ -54,6 +54,13 @@ export async function jsonServer(t, handler) {
   return { server, url: `http://127.0.0.1:${address.port}`, port: address.port };
 }
 
+// Runs now probe a provider for a model's limits (GET …/models, Ollama's POST /api/show) before
+// the first chat request. Fixtures that only script chat replies answer those with a 404, which
+// is what a server without the endpoint returns, so the probe falls back cleanly.
+export function isDiscoveryProbe(request) {
+  return request.method === 'GET' || String(request.url || '').endsWith('/api/show');
+}
+
 export async function readJsonBody(request) {
   const chunks = [];
   for await (const chunk of request) chunks.push(chunk);

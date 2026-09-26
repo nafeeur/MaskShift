@@ -1,5 +1,8 @@
 import { safeJsonParse, truncate } from '../core/utils.mjs';
 import { parseToolCalls, toTextProtocolMessages } from './tool-protocol.mjs';
+import {
+  DEFAULT_CONTEXT_WINDOW, familyContextWindow, normalizeWindow, outputTokensFor, parameterBillions, parseContextOverflow, tierFor,
+} from './model-profile.mjs';
 
 // Errors a provider returns when the model or endpoint has no function-calling support.
 // Matching these is what lets `toolProtocol: 'auto'` recover without the user configuring it.
@@ -344,11 +347,14 @@ function toGemini(messages, ref = null) {
 }
 
 export class ProviderManager {
-  constructor({ config, logger, eventBus }) {
+  constructor({ config, logger, eventBus, store = null }) {
     this.config = config;
     this.logger = logger;
     this.eventBus = eventBus;
+    this.store = store;
     this.modelCache = new Map();
+    this.profileCache = new Map();
+    this.limitCache = new Map();
   }
 
   provider(id) {
@@ -408,12 +414,22 @@ export class ProviderManager {
         const key = this.apiKey(provider);
         if (key) headers.Authorization = `Bearer ${key}`;
         const data = await fetchJson(`${provider.baseUrl.replace(/\/$/, '')}/models`, { headers }, { timeoutMs: 5000 });
-        models = (data.data || data.models || []).map((item) => ({ id: item.id || item.name, name: item.id || item.name, ownedBy: item.owned_by }));
+        // Servers report their limit under different names: OpenRouter/Together `context_length`,
+        // vLLM `max_model_len`, Groq `context_window`, LM Studio `max_context_length`.
+        models = (data.data || data.models || []).map((item) => ({
+          id: item.id || item.name, name: item.id || item.name, ownedBy: item.owned_by,
+          contextWindow: normalizeWindow(item.context_length ?? item.max_model_len ?? item.context_window
+            ?? item.max_context_length ?? item.top_provider?.context_length),
+          maxOutputTokens: Number(item.top_provider?.max_completion_tokens || item.max_output_tokens) || null,
+        }));
       } else if (provider.type === 'gemini') {
         const key = this.apiKey(provider);
         const data = await fetchJson(`${provider.baseUrl.replace(/\/$/, '')}/models?key=${encodeURIComponent(key)}`, {}, { timeoutMs: 5000 });
         models = (data.models || []).filter((item) => item.supportedGenerationMethods?.includes('generateContent'))
-          .map((item) => ({ id: item.name.replace(/^models\//, ''), name: item.displayName || item.name }));
+          .map((item) => ({
+            id: item.name.replace(/^models\//, ''), name: item.displayName || item.name,
+            contextWindow: normalizeWindow(item.inputTokenLimit), maxOutputTokens: Number(item.outputTokenLimit) || null,
+          }));
       }
       const result = { at: Date.now(), status: 'online', models, error: null };
       this.modelCache.set(providerId, result);
@@ -471,22 +487,108 @@ export class ProviderManager {
     return { provider, model, ref: `${provider.id}:${model}` };
   }
 
+  // Limits the provider itself reports for one model, fetched once per model and cached.
+  async #reportedLimits(resolved) {
+    if (this.limitCache.has(resolved.ref)) return this.limitCache.get(resolved.ref);
+    const { provider, model } = resolved;
+    let limits = {};
+    try {
+      if (provider.type === 'ollama') {
+        const data = await fetchJson(`${provider.baseUrl.replace(/\/$/, '')}/api/show`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', ...provider.headers }, body: JSON.stringify({ model }),
+        }, { timeoutMs: 4000 });
+        const info = data.model_info || {};
+        const key = Object.keys(info).find((name) => name.endsWith('.context_length'));
+        limits = { contextWindow: normalizeWindow(key ? info[key] : null), parameterSize: data.details?.parameter_size || null };
+      } else {
+        const discovered = await this.discover(provider.id);
+        const entry = discovered.models.find((item) => (item.id || item) === model);
+        if (entry && typeof entry === 'object') limits = { contextWindow: entry.contextWindow || null, maxOutputTokens: entry.maxOutputTokens || null };
+      }
+    } catch { /* unreachable or unsupported: fall through to the next source */ }
+    this.limitCache.set(resolved.ref, limits);
+    return limits;
+  }
+
   /**
-   * A model's declared context window, in tokens — from explicit per-model config
-   * (`provider.models[].contextWindow`), a per-ref override (`config.harness.models[ref]`),
-   * or Ollama's `num_ctx` option. Returns null when nothing is declared, so callers can leave
-   * their existing (generous) default behavior untouched rather than guessing a model's limit
-   * from its name.
+   * Everything MaskShift sizes around a model: its context window, output cap, and a rough
+   * capability tier. Never null — an unknown model gets a conservative default that an
+   * overflow error later corrects (see learnContextWindow).
    */
-  async contextWindowFor(modelRef) {
+  async modelProfile(modelRef) {
     const resolved = await this.resolveModel(modelRef);
-    const configured = (resolved.provider.models || []).find((item) => item?.id === resolved.model);
-    const override = this.config.get().harness?.models?.[resolved.ref];
-    const declared = Number(override?.contextWindow) || Number(configured?.contextWindow);
-    if (Number.isFinite(declared) && declared >= 512) return Math.floor(declared);
-    const numCtx = resolved.provider.type === 'ollama' ? Number(resolved.provider.options?.num_ctx) : null;
-    if (Number.isFinite(numCtx) && numCtx >= 512) return Math.floor(numCtx);
-    return null;
+    const cached = this.profileCache.get(resolved.ref);
+    if (cached) return cached;
+    const config = this.config.get();
+    const { provider, model } = resolved;
+    const configured = (provider.models || []).find((item) => item?.id === model) || {};
+    const override = config.harness?.models?.[resolved.ref] || {};
+    const reported = await this.#reportedLimits(resolved);
+    let contextWindow = normalizeWindow(override.contextWindow) || normalizeWindow(configured.contextWindow);
+    let source = contextWindow ? 'config' : null;
+    if (!contextWindow && provider.type === 'ollama') {
+      // Ollama silently truncates to num_ctx, whatever the model was trained on, so the window
+      // that matters is the one we ask for — see #ollama, which sends this same value.
+      const numCtx = normalizeWindow(provider.options?.num_ctx);
+      const trained = reported.contextWindow || familyContextWindow(model) || DEFAULT_CONTEXT_WINDOW;
+      contextWindow = numCtx || Math.min(trained, normalizeWindow(config.harness?.ollamaContextCap) || 32_768);
+      source = numCtx ? 'config' : 'provider';
+    }
+    if (!contextWindow && reported.contextWindow) { contextWindow = reported.contextWindow; source = 'provider'; }
+    if (!contextWindow) { contextWindow = familyContextWindow(model); source = contextWindow ? 'family' : null; }
+    if (!contextWindow) { contextWindow = DEFAULT_CONTEXT_WINDOW; source = 'default'; }
+    const learned = normalizeWindow(this.store?.getSetting('modelContextLimits', {})?.[resolved.ref]);
+    if (learned && learned < contextWindow) { contextWindow = learned; source = 'learned'; }
+    const parameters = parameterBillions(reported.parameterSize) ?? parameterBillions(model);
+    const profile = {
+      ref: resolved.ref, contextWindow, source, parameters,
+      tier: tierFor({ contextWindow, parameters }),
+      maxOutputTokens: outputTokensFor({
+        contextWindow,
+        declaredOutput: Number(override.maxOutputTokens || configured.maxOutputTokens || reported.maxOutputTokens) || null,
+        configured: Number(config.harness?.maxOutputTokens) || null,
+      }),
+    };
+    this.profileCache.set(resolved.ref, profile);
+    return profile;
+  }
+
+  async contextWindowFor(modelRef) {
+    return (await this.modelProfile(modelRef)).contextWindow;
+  }
+
+  /**
+   * Records a limit an overflow error revealed (or, when the error named none, a window 25%
+   * smaller than the one that just failed), persisted so the next session starts right.
+   */
+  async learnContextWindow(modelRef, limit = null) {
+    const current = await this.modelProfile(modelRef);
+    const stated = normalizeWindow(limit);
+    // A stated limit at or above what we already assumed means our ~4-chars-per-token estimate
+    // undercounted this model's tokens, so budget a margin below it instead.
+    const next = stated && stated < current.contextWindow
+      ? stated
+      : normalizeWindow(Math.floor(current.contextWindow * (stated ? 0.85 : 0.75)));
+    if (!next || next >= current.contextWindow) return current;
+    if (this.store) {
+      const known = this.store.getSetting('modelContextLimits', {}) || {};
+      this.store.setSetting('modelContextLimits', { ...known, [current.ref]: next });
+    }
+    this.profileCache.delete(current.ref);
+    this.eventBus.emit('model.context-window.learned', { model: current.ref, previous: current.contextWindow, next });
+    const updated = await this.modelProfile(modelRef);
+    if (!this.store) {
+      // No store to persist to (tests, embedded use): keep the lesson for this process at least.
+      const pinned = { ...updated, contextWindow: next, source: 'learned', tier: tierFor({ contextWindow: next, parameters: updated.parameters }) };
+      pinned.maxOutputTokens = Math.min(updated.maxOutputTokens, Math.max(512, Math.floor(next * 0.25)));
+      this.profileCache.set(current.ref, pinned);
+      return pinned;
+    }
+    return updated;
+  }
+
+  isContextOverflow(error) {
+    return parseContextOverflow(error);
   }
 
   /** Cache of models proven to lack native tool calling, so the fallback costs one request once. */
@@ -719,7 +821,11 @@ export class ProviderManager {
       model: resolved.model,
       messages: toOllamaMessages(messages, resolved.ref),
       stream: true,
-      options: { temperature, ...(provider.options || {}), num_predict: maxTokens },
+      options: {
+        temperature,
+        num_ctx: (await this.modelProfile(resolved.ref).catch(() => null))?.contextWindow || undefined,
+        ...(provider.options || {}), num_predict: maxTokens,
+      },
       ...(tools.length ? { tools: toOpenAiTools(tools) } : {}),
     };
     const headers = { 'Content-Type': 'application/json', ...provider.headers };

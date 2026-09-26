@@ -1,7 +1,7 @@
 import { nowIso, runCommand, sha256, truncate } from '../core/utils.mjs';
 import { estimateUsageCost, summarizeCosts } from '../core/pricing.mjs';
 import { repairPrompt } from './tool-protocol.mjs';
-import { fitHistory } from './context-budget.mjs';
+import { elideStaleToolResults, estimateHistoryTokens, fitHistory, historyBudget } from './context-budget.mjs';
 import { compactTurns } from './compaction.mjs';
 
 // Bounded so a model that cannot produce valid syntax ends the run instead of looping on it.
@@ -10,6 +10,10 @@ const MAX_TOOL_CALL_REPAIRS = 2;
 function titleFromPrompt(prompt) {
   return String(prompt || '').replace(/\s+/g, ' ').trim().slice(0, 78) || 'MaskShift run';
 }
+
+// Upper bound on messages read back per run. Far above any real session; it only exists so a
+// pathological one cannot load unbounded rows into memory.
+const HISTORY_LOAD_LIMIT = 20_000;
 
 function messageForProvider(message) {
   const meta = message.meta || {};
@@ -20,6 +24,28 @@ function messageForProvider(message) {
     ...(meta.providerState ? { providerState: meta.providerState } : {}),
     ...(meta.toolCallId ? { toolCallId: meta.toolCallId, toolName: meta.toolName, isError: meta.isError } : {}),
   };
+}
+
+// A small model's window cannot afford ~30 tool schemas on every turn (measured: they alone can
+// fill an 8k window), and it also chooses better from a short list. It gets a core set for
+// reading, editing, searching and running code, plus anything it explicitly activates through
+// capability_search/capability_activate — so the whole catalog stays reachable, just on demand.
+const SMALL_MODEL_CORE_TOOLS = new Set([
+  'fs_list', 'fs_read', 'fs_write', 'fs_patch', 'search_text', 'shell_exec',
+  'git_status', 'git_diff', 'plan_update', 'capability_search', 'capability_activate',
+]);
+
+function compactToolsFor(profile, tools, capabilityState) {
+  if (profile?.tier !== 'small') return tools;
+  const activated = new Set((capabilityState?.activated || []).map((item) => item.name));
+  return tools.filter((tool) => SMALL_MODEL_CORE_TOOLS.has(tool.name) || activated.has(tool.name)).map((tool) => {
+    const schema = tool.inputSchema || {};
+    const properties = Object.fromEntries(Object.entries(schema.properties || {}).map(([key, value]) => {
+      const { description, ...rest } = value || {};
+      return [key, description ? { ...rest, description: truncate(String(description), 60) } : rest];
+    }));
+    return { ...tool, description: truncate(String(tool.description || ''), 140), inputSchema: { ...schema, properties } };
+  });
 }
 
 function renderToolResult(value, maxChars) {
@@ -279,12 +305,29 @@ export class AgentEngine {
         }
       }
 
-      const workspaceContext = await this.contextBuilder.build({ workspaceId: run.workspace_id, prompt: run.prompt, sessionId: session.id });
+      // Everything below is sized to the model actually running: its window bounds the injected
+      // repository context, its tier picks the prompt's verbosity, its output cap bounds replies.
+      let modelProfile = await this.providerManager.modelProfile(run.model_id).catch(() => null);
+      // Share of the window (in ~4-char tokens) spent on injected repository context. A small
+      // model keeps more of its window for the conversation itself.
+      const contextCharsFor = (profile) => (profile
+        ? Math.min(this.config.get().maxContextChars, Math.floor(profile.contextWindow * 4 * (profile.tier === 'small' ? 0.2 : 0.35)))
+        : undefined);
+      let workspaceContext = await this.contextBuilder.build({ workspaceId: run.workspace_id, prompt: run.prompt, sessionId: session.id, maxChars: contextCharsFor(modelProfile) });
       const capabilityState = this.capabilityController.createState({ runId: run.id, workspaceId: run.workspace_id });
       entry.capabilityState = capabilityState;
       await this.capabilityController.autoPrime(capabilityState, run.prompt);
 
-      const history = this.store.listMessages(session.id, 240).map(messageForProvider);
+      // The whole session, not a recent slice: fitHistory and compaction decide what fits, so
+      // nothing older silently disappears without being summarized first.
+      const messageIds = new WeakMap();
+      const positions = new Map();
+      const history = [];
+      const remember = (message, stored) => {
+        history.push(message);
+        if (stored?.id) { messageIds.set(message, stored.id); positions.set(stored.id, history.length - 1); }
+      };
+      for (const row of this.store.listMessages(session.id, HISTORY_LOAD_LIMIT)) remember(messageForProvider(row), row);
       const maxSteps = entry.options.maxSteps || this.config.get().maxAgentSteps;
       let finalContent = '';
       let step = 0;
@@ -294,7 +337,15 @@ export class AgentEngine {
       // Persists across this run's turns: once some of the oldest turns have been folded into a
       // summary, later turns extend that same summary with only what's newly been dropped since,
       // rather than re-summarizing the whole drop set from scratch every time it grows.
-      const compaction = { summary: null, coveredTurns: 0 };
+      // Saved on the session, so the next prompt in a long session starts from this summary
+      // instead of losing it when the run ends.
+      const savedCompaction = this.store.getSession(session.id)?.meta?.compaction || {};
+      const compaction = {
+        summary: savedCompaction.summary || null,
+        throughMessageId: savedCompaction.throughMessageId || null,
+        lastFailedStep: -Infinity,
+      };
+      let overflowRetries = 0;
 
       while (step < maxSteps) {
         if (signal.aborted) throw signal.reason || new Error('Run cancelled');
@@ -302,46 +353,56 @@ export class AgentEngine {
         this.store.updateRun(run.id, { step_count: step });
         const currentRun = this.store.getRun(run.id);
         const currentSession = this.store.getSession(session.id);
-        const system = this.promptBuilder.system({ workspaceContext, capabilityState, planState: entry.planState, run: currentRun, session: currentSession });
-        const tools = await this.capabilityController.descriptors(capabilityState);
+        const system = this.promptBuilder.system({ workspaceContext, capabilityState, planState: entry.planState, run: currentRun, session: currentSession, modelProfile });
+        const tools = compactToolsFor(modelProfile, await this.capabilityController.descriptors(capabilityState), capabilityState);
         this.#event(run.id, 'model-turn', { step, tools: tools.map((tool) => tool.name), skillCount: capabilityState.skills.size }, scope);
-        const maxTokens = entry.options.maxTokens || 16_384;
-        // Only trims when the model declares a smaller-than-default context window (e.g. a
-        // small local model); otherwise the full history goes out exactly as before. The system
-        // message (with its cache-boundary blocks) and tool list are never touched here.
+        const maxTokens = entry.options.maxTokens || modelProfile?.maxOutputTokens || 16_384;
         let outboundHistory = history;
-        const contextTokens = await this.providerManager.contextWindowFor(currentRun.model_id).catch(() => null);
+        const contextTokens = await this.providerManager.contextWindowFor(currentRun.model_id).catch(() => modelProfile?.contextWindow || null);
         if (contextTokens) {
-          const fitted = fitHistory({
-            history,
+          const sizes = {
             contextTokens,
             outputTokens: maxTokens,
             systemTokens: Math.ceil(Buffer.byteLength(system.text, 'utf8') / 4),
             toolTokens: Math.ceil(Buffer.byteLength(JSON.stringify(tools), 'utf8') / 4),
-          });
+          };
+          // Old tool output is the cheapest thing to give up: shrink it before dropping turns.
+          const candidate = estimateHistoryTokens(history) > historyBudget(sizes) * 0.5
+            ? elideStaleToolResults(history, { onReplace: (original, replacement) => messageIds.set(replacement, messageIds.get(original)) })
+            : history;
+          const fitted = fitHistory({ history: candidate, ...sizes });
           outboundHistory = fitted.history;
           if (fitted.omitted) {
             this.#event(run.id, 'context-trimmed', { omittedTurns: fitted.omitted, contextTokens }, scope);
-            const newlyDropped = fitted.droppedTurns.slice(compaction.coveredTurns);
-            if (newlyDropped.length) {
+            const positionOf = (turn) => positions.get(messageIds.get(turn.at(-1))) ?? -1;
+            const coveredThrough = compaction.throughMessageId ? (positions.get(compaction.throughMessageId) ?? -1) : -1;
+            const newlyDropped = fitted.droppedTurns.filter((turn) => positionOf(turn) > coveredThrough);
+            if (newlyDropped.length && step - compaction.lastFailedStep >= 5) {
               await this.hooks?.run('PreCompact', { ...scope, workspacePath, omittedTurns: fitted.omitted, droppedTurns: newlyDropped, previousSummary: compaction.summary });
               const compacted = await compactTurns(this.providerManager, {
                 modelRef: currentRun.model_id, newlyDropped, previousSummary: compaction.summary, signal,
+                maxSummaryTokens: Math.max(400, Math.min(2_000, Math.floor(contextTokens * 0.03))),
               });
-              compaction.summary = compacted.summary;
-              compaction.coveredTurns = fitted.omitted;
               if (compacted.usage) {
+                compaction.summary = compacted.summary;
+                compaction.throughMessageId = messageIds.get(newlyDropped.at(-1).at(-1)) || compaction.throughMessageId;
+                const sessionMeta = this.store.getSession(session.id)?.meta || {};
+                this.store.updateSession(session.id, {
+                  meta: { ...sessionMeta, compaction: { summary: compaction.summary, throughMessageId: compaction.throughMessageId, updatedAt: nowIso() } },
+                });
                 usage.push(compacted.usage);
                 costs.push(estimateUsageCost(this.config.get(), compacted.providerId, compacted.providerType, compacted.model, compacted.usage));
+              } else {
+                compaction.lastFailedStep = step;
               }
-              this.#event(run.id, 'context-compacted', { omittedTurns: fitted.omitted, summarized: Boolean(compacted.summary) }, scope);
+              this.#event(run.id, 'context-compacted', { omittedTurns: fitted.omitted, summarized: Boolean(compacted.usage) }, scope);
             }
             // fitted.history[0] is fitHistory's own generic "(N turns omitted)" placeholder —
-            // replaced with the real summary when compaction produced one, so the model keeps
-            // the concrete facts from those turns instead of just being told they existed.
+            // replaced with the real summary when there is one, so the model keeps the concrete
+            // facts from those turns instead of just being told they existed.
             if (compaction.summary) {
               outboundHistory = [
-                { role: 'user', content: `[Compacted summary of ${fitted.omitted} earlier turn${fitted.omitted === 1 ? '' : 's'}, dropped to fit this model's context window]\n\n${compaction.summary}` },
+                { role: 'user', content: `[Summary of ${fitted.omitted} earlier turn${fitted.omitted === 1 ? '' : 's'}, dropped to fit this model's context window]\n\n${compaction.summary}` },
                 ...fitted.history.slice(1),
               ];
             }
@@ -355,20 +416,36 @@ export class AgentEngine {
         // own return value below, persisted as the `assistant` message regardless of how many
         // deltas were dropped here.
         let lastDeltaEmitAt = 0;
-        const response = await this.providerManager.complete({
-          modelRef: currentRun.model_id,
-          messages: [{ role: 'system', content: system.text, blocks: system.blocks }, ...outboundHistory],
-          tools,
-          signal,
-          temperature: entry.options.temperature ?? 0.1,
-          maxTokens,
-          onDelta: (content) => {
-            const now = Date.now();
-            if (now - lastDeltaEmitAt < 60) return;
-            lastDeltaEmitAt = now;
-            this.eventBus.emit('run.assistant-delta', { step, content }, scope);
-          },
-        });
+        let response;
+        try {
+          response = await this.providerManager.complete({
+            modelRef: currentRun.model_id,
+            messages: [{ role: 'system', content: system.text, blocks: system.blocks }, ...outboundHistory],
+            tools,
+            signal,
+            temperature: entry.options.temperature ?? 0.1,
+            maxTokens,
+            onDelta: (content) => {
+              const now = Date.now();
+              if (now - lastDeltaEmitAt < 60) return;
+              lastDeltaEmitAt = now;
+              this.eventBus.emit('run.assistant-delta', { step, content }, scope);
+            },
+          });
+        } catch (error) {
+          // The provider says the request did not fit. Learn the real limit, resize everything
+          // to it, and retry this same turn rather than failing a long session outright.
+          const overflow = signal.aborted ? null : this.providerManager.isContextOverflow?.(error);
+          if (!overflow || overflowRetries >= 2) throw error;
+          overflowRetries += 1;
+          const previous = contextTokens;
+          modelProfile = await this.providerManager.learnContextWindow(currentRun.model_id, overflow.limit);
+          workspaceContext = await this.contextBuilder.build({ workspaceId: run.workspace_id, prompt: run.prompt, sessionId: session.id, maxChars: contextCharsFor(modelProfile) });
+          this.#event(run.id, 'context-window-learned', { previous, next: modelProfile.contextWindow, stated: overflow.limit }, scope);
+          step -= 1;
+          continue;
+        }
+        overflowRetries = 0;
         usage.push(response.usage);
         costs.push(estimateUsageCost(this.config.get(), response.providerId, response.providerType, response.model, response.usage));
         const maxRunTokens = Number(this.config.get().maxRunTokens) || 5_000_000;
@@ -379,11 +456,10 @@ export class AgentEngine {
         const assistantMessage = {
           role: 'assistant', content: response.content || '', toolCalls: response.toolCalls || [], providerState: response.providerState,
         };
-        history.push(assistantMessage);
-        this.store.addMessage({
+        remember(assistantMessage, this.store.addMessage({
           sessionId: session.id, role: 'assistant', content: response.content || '',
           meta: { runId: run.id, modelRef: response.modelRef, toolCalls: response.toolCalls || [], finishReason: response.finishReason, usage: response.usage, providerState: response.providerState },
-        });
+        }));
         this.#event(run.id, 'assistant', { content: response.content || '', toolCalls: response.toolCalls || [], modelRef: response.modelRef, usage: response.usage }, scope);
         if (response.content) finalContent = response.content;
 
@@ -392,11 +468,10 @@ export class AgentEngine {
         if (!response.toolCalls?.length && response.parseErrors?.length && repairAttempts < MAX_TOOL_CALL_REPAIRS) {
           repairAttempts += 1;
           const correction = repairPrompt(response.parseErrors, tools);
-          history.push({ role: 'user', content: correction });
-          this.store.addMessage({
+          remember({ role: 'user', content: correction }, this.store.addMessage({
             sessionId: session.id, role: 'user', content: correction,
             meta: { runId: run.id, synthetic: true, toolCallRepair: repairAttempts },
-          });
+          }));
           this.#event(run.id, 'tool-call-repair', { attempt: repairAttempts, errors: response.parseErrors }, scope);
           continue;
         }
@@ -427,11 +502,10 @@ export class AgentEngine {
             role: 'tool', toolCallId: result.call.id, toolName: result.call.name,
             content: result.content, isError: result.isError,
           };
-          history.push(toolMessage);
-          this.store.addMessage({
+          remember(toolMessage, this.store.addMessage({
             sessionId: session.id, role: 'tool', content: result.content,
             meta: { runId: run.id, toolCallId: result.call.id, toolName: result.call.name, isError: result.isError },
-          });
+          }));
           this.#event(run.id, result.isError ? 'tool-error' : 'tool-result', {
             toolCallId: result.call.id, tool: result.call.name, content: result.content,
           }, scope);

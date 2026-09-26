@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createProject, jsonServer, readJsonBody, respondOpenAIChatSSE, runtimeForTest, waitFor } from './helpers.mjs';
+import { createProject, isDiscoveryProbe, jsonServer, readJsonBody, respondJson, respondOpenAIChatSSE, runtimeForTest, waitFor } from './helpers.mjs';
 
 function textResponse(response, content = 'Done.') {
   return respondOpenAIChatSSE(response, { content, finishReason: 'stop', usage: { prompt_tokens: 5, completion_tokens: 5 } });
@@ -132,6 +132,7 @@ test('a run is aborted once it exceeds its configured wall-clock deadline', asyn
 test('a run is stopped once it exceeds its configured token budget', async (t) => {
   let turn = 0;
   const modelServer = await jsonServer(t, async (request, response) => {
+    if (isDiscoveryProbe(request)) return respondJson(response, 404, { error: 'not found' });
     turn += 1;
     if (turn === 1) {
       return respondOpenAIChatSSE(response, {

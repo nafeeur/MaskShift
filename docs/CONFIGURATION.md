@@ -247,6 +247,54 @@ Supported `type` values are `ollama`, `openai-responses`, `openai-compatible`, `
 
 An `anthropic` provider entry also accepts `promptCaching` (default `true`). When enabled, MaskShift marks the stable system-prompt block, the active tool schema list, and the conversation-so-far boundary with `cache_control: {"type": "ephemeral"}` breakpoints so a run's repeated turns reuse cached input tokens instead of rebilling them in full. Set `"promptCaching": false` on the provider entry if a proxy in front of the Anthropic-compatible endpoint rejects the `cache_control` field.
 
+## Model adaptation
+
+MaskShift sizes every run to the model actually running it, including models it has never
+seen. For each model it resolves a **context window**, taking the first of:
+
+1. `harness.models["provider:model"].contextWindow`, or `contextWindow` on the provider's
+   `models[]` entry.
+2. What the provider reports: Ollama's `/api/show` (`*.context_length`), an OpenAI-compatible
+   `/models` listing (`context_length`, `max_model_len`, `context_window`,
+   `max_context_length`), or Gemini's `inputTokenLimit`.
+3. A family default for well-known model names, or a size in the name (`…-128k`).
+4. `32768` when nothing else is known.
+
+When a provider rejects a request as too long, MaskShift reads the real limit from the error
+(or, if the error names none, assumes a window 25% smaller), resizes the prompt, and retries
+the same turn — up to twice. The learned limit is saved in the `modelContextLimits` setting,
+so later sessions start with it. To forget a learned limit, remove that model's entry from
+the setting or set an explicit `contextWindow`.
+
+For Ollama, which silently truncates to `num_ctx`, MaskShift sends `num_ctx` itself: the
+model's trained window, capped at `harness.ollamaContextCap` (default `32768`, to bound
+memory use). An explicit `options.num_ctx` on the provider always wins.
+
+From the window (and the parameter count, when the name or Ollama reports it) the model gets a
+tier, which shapes the prompt:
+
+| Tier | When | Effect |
+|---|---|---|
+| `small` | window under 16k, or ≤9B parameters | Short operating contract, a core set of 11 tools (the rest stay reachable through `capability_search`/`capability_activate`), 20% of the window for repository context |
+| `medium` | everything between | Full prompt, 35% of the window for repository context |
+| `large` | window of 100k+ and ≥30B parameters (or unknown) | Full prompt, 35% of the window for repository context |
+
+Replies are capped at a quarter of the window (and at `harness.maxOutputTokens` or the
+model's reported output limit, when lower). Agentic tool use needs roughly an 8k window at
+minimum; below that, a run fails with a clear context-budget error rather than sending a
+truncated request.
+
+### Long sessions
+
+- Each run reads the whole session back, not a recent slice. What does not fit the window is
+  summarized rather than dropped silently.
+- The summary uses fixed headings (goal, files touched, decisions, open issues, key facts), is
+  sized to the window (400–2 000 tokens), and is saved on the session, so the next prompt
+  continues from it and never re-summarizes turns it already covers.
+- When history passes half of its budget, large tool results outside the four most recent
+  turns are replaced with a short stub naming the tool, so an old file read stops costing its
+  full size on every request. The model can re-run the tool if it needs the content again.
+
 ## Memory ranking
 
 `memory` controls how `memory_search`/`memory_list` rank and age persistent memories.
