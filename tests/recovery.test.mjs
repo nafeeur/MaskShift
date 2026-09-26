@@ -4,7 +4,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 import { main } from '../src/cli/main.mjs';
-import { createProject, jsonServer, readJsonBody, respondOpenAIChatSSE, runtimeForTest, waitFor } from './helpers.mjs';
+import { createProject, isDiscoveryProbe, jsonServer, readJsonBody, respondJson, respondOpenAIChatSSE, runtimeForTest, waitFor } from './helpers.mjs';
 
 function captureStdout() {
   const chunks = [];
@@ -114,6 +114,7 @@ test('reconcile refuses a run that is still active in this process', async (t) =
 
 test('a real run records its owner pid and pairs tool intents with results', async (t) => {
   const modelServer = await jsonServer(t, async (request, response) => {
+    if (isDiscoveryProbe(request)) return respondJson(response, 404, { error: 'not found' });
     const body = await readJsonBody(request);
     if (body.messages.some((m) => Array.isArray(m.tool_calls))) {
       return respondOpenAIChatSSE(response, { content: 'done', finishReason: 'stop' });

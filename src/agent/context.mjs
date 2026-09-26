@@ -20,7 +20,7 @@ export class ContextBuilder {
     this.logger = logger;
   }
 
-  async build({ workspaceId, prompt, sessionId }) {
+  async build({ workspaceId, prompt, sessionId, maxChars }) {
     if (!workspaceId) {
       return { workspace: null, text: `No workspace is open. Host current directory: ${process.cwd()}` };
     }
@@ -46,7 +46,7 @@ export class ContextBuilder {
     }
 
     const profile = this.contextPlanner.profile(prompt);
-    const budgets = this.contextPlanner.budgets(undefined, profile);
+    const budgets = this.contextPlanner.budgets(maxChars, profile);
     const [inspection, tree, instructions, rawRepoHits, rawMemories] = await Promise.all([
       this.workspaceManager.inspect(workspaceId).catch((error) => ({ error: error.message, workspace })),
       this.workspaceManager.listFiles(workspaceId, { depth: 3, maxEntries: 1600, includeHidden: false }).catch(() => ({ entries: [], truncated: false })),

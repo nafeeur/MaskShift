@@ -27,9 +27,16 @@ function renderTurn(turn) {
 export async function compactTurns(providerManager, { modelRef, newlyDropped, previousSummary, signal, maxSummaryTokens = 400 }) {
   if (!newlyDropped.length) return { summary: previousSummary || null, usage: null };
   const rendered = newlyDropped.map(renderTurn).join('\n\n---\n\n');
+  const format = `Write it under exactly these headings, as terse bullet points:
+## Goal
+## Files touched
+## Decisions
+## Open issues
+## Key facts
+Preserve concrete facts: file paths, commands, values discovered, errors hit and how they were resolved. Merge redundant points, drop pleasantries and narration, and drop anything later superseded. Keep it under ${maxSummaryTokens} tokens.`;
   const instructions = previousSummary
-    ? `You are maintaining a running summary of an in-progress coding session so older turns can be safely dropped from context without losing anything a continuing assistant would still need. Here is the summary so far:\n\n${previousSummary}\n\nHere is additional earlier conversation to fold into it. Produce one updated, consolidated summary — merge redundant points rather than appending. Preserve concrete facts: file paths touched, decisions made, values discovered, errors hit and how they were resolved. Drop pleasantries and narration. Keep it under ${maxSummaryTokens} tokens.\n\nAdditional conversation:\n\n${rendered}`
-    : `Summarize the following earlier portion of an in-progress coding session so it can be safely dropped from context without losing anything a continuing assistant would still need. Preserve concrete facts: file paths touched, decisions made, values discovered, errors hit and how they were resolved. Drop pleasantries and narration. Keep it under ${maxSummaryTokens} tokens.\n\n${rendered}`;
+    ? `You are maintaining a running summary of an in-progress coding session so older turns can be dropped from context without losing anything a continuing assistant still needs. Here is the summary so far:\n\n${previousSummary}\n\nFold the additional earlier conversation below into it and produce one updated, consolidated summary. ${format}\n\nAdditional conversation:\n\n${rendered}`
+    : `Summarize the following earlier portion of an in-progress coding session so it can be dropped from context without losing anything a continuing assistant still needs. ${format}\n\n${rendered}`;
   try {
     const result = await providerManager.complete({
       modelRef, messages: [{ role: 'user', content: instructions }], tools: [], signal, temperature: 0, maxTokens: maxSummaryTokens,

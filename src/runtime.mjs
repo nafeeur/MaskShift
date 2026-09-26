@@ -42,7 +42,7 @@ export async function createRuntime({ configPath, configOverrides = {}, workspac
   await skillManager.setWorkspace(workspacePath);
   const personaManager = new PersonaManager({ config, logger, eventBus });
   await personaManager.setWorkspace(workspacePath);
-  const providerManager = new ProviderManager({ config, logger, eventBus });
+  const providerManager = new ProviderManager({ config, logger, eventBus, store });
   const mcpManager = new McpManager({ config, logger, eventBus, workspaceManager });
   await mcpManager.init(workspacePath);
   const lspManager = new LspManager({ config, logger, eventBus, workspaceManager });

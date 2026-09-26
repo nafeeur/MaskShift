@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { ContextBudgetError, fitHistory } from '../src/agent/context-budget.mjs';
-import { createProject, jsonServer, readJsonBody, respondOpenAIChatSSE, runtimeForTest, waitFor } from './helpers.mjs';
+import { createProject, isDiscoveryProbe, jsonServer, readJsonBody, respondJson, respondOpenAIChatSSE, runtimeForTest, waitFor } from './helpers.mjs';
 
 function longMessage(role, label) {
   return { role, content: `${label} `.repeat(80) };
@@ -53,6 +53,7 @@ test('fitHistory throws when the system prompt and tools alone exceed the budget
 test('adaptive context budgeting trims old session history for a model with a small declared context window, compacting what it drops', async (t) => {
   const requests = [];
   const modelServer = await jsonServer(t, async (request, response) => {
+    if (isDiscoveryProbe(request)) return respondJson(response, 404, { error: 'not found' });
     const body = await readJsonBody(request);
     requests.push(body);
     // The compaction summarization call has no system message (see compaction.mjs) — the real
@@ -109,7 +110,7 @@ test('adaptive context budgeting trims old session history for a model with a sm
   assert.equal(compacted.payload.summarized, true);
   // The real turn's history should carry the compaction summary, not the generic
   // "(N turns omitted)" placeholder fitHistory falls back to when compaction is unavailable.
-  const compactedMessage = turnRequest.messages.find((message) => typeof message.content === 'string' && message.content.includes('Compacted summary'));
+  const compactedMessage = turnRequest.messages.find((message) => typeof message.content === 'string' && /^\[Summary of \d+ earlier turn/.test(message.content));
   assert.ok(compactedMessage, 'expected the compacted summary to replace the generic omission digest');
   assert.match(compactedMessage.content, /SUMMARY: earlier turns discussed/);
   assert.ok(!turnRequest.messages.some((message) => typeof message.content === 'string' && message.content.includes('omitted from this request')));
@@ -118,6 +119,7 @@ test('adaptive context budgeting trims old session history for a model with a sm
 test('a model with no declared context window sends full history untouched, as before', async (t) => {
   const requests = [];
   const modelServer = await jsonServer(t, async (request, response) => {
+    if (isDiscoveryProbe(request)) return respondJson(response, 404, { error: 'not found' });
     const body = await readJsonBody(request);
     requests.push(body);
     return respondOpenAIChatSSE(response, { content: 'Done.', finishReason: 'stop', usage: { prompt_tokens: 10, completion_tokens: 2 } });

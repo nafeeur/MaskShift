@@ -16,25 +16,7 @@ function renderPlan(plan) {
   return [plan.summary || '', ...linear, ...(dag.length ? ['Executable DAG:', ...dag] : [])].filter(Boolean).join('\n');
 }
 
-export class PromptBuilder {
-  constructor({ config, capabilityController }) {
-    this.config = config;
-    this.capabilityController = capabilityController;
-  }
-
-  system({ workspaceContext, capabilityState, planState, run, session }) {
-    const config = this.config.get();
-    const active = this.capabilityController.snapshot(capabilityState);
-    const catalog = this.capabilityController.catalogSummary({ workspaceId: run.workspace_id });
-
-    // Stable for the whole run: identical on every turn, so an Anthropic-style prompt cache can
-    // reuse it instead of re-billing the (often large) repository context and catalog each turn.
-    const stable = `
-# MASKSHIFT // OVERDRIVE EXECUTION KERNEL
-
-You are MaskShift, an autonomous maximalist software-engineering harness. You operate as a principal engineer with direct host access, a lazy capability fabric, persistent memory, reusable skills, MCP connectors, subagents, repository indexing, Git checkpoints, and unrestricted Unix tools.
-
-## Operating contract
+const FULL_CONTRACT = (config) => `## Operating contract
 
 - Complete the user's engineering task end to end. Inspect, modify, run, test, debug, and verify rather than merely describing changes.
 - Permission mode is **${config.permissionMode}** and filesystem scope is **${config.filesystemScope}**. Do not ask for routine command, file, package, network, Git, or tool permission. Use the access already granted.
@@ -47,7 +29,41 @@ You are MaskShift, an autonomous maximalist software-engineering harness. You op
 - Use persistent memory for durable project conventions or decisions, not transient chatter. Improve or create a skill only when the workflow is genuinely reusable.
 - When the current tools are insufficient, call capability_search. Then call capability_activate. Never invent a tool name.
 - MCP and skill catalogs are intentionally lazy: availability does not mean their schemas or bodies are in context. Activate only what advances the current task.
-- Deliver a concise final report with what changed, verification performed, and any concrete limitation. Do not dump internal scratch work.
+- Deliver a concise final report with what changed, verification performed, and any concrete limitation. Do not dump internal scratch work.`;
+
+const SMALL_CONTRACT = `## Operating contract
+
+- Finish the task end to end: inspect, edit, run, and verify. Do not just describe changes.
+- You already have permission for commands, files, and tools. Do not ask for it.
+- Find the right files yourself. Make small, targeted edits.
+- Run tests or the relevant check before saying you are done. Fix errors you hit.
+- If you need a tool you do not have, call capability_search, then capability_activate.
+- End with a short report: what changed and how you verified it.`;
+
+export class PromptBuilder {
+  constructor({ config, capabilityController }) {
+    this.config = config;
+    this.capabilityController = capabilityController;
+  }
+
+  system({ workspaceContext, capabilityState, planState, run, session, modelProfile = null }) {
+    const config = this.config.get();
+    const active = this.capabilityController.snapshot(capabilityState);
+    const small = modelProfile?.tier === 'small';
+    const fullCatalog = this.capabilityController.catalogSummary({ workspaceId: run.workspace_id });
+    // A small model has little window to spare and follows short, concrete rules better than a
+    // long contract, so it gets the same obligations in a fraction of the tokens.
+    const catalog = small ? truncate(fullCatalog, 1_500) : fullCatalog;
+    const contract = small ? SMALL_CONTRACT : FULL_CONTRACT(config);
+
+    // Stable for the whole run: identical on every turn, so an Anthropic-style prompt cache can
+    // reuse it instead of re-billing the (often large) repository context and catalog each turn.
+    const stable = `
+# MASKSHIFT // OVERDRIVE EXECUTION KERNEL
+
+You are MaskShift, an autonomous maximalist software-engineering harness. You operate as a principal engineer with direct host access, a lazy capability fabric, persistent memory, reusable skills, MCP connectors, subagents, repository indexing, Git checkpoints, and unrestricted Unix tools.
+
+${contract}
 
 ## Run identity
 

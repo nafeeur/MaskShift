@@ -53,9 +53,40 @@ function groupTurns(history) {
  * small even for that fails loudly via ContextBudgetError rather than sending a corrupt or
  * silently-incomplete request.
  */
-export function fitHistory({ history, contextTokens, outputTokens = 4096, systemTokens = 0, toolTokens = 0 }) {
+/** Tokens left for conversation history once the system prompt, tools, and reply are paid for. */
+export function historyBudget({ contextTokens, outputTokens = 4096, systemTokens = 0, toolTokens = 0 }) {
   const headroom = Math.max(256, Math.floor(contextTokens * 0.1));
-  const budget = contextTokens - outputTokens - headroom - systemTokens - toolTokens;
+  return contextTokens - outputTokens - headroom - systemTokens - toolTokens;
+}
+
+export function estimateHistoryTokens(history) {
+  return history.reduce((sum, message) => sum + messageTokens(message), 0);
+}
+
+/**
+ * Replaces the body of large tool results outside the most recent turns with a short stub
+ * naming the tool, so a file read two hours ago stops costing its full size on every request.
+ * The model can re-run the tool if it needs the content again. Returns a new array; the stored
+ * transcript is untouched. `onReplace(original, replacement)` lets a caller carry its own
+ * bookkeeping (message ids) over to the replacement objects.
+ */
+export function elideStaleToolResults(history, { keepRecentTurns = 4, minChars = 1500, onReplace } = {}) {
+  const turns = groupTurns(history);
+  const cutoff = Math.max(0, turns.length - keepRecentTurns);
+  return turns.flatMap((turn, index) => (index >= cutoff ? turn : turn.map((message) => {
+    const content = String(message.content || '');
+    if (message.role !== 'tool' || content.length < minChars) return message;
+    const replacement = {
+      ...message,
+      content: `[Older ${message.toolName || 'tool'} result elided to save context (${content.length} chars). Re-run the tool if you need it again. It began:]\n${content.slice(0, 300)}`,
+    };
+    onReplace?.(message, replacement);
+    return replacement;
+  })));
+}
+
+export function fitHistory({ history, contextTokens, outputTokens = 4096, systemTokens = 0, toolTokens = 0 }) {
+  const budget = historyBudget({ contextTokens, outputTokens, systemTokens, toolTokens });
   if (budget < 256) {
     throw new ContextBudgetError('This model\'s context window is too small to fit the required system prompt and tool schemas.', { contextTokens, outputTokens, systemTokens, toolTokens });
   }
