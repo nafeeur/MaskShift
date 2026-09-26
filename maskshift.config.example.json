@@ -34,6 +34,12 @@
   "pluginDirs": [
     "~/.maskshift/plugins"
   ],
+  "agentsDirs": [
+    "~/.maskshift/agents",
+    "./.maskshift/agents",
+    "./.claude/agents",
+    "~/.claude/agents"
+  ],
   "contextFiles": [
     "AGENTS.md",
     "CLAUDE.md",

@@ -15,7 +15,7 @@ function parseScalar(value) {
   return trimmed;
 }
 
-function parseFrontmatter(content) {
+export function parseFrontmatter(content) {
   if (!content.startsWith('---\n')) return { meta: {}, body: content };
   const end = content.indexOf('\n---\n', 4);
   if (end < 0) return { meta: {}, body: content };

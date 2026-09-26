@@ -1,13 +1,14 @@
-export function registerAgentTools(registry, { getEngine, config }) {
+export function registerAgentTools(registry, { getEngine, config, personaManager }) {
   registry.register({
     name: 'agent_delegate',
     title: 'Delegate to subagent',
-    description: 'Run a focused subagent with its own session and capability context. Optionally isolate editing in a Git worktree and branch.',
+    description: 'Run a focused subagent with its own session and capability context. Optionally give it a named persona (see agent_persona_list) to frame its system prompt, and optionally isolate editing in a Git worktree and branch.',
     category: 'orchestration', risk: 'agent',
-    keywords: ['subagent', 'delegate', 'parallel', 'specialist', 'worktree'],
+    keywords: ['subagent', 'delegate', 'parallel', 'specialist', 'worktree', 'persona'],
     inputSchema: {
       type: 'object', required: ['task'], properties: {
         task: { type: 'string' }, model: { type: 'string' },
+        persona: { type: 'string', description: 'Name of a bundled or project persona (from agent_persona_list) whose system prompt frames this subagent, e.g. "code-reviewer" or "security-reviewer".' },
         isolated: { type: 'boolean', default: false }, name: { type: 'string' },
         mode: { type: 'string', enum: ['inspect', 'edit'], default: 'inspect' },
       },
@@ -18,12 +19,12 @@ export function registerAgentTools(registry, { getEngine, config }) {
   registry.register({
     name: 'agent_parallel',
     title: 'Run parallel subagents',
-    description: 'Delegate multiple independent research, review, test, or implementation tasks concurrently and aggregate their final results.',
+    description: 'Delegate multiple independent research, review, test, or implementation tasks concurrently and aggregate their final results. Each task may set its own persona.',
     category: 'orchestration', risk: 'agent',
-    keywords: ['swarm', 'parallel agents', 'reviewers', 'fan out'],
+    keywords: ['swarm', 'parallel agents', 'reviewers', 'fan out', 'persona'],
     inputSchema: {
       type: 'object', required: ['tasks'], properties: {
-        tasks: { type: 'array', minItems: 1, maxItems: 12, items: { type: 'object', required: ['task'], properties: { task: { type: 'string' }, model: { type: 'string' }, isolated: { type: 'boolean', default: false }, name: { type: 'string' }, mode: { type: 'string', enum: ['inspect', 'edit'], default: 'inspect' } } } },
+        tasks: { type: 'array', minItems: 1, maxItems: 12, items: { type: 'object', required: ['task'], properties: { task: { type: 'string' }, model: { type: 'string' }, persona: { type: 'string' }, isolated: { type: 'boolean', default: false }, name: { type: 'string' }, mode: { type: 'string', enum: ['inspect', 'edit'], default: 'inspect' } } } },
       },
     },
     execute: async (args, context) => {
@@ -31,6 +32,16 @@ export function registerAgentTools(registry, { getEngine, config }) {
       const selected = args.tasks.slice(0, maximum);
       return Promise.all(selected.map((task) => getEngine().delegate(task, context).catch((error) => ({ task: task.task, error: error.message }))));
     },
+  });
+
+  registry.register({
+    name: 'agent_persona_list',
+    title: 'List subagent personas',
+    description: 'List named personas (bundled and project-defined) that can be passed as agent_delegate\'s persona argument to frame a subagent\'s system prompt for a specific role, such as reviewing code or resolving a build failure.',
+    category: 'orchestration', readOnly: true, alwaysAvailable: true,
+    keywords: ['persona', 'subagent', 'role', 'reviewer'],
+    inputSchema: { type: 'object', properties: { query: { type: 'string' } } },
+    execute: async (args) => (args.query ? personaManager.search(args.query) : personaManager.list()),
   });
 
   registry.register({

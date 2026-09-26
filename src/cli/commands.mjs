@@ -57,6 +57,7 @@ const workspaceCommands = {
       runtime.store.setSetting('lastWorkspaceId', workspace.id);
       await runtime.mcpManager.refreshDefinitions(workspace.path);
       await runtime.skillManager.setWorkspace(workspace.path);
+      await runtime.personaManager.setWorkspace(workspace.path);
       runtime.pluginManager.workspacePath = workspace.path;
       await runtime.pluginManager.scan({ activate: true });
       if (args.index !== false && args['no-index'] !== true) await runtime.indexer.index(workspace.id, { force: true });

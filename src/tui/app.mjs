@@ -2382,6 +2382,7 @@ export class MaskShiftTui {
         this.setWorkspace(workspace);
         await this.runtime.mcpManager.refreshDefinitions(workspace.path);
         await this.runtime.skillManager.setWorkspace(workspace.path);
+        await this.runtime.personaManager.setWorkspace(workspace.path);
         this.runtime.pluginManager.workspacePath = workspace.path;
         await this.runtime.pluginManager.scan({ activate: true });
         this.refreshCatalogs();
