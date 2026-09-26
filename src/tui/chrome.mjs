@@ -12,7 +12,7 @@
 //   The active view tab is the only filled chip on screen. Everything else in
 //   the chrome is text on the background.
 
-import { glyphs } from './box.mjs';
+import { glyphs, meter } from './box.mjs';
 import { LAYER } from './regions.mjs';
 import { statusOf, statusGlyph } from './status.mjs';
 import { fit, padStart, repeat, truncate, visibleWidth } from './text.mjs';
@@ -168,7 +168,9 @@ export function tabStrip(app, width, offset = 0) {
     const plain = ` ${view.index} ${view.title} `;
     // The ordinal is navigation, not content: it stays a step quieter than the
     // name it belongs to, in both states.
-    const painted = active
+    const painted = active && !theme.enabled
+      ? `[${view.index} ${view.title}]`
+      : active
       ? theme.paint(' ', { bg: theme.roles.primary })
         + theme.paint(view.index, { fg: theme.mixed(theme.roles.primary, theme.roles.onPrimary, 0.55), bg: theme.roles.primary, bold: true })
         + theme.paint(` ${view.title} `, { fg: theme.roles.onPrimary, bg: theme.roles.primary, bold: true })
@@ -232,16 +234,29 @@ export function statusRail(app, width, offset = 0) {
     : budget && app.totals.cost >= budget * 0.8 ? theme.roles.warning
       : undefined;
 
-  const metrics = [
-    stat(theme, 'TURN', String(app.metrics.step).padStart(2, '0')),
-    stat(theme, 'TIME', app.metrics.elapsed),
-    stat(theme, 'TOKENS', app.metrics.tokens),
-    stat(theme, 'COST', app.metrics.cost, costTone),
-  ].join(divider(theme));
-
+  const context = app.contextState;
+  // Dropped in reverse priority as the row narrows, like the header's chips. The context meter
+  // survives longest: it is the one number that predicts trouble rather than reporting history.
+  const candidates = [
+    context && { priority: 0, text: contextMeter(theme, context) },
+    { priority: 3, text: stat(theme, 'TURN', String(app.metrics.step).padStart(2, '0')) },
+    { priority: 4, text: stat(theme, 'TIME', app.metrics.elapsed) },
+    { priority: 2, text: stat(theme, 'TOKENS', app.metrics.tokens) },
+    { priority: 1, text: stat(theme, 'COST', app.metrics.cost, costTone) },
+  ].filter(Boolean);
   const lead = theme.paint(`${statusGlyph(theme, status)} `, { fg: tone })
     + theme.paint(state.label, { fg: tone, bold: true })
     + theme.paint(`  ${glyphs(theme).pipe}  `, { fg: theme.roles.border });
+  const gapWidth = visibleWidth(divider(theme));
+  let spare = width - visibleWidth(lead) - 16 - 4;
+  const kept = new Set();
+  for (const item of [...candidates].sort((a, b) => a.priority - b.priority)) {
+    const cost = visibleWidth(item.text) + (kept.size ? gapWidth : 0);
+    if (cost > spare) continue;
+    kept.add(item);
+    spare -= cost;
+  }
+  const metrics = candidates.filter((item) => kept.has(item)).map((item) => item.text).join(divider(theme));
   const room = Math.max(8, width - visibleWidth(lead) - visibleWidth(metrics) - 4);
   const title = truncate(app.sessionTitle || (run ? 'RUN IN PROGRESS' : 'STANDBY FOR ORDERS'), room);
 
@@ -256,6 +271,17 @@ export function statusRail(app, width, offset = 0) {
   });
 
   return fit(` ${left}${' '.repeat(gap)}${metrics} `, width);
+}
+
+/**
+ * How much of the model's context window the last request used: a short meter that shifts from
+ * green to amber at 60% and red at 85%, since that is when history starts being summarized.
+ */
+function contextMeter(theme, context) {
+  const tone = theme.role(context.tone);
+  return theme.paint('CTX ', { fg: theme.roles.muted })
+    + meter(theme, context.used, context.window, 8, { colour: tone })
+    + theme.paint(` ${context.label}`, { fg: context.ratio >= 0.6 ? tone : theme.roles.text, bold: true });
 }
 
 /**

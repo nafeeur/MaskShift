@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { absolutePath, ensureDir, id, nowIso, runCommand, sha256, truncate } from '../core/utils.mjs';
+import { absolutePath, ensureDir, id, nowIso, runCommand, sha256, shellQuote, truncate } from '../core/utils.mjs';
 
 const DEFAULT_IGNORES = new Set([
   '.git', '.hg', '.svn', 'node_modules', '.next', '.nuxt', '.cache', '.venv', 'venv',
@@ -223,6 +223,94 @@ export class WorkspaceManager {
       workspaceId, runId, kind: 'snapshot', ref: snapshotDir,
       manifest: { label, files, totalBytes },
     });
+  }
+
+  /**
+   * What has changed in the workspace since a checkpoint: files modified, files created (which a
+   * plain restore would leave behind), and files deleted. Null when the checkpoint cannot say.
+   */
+  async checkpointChanges(workspaceId, checkpoint) {
+    const workspace = this.get(workspaceId);
+    if (checkpoint.kind === 'git-ref') {
+      const { gitRoot, commit, untracked = [] } = checkpoint.manifest || {};
+      if (!commit || !gitRoot) return null;
+      const [diff, status] = await Promise.all([
+        runCommand(`git diff --name-status --no-renames ${commit}`, { cwd: gitRoot, timeoutMs: 60_000, maxOutputChars: 400_000 }),
+        runCommand('git status --porcelain=v1 -z --untracked-files=all', { cwd: gitRoot, timeoutMs: 30_000, maxOutputChars: 400_000 }),
+      ]);
+      if (diff.code !== 0) return null;
+      const changes = { modified: [], created: [], deleted: [] };
+      for (const line of diff.stdout.split('\n').filter(Boolean)) {
+        const [code, file] = line.split('\t');
+        if (code === 'D') changes.deleted.push(file);
+        else if (code === 'A') changes.created.push(file);
+        else changes.modified.push(file);
+      }
+      const before = new Set(untracked);
+      for (const entry of status.stdout.split('\0').filter((item) => item.startsWith('?? '))) {
+        const file = entry.slice(3);
+        if (!before.has(file) && !changes.created.includes(file)) changes.created.push(file);
+      }
+      return changes;
+    }
+    if (checkpoint.kind === 'snapshot') {
+      const known = new Set(checkpoint.manifest?.files || []);
+      const listing = await this.listFiles(workspaceId, { depth: 100, includeHidden: true, maxEntries: 20_000 });
+      const current = listing.entries.filter((item) => item.type === 'file').map((item) => item.path);
+      const modified = [];
+      for (const file of current.filter((item) => known.has(item))) {
+        const [now, then] = await Promise.all([
+          fsp.readFile(path.join(workspace.path, file)).catch(() => null),
+          fsp.readFile(path.join(checkpoint.ref, file)).catch(() => null),
+        ]);
+        if (!now || !then || !now.equals(then)) modified.push(file);
+      }
+      const present = new Set(current);
+      return {
+        modified,
+        created: current.filter((item) => !known.has(item)),
+        deleted: [...known].filter((item) => !present.has(item)),
+      };
+    }
+    return null;
+  }
+
+  /** Unified diff of one file between a checkpoint and the working tree. */
+  async checkpointFileDiff(workspaceId, checkpoint, relative) {
+    const workspace = this.get(workspaceId);
+    if (checkpoint.kind === 'git-ref' && checkpoint.manifest?.commit) {
+      const { gitRoot, commit } = checkpoint.manifest;
+      const tracked = await runCommand(`git diff --no-color ${commit} -- ${shellQuote(relative)}`, { cwd: gitRoot, timeoutMs: 30_000, maxOutputChars: 200_000 });
+      if (tracked.stdout.trim()) return tracked.stdout;
+      // Not in the checkpoint's tree at all: a file the run created, shown as all additions.
+      const created = await runCommand(`git diff --no-color --no-index /dev/null ${shellQuote(relative)}`, { cwd: gitRoot, timeoutMs: 30_000, maxOutputChars: 200_000 });
+      return created.stdout;
+    }
+    if (checkpoint.kind === 'snapshot') {
+      const before = path.join(checkpoint.ref, relative);
+      const after = path.join(workspace.path, relative);
+      const exists = async (file) => fsp.access(file).then(() => true, () => false);
+      const left = await exists(before) ? shellQuote(before) : '/dev/null';
+      const right = await exists(after) ? shellQuote(after) : '/dev/null';
+      const result = await runCommand(`git diff --no-color --no-index ${left} ${right}`, { cwd: workspace.path, timeoutMs: 30_000, maxOutputChars: 200_000 });
+      return result.stdout;
+    }
+    return '';
+  }
+
+  /** Puts the workspace back to a checkpoint, including removing files created since. */
+  async undoToCheckpoint(workspaceId, checkpoint) {
+    const workspace = this.get(workspaceId);
+    const changes = await this.checkpointChanges(workspaceId, checkpoint);
+    const result = await this.restoreCheckpoint(workspaceId, checkpoint);
+    const root = checkpoint.kind === 'git-ref' ? checkpoint.manifest.gitRoot : workspace.path;
+    const removed = [];
+    for (const relative of changes?.created || []) {
+      const full = path.resolve(root, relative);
+      if (!full.startsWith(`${path.resolve(root)}${path.sep}`)) continue;
+      await fsp.rm(full, { force: true }).then(() => removed.push(relative)).catch(() => {});
+    }
+    return { ...result, changes, removed };
   }
 
   async restoreCheckpoint(workspaceId, checkpoint) {

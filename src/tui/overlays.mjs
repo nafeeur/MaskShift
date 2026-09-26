@@ -3,6 +3,7 @@
 
 import { frameColour, glyphs, panel } from './box.mjs';
 import { centreOffset } from './layout.mjs';
+import { diffLines } from './diff.mjs';
 import { presence } from './motion.mjs';
 import { LAYER } from './regions.mjs';
 import { fit, repeat, truncate, underlay, visibleWidth, wrap } from './text.mjs';
@@ -182,8 +183,11 @@ export class PaletteOverlay extends Overlay {
 
 /** A generic single-choice picker (sessions, models, workspaces, providers). */
 export class PickerOverlay extends Overlay {
-  constructor({ title, items, onSelect, placeholder = 'Filter…', renderRow = null, footer = '', selectedId = null }) {
+  constructor({ title, items, onSelect, placeholder = 'Filter…', renderRow = null, footer = '', selectedId = null, preview = null, previewRows = 5 }) {
     super({ title });
+    // Optional detail pane under the list for the highlighted row: (app, item, width) => lines.
+    this.preview = preview;
+    this.previewRows = preview ? previewRows : 0;
     this.items = items;
     this.onSelect = onSelect;
     this.field = new TextField({ placeholder });
@@ -215,7 +219,7 @@ export class PickerOverlay extends Overlay {
     this.list.setItems(this.matches(), { keepSelection: true });
     const size = this.size(viewport);
     const width = size.columns;
-    const listHeight = Math.max(3, size.rows - (this.footer ? 6 : 5));
+    const listHeight = Math.max(3, size.rows - (this.footer ? 6 : 5) - (this.preview ? this.previewRows + 1 : 0));
     const input = this.field.render(theme, width - 8, { focused: true });
     const body = [
       gutter(theme, mark.caret, { tone: theme.roles.primary }) + input.text,
@@ -233,6 +237,11 @@ export class PickerOverlay extends Overlay {
           : fit(line, itemWidth);
       }),
     ];
+    if (this.preview) {
+      const detail = this.list.current ? this.preview(app, this.list.current, width - 4 - SPACE.gutter) : [];
+      body.push(theme.paint(repeat(mark.tick, width - 4), { fg: theme.roles.border }));
+      for (let row = 0; row < this.previewRows; row += 1) body.push(fit(gutter(theme) + (detail[row] ?? ''), width - 4));
+    }
     if (this.footer) body.push('', gutter(theme) + theme.paint(truncate(this.footer, width - 6), { fg: theme.roles.muted, italic: true }));
 
     const lines = panel({
@@ -532,9 +541,11 @@ export class FormOverlay extends Overlay {
 }
 
 export class ConfirmOverlay extends Overlay {
-  constructor({ title = 'CONFIRM', message, danger = false, onConfirm }) {
+  constructor({ title = 'CONFIRM', message, details = [], danger = false, onConfirm }) {
     super({ title });
     this.message = message;
+    // Pre-painted lines shown under the question — what, concretely, YES will do.
+    this.details = details;
     this.danger = danger;
     this.onConfirm = onConfirm;
     this.choice = danger ? 1 : 0;
@@ -547,6 +558,7 @@ export class ConfirmOverlay extends Overlay {
     const mark = glyphs(theme);
     const width = Math.min(viewport.columns - 6, 66);
     const body = wrap(this.message, width - 4).map((line) => theme.paint(line, { fg: theme.roles.text }));
+    if (this.details.length) body.push('', ...this.details.map((line) => truncate(line, width - 4)));
     body.push('');
     // The destructive answer is never the quiet one: a confirmation that puts
     // YES in the same neutral as NO is a confirmation nobody reads.
@@ -612,6 +624,173 @@ export class ConfirmOverlay extends Overlay {
       this.error = error.message;
       app.requestRender();
     }
+  }
+}
+
+/**
+ * The permission gate's dialogue (see ToolRegistry#authorize). Unlike ConfirmOverlay it shows
+ * what the call will actually do, and it has a third answer, because approving the same safe
+ * command twenty times in a row trains people to stop reading the prompt.
+ */
+export const APPROVAL_CHOICES = ['yes', 'no', 'always'];
+const SAFE_RISKS = new Set(['normal', 'write', 'state', 'local-index', 'local-snapshot']);
+
+export class ApprovalOverlay extends Overlay {
+  constructor({ tool, name, preview, mode, onChoose }) {
+    super({ title: 'APPROVE TOOL CALL' });
+    this.tool = tool || {};
+    this.name = name;
+    this.preview = preview;
+    this.mode = mode;
+    this.onChoose = onChoose;
+    // Enter on a routine edit approves it; Enter on something that can reach outside the
+    // workspace does not. Same rule as ConfirmOverlay: the dangerous answer is never the default.
+    this.choice = SAFE_RISKS.has(this.tool.risk || 'normal') ? 0 : 1;
+    // Must be answered: a stray click elsewhere is not a decision.
+    this.dismissOnOutsideClick = false;
+  }
+
+  render(app, viewport) {
+    const { theme } = app;
+    const mark = glyphs(theme);
+    const width = Math.min(viewport.columns - 6, 88);
+    const inner = width - 4;
+    const body = [];
+    body.push(theme.paint(this.name, { fg: theme.roles.tool, bold: true })
+      + theme.paint(`  ${mark.dot}  ${truncate(this.tool.title || '', Math.max(4, inner - this.name.length - 5))}`, { fg: theme.roles.muted }));
+    body.push('');
+    body.push(...this.preview);
+    body.push('');
+    const labels = ['YES', 'NO', 'ALWAYS THIS SESSION'];
+    const tones = [theme.roles.success, theme.roles.accent, theme.roles.warning];
+    const buttons = labels.map((label, index) => (this.choice === index
+      ? chip(theme, label, { tone: tones[index] })
+      : theme.paint(` ${label} `, { fg: theme.roles.muted })));
+    const buttonRow = body.length;
+    body.push(buttons.join('  '));
+    const lines = panel({
+      theme, width, height: body.length + 2, title: this.title,
+      note: `${mark.warn} ${String(this.tool.risk || 'normal').toUpperCase()} ${mark.dot} ${String(this.mode || '').toUpperCase()}`,
+      stamp: 'y · n · a  or  ←/→ ↵', focused: true, body,
+      colour: this.enter(theme, theme.roles.warning),
+    });
+    const offset = centreOffset(viewport, { columns: width, rows: lines.length });
+    this.claim(app, offset, width, lines.length);
+    let column = offset.column + 2;
+    for (const [index, button] of buttons.entries()) {
+      this.zone(app, {
+        row: offset.row + 1 + buttonRow, column, width: visibleWidth(button), height: 1,
+        id: `overlay:approval:${APPROVAL_CHOICES[index]}`,
+        onPress: () => this.onChoose(APPROVAL_CHOICES[index]),
+      });
+      column += visibleWidth(button) + 2;
+    }
+    return { lines, offset, cursor: null };
+  }
+
+  handle(app, event) {
+    if (event.name === 'escape' || event.name === 'n') { this.onChoose('no'); return true; }
+    if (event.name === 'y') { this.onChoose('yes'); return true; }
+    if (event.name === 'a') { this.onChoose('always'); return true; }
+    if (event.name === 'left') { this.choice = (this.choice + 2) % 3; return true; }
+    if (event.name === 'right' || event.name === 'tab') { this.choice = (this.choice + 1) % 3; return true; }
+    if (event.name === 'enter') { this.onChoose(APPROVAL_CHOICES[this.choice]); return true; }
+    return true;
+  }
+}
+
+/**
+ * Everything one run changed: the files on the left, the selected file's diff on the right,
+ * measured against the checkpoint taken just before the run (the same one undo returns to).
+ */
+const CHANGE_MARKS = { modified: ['M', 'warning'], created: ['+', 'success'], deleted: ['-', 'danger'] };
+
+export class ChangesOverlay extends Overlay {
+  constructor({ title = 'RUN CHANGES', subtitle = '', files, loadDiff, onUndo }) {
+    super({ title });
+    this.subtitle = subtitle;
+    this.files = files;
+    this.loadDiff = loadDiff;
+    this.onUndo = onUndo;
+    this.selected = 0;
+    this.scroll = 0;
+    this.diffs = new Map();
+  }
+
+  ensureDiff(app) {
+    const file = this.files[this.selected];
+    if (!file || this.diffs.has(file.path)) return;
+    this.diffs.set(file.path, null);
+    Promise.resolve(this.loadDiff(file.path))
+      // Git's own bookkeeping lines say nothing the file list does not already show.
+      .then((text) => this.diffs.set(file.path, String(text || '').split('\n')
+        .filter((line) => !/^(diff --git |index [0-9a-f]+\.\.|new file mode |deleted file mode |similarity index )/.test(line))
+        .join('\n')))
+      .catch((error) => this.diffs.set(file.path, `(could not diff: ${error.message})`))
+      .finally(() => app.requestRender());
+  }
+
+  render(app, viewport) {
+    const { theme } = app;
+    const mark = glyphs(theme);
+    this.ensureDiff(app);
+    const width = Math.min(viewport.columns - 4, 150);
+    const height = Math.max(8, viewport.rows - 2);
+    const inner = height - 2;
+    const listWidth = Math.min(38, Math.max(20, Math.floor((width - 4) * 0.3)));
+    const diffWidth = Math.max(10, width - 4 - listWidth - 3);
+
+    const left = this.files.map((file, index) => {
+      const [symbol, tone] = CHANGE_MARKS[file.kind] || ['?', 'muted'];
+      const selected = index === this.selected;
+      const line = (selected ? theme.paint(`${mark.caret} `, { fg: theme.roles.primary }) : '  ')
+        + theme.paint(`${symbol} `, { fg: theme.role(tone), bold: true })
+        + theme.paint(truncate(file.path, listWidth - 4), { fg: selected ? theme.roles.text : theme.roles.dim, bold: selected });
+      return selected ? underlay(fit(line, listWidth), theme.bg(theme.roles.selection)) : fit(line, listWidth);
+    });
+    const listStart = Math.max(0, Math.min(this.selected - Math.floor(inner / 2), this.files.length - inner));
+
+    const file = this.files[this.selected];
+    const text = file ? this.diffs.get(file.path) : '';
+    let right;
+    if (text === null || text === undefined) right = [theme.paint('Loading diff…', { fg: theme.roles.muted, italic: true })];
+    else if (!text.trim()) right = [theme.paint(file?.kind === 'deleted' ? 'Deleted by this run.' : 'No textual difference (binary or permission change).', { fg: theme.roles.muted, italic: true })];
+    else right = diffLines(theme, text, diffWidth - 2, { maxLines: 4000 });
+    this.scroll = Math.max(0, Math.min(this.scroll, Math.max(0, right.length - inner)));
+
+    const seam = theme.paint(` ${mark.bar} `, { fg: theme.roles.border });
+    const body = [];
+    for (let row = 0; row < inner; row += 1) {
+      body.push((left[listStart + row] ?? ' '.repeat(listWidth)) + seam + fit(right[this.scroll + row] ?? '', diffWidth));
+    }
+    const lines = panel({
+      theme, width, height, title: this.title,
+      note: this.subtitle ? truncate(this.subtitle, Math.floor(width / 2)) : '',
+      stamp: `${this.files.length} FILE${this.files.length === 1 ? '' : 'S'} ${mark.dot} ↑↓ file ${mark.dot} pgup/pgdn scroll ${mark.dot} u undo`,
+      focused: true, body, colour: this.enter(theme, frameColour(theme, true)),
+    });
+    const offset = centreOffset(viewport, { columns: width, rows: lines.length });
+    this.claim(app, offset, width, lines.length);
+    for (let row = 0; row < inner && listStart + row < this.files.length; row += 1) {
+      const index = listStart + row;
+      this.zone(app, {
+        row: offset.row + 1 + row, column: offset.column + 2, width: listWidth, height: 1,
+        id: `overlay:changes:${index}`,
+        onPress: () => { this.selected = index; this.scroll = 0; },
+      });
+    }
+    return { lines, offset, cursor: null };
+  }
+
+  handle(app, event) {
+    const page = Math.max(4, (app.screen?.size?.rows || 30) - 8);
+    if (event.name === 'escape' || event.name === 'q') { app.closeOverlay(); return true; }
+    if (event.name === 'up' || event.name === 'k') { this.selected = Math.max(0, this.selected - 1); this.scroll = 0; return true; }
+    if (event.name === 'down' || event.name === 'j') { this.selected = Math.min(this.files.length - 1, this.selected + 1); this.scroll = 0; return true; }
+    if (event.name === 'pagedown' || event.name === 'space') { this.scroll += page; return true; }
+    if (event.name === 'pageup') { this.scroll = Math.max(0, this.scroll - page); return true; }
+    if (event.name === 'u') { this.onUndo?.(); return true; }
+    return true;
   }
 }
 

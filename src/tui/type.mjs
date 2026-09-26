@@ -52,6 +52,9 @@ export function key(theme, text) {
  * look like four things were selected at once.
  */
 export function chip(theme, text, { tone = null } = {}) {
+  // A chip is a filled background; with colour off (NO_COLOR) that fill is gone, so brackets
+  // take its place in the same two columns and the selected choice stays visible.
+  if (!theme.enabled) return `[${text}]`;
   return theme.paint(` ${text} `, {
     fg: theme.roles.onPrimary, bg: tone || theme.roles.primary, bold: true,
   });

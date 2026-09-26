@@ -7,7 +7,8 @@ import { createRuntime } from '../runtime.mjs';
 import { startTui } from '../tui/app.mjs';
 import { commandExists, parseArgs, VERSION } from '../core/utils.mjs';
 import { GROUPS, SINGLE, toolContext } from './commands.mjs';
-import { Ui, oneLine } from './ui.mjs';
+import { Ui } from './ui.mjs';
+import { plainSession, streamRunEvents } from './plain.mjs';
 
 const GLOBAL_FLAGS = [
   ['--workspace PATH', 'Workspace to operate on (default: the current directory)'],
@@ -15,6 +16,7 @@ const GLOBAL_FLAGS = [
   ['--config PATH', 'Configuration file to load'],
   ['--json', 'Emit machine-readable JSON instead of styled output'],
   ['--no-color', 'Disable colour (NO_COLOR is honoured too)'],
+  ['--plain', 'Line-by-line session instead of the full-screen interface (screen readers, logs); MASKSHIFT_PLAIN=1 too'],
   ['-h, --help', 'Show help for a command'],
   ['-v, --version', 'Print the MaskShift version'],
 ];
@@ -128,37 +130,7 @@ async function headlessRun(runtime, ui, args, positional) {
   });
 
   const quiet = Boolean(args.quiet || ui.json);
-  const unsubscribe = quiet ? () => {} : runtime.eventBus.subscribe((event) => {
-    if (event.sessionId !== session.id) return;
-    const payload = event.payload || {};
-    switch (event.type) {
-      case 'run.started':
-        ui.line(ui.theme.paint(`${ui.marks.diamond} run ${event.runId} on ${payload.model}`, { fg: ui.theme.roles.primary, bold: true }));
-        break;
-      case 'run.model-turn':
-        ui.line(ui.theme.paint(`${ui.marks.dot} turn ${String(payload.step).padStart(2, '0')} — ${payload.tools?.length ?? 0} tools active`, { fg: ui.theme.roles.border }));
-        break;
-      case 'run.assistant':
-        if (payload.content?.trim()) { ui.line(); ui.markdown(payload.content); }
-        for (const call of payload.toolCalls || []) {
-          ui.line(ui.theme.paint(`  ${ui.marks.caret} ${call.name}`, { fg: ui.theme.roles.tool })
-            + ui.theme.paint(` ${oneLine(JSON.stringify(call.args ?? {}), ui.width - call.name.length - 8)}`, { fg: ui.theme.roles.border }));
-        }
-        break;
-      case 'run.tool-result':
-        ui.line(ui.theme.paint(`  ${ui.marks.check} ${payload.tool}`, { fg: ui.theme.roles.success })
-          + ui.theme.paint(` ${oneLine(payload.content, ui.width - String(payload.tool).length - 8)}`, { fg: ui.theme.roles.muted }));
-        break;
-      case 'run.tool-error':
-        ui.line(ui.theme.paint(`  ${ui.marks.cross} ${payload.tool}`, { fg: ui.theme.roles.danger })
-          + ui.theme.paint(` ${oneLine(payload.content, ui.width - String(payload.tool).length - 8)}`, { fg: ui.theme.roles.muted }));
-        break;
-      case 'run.checkpoint':
-        ui.line(ui.theme.paint(`  ${ui.marks.dot} checkpoint ${payload.ref || payload.kind || ''}`, { fg: ui.theme.roles.border }));
-        break;
-      default: break;
-    }
-  });
+  const unsubscribe = quiet ? () => {} : streamRunEvents(runtime, ui, session.id);
 
   const run = await runtime.engine.startRun({
     sessionId: session.id, workspaceId: workspace.id, prompt,
@@ -266,10 +238,15 @@ export async function main(argv = process.argv.slice(2)) {
   };
 
   try {
+    if (command === 'tui' && (args.plain || process.env.MASKSHIFT_PLAIN === '1')) {
+      // Screen readers announce box-drawing and symbol glyphs by name; plain marks read cleanly.
+      if (process.env.MASKSHIFT_ASCII === undefined) process.env.MASKSHIFT_ASCII = '1';
+      return await plainSession(runtime, new Ui({ json: false }), args);
+    }
     if (command === 'tui') {
       if (!process.stdout.isTTY) {
         ui.fail('The MaskShift interface needs an interactive terminal.');
-        ui.info('Use "maskshift run" for headless execution, or "maskshift help" for the command list.');
+        ui.info('Use "maskshift --plain" for a line-by-line session, "maskshift run" for one headless run, or "maskshift help".');
         return 2;
       }
       return await startTui(runtime, {

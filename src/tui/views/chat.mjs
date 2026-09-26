@@ -214,12 +214,30 @@ function buildMessageLines(app, theme, text) {
     previousKind = kind;
   };
 
+  // Where the session's saved summary ends (see engine.mjs). Everything above it no longer
+  // reaches the model verbatim, so the transcript says so at that exact point instead of letting
+  // the model's later "forgetfulness" look like a bug.
+  const summarizedThrough = app.compaction?.summary ? app.compaction.throughMessageId : null;
+  const summaryIndex = summarizedThrough ? app.messages.findIndex((message) => message.id === summarizedThrough) : -1;
+  let summaryRow = null;
+  const pushSummaryMarker = (count) => {
+    if (lines.length) lines.push('');
+    summaryRow = lines.length;
+    lines.push(summaryMarker(theme, text, count));
+    previousKind = 'marker';
+  };
+  if (summarizedThrough && summaryIndex < 0) pushSummaryMarker(null);
+
   for (const [messageIndex, message] of app.messages.entries()) {
+    if (messageIndex > 0 && messageIndex - 1 === summaryIndex) pushSummaryMarker(summaryIndex + 1);
     if (message.role === 'user') {
       openBlock('user');
       const colour = theme.roles.user;
       lines.push(rail(theme, colour, { lead: true })
-        + speakerRow(theme, 'OPERATOR', colour, text, { stamp: app.stamp(message.created_at) }));
+        + speakerRow(theme, 'OPERATOR', colour, text, {
+          qualifier: message.meta?.source === 'steer' ? 'steered mid-run' : '',
+          stamp: app.stamp(message.created_at),
+        }));
       for (const piece of wrap(String(message.content || ''), text)) {
         lines.push(rail(theme, colour) + theme.paint(piece, { fg: theme.roles.text }));
       }
@@ -269,7 +287,17 @@ function buildMessageLines(app, theme, text) {
       continue;
     }
   }
-  return { lines, lastKind: previousKind, imageBlocks, toolTriggers };
+  if (summaryIndex === app.messages.length - 1 && summaryIndex >= 0) pushSummaryMarker(summaryIndex + 1);
+  return { lines, lastKind: previousKind, imageBlocks, toolTriggers, summaryRow };
+}
+
+function summaryMarker(theme, width, count) {
+  const mark = glyphs(theme);
+  const label = ` ${count ? `${count} EARLIER MESSAGE${count === 1 ? '' : 'S'}` : 'EARLIER MESSAGES'} SUMMARIZED ${mark.dot} s TO READ `;
+  const side = Math.max(2, Math.floor((width - visibleWidth(label)) / 2));
+  const line = theme.unicode ? '─' : '-';
+  const rule = (n) => theme.paint(line.repeat(Math.max(0, n)), { fg: theme.mixed(theme.roles.border, theme.roles.info, 0.6) });
+  return rule(side) + theme.paint(label, { fg: theme.roles.info, bold: true }) + rule(width - side - visibleWidth(label));
 }
 
 export function transcriptLines(app, width) {
@@ -277,10 +305,10 @@ export function transcriptLines(app, width) {
   const text = Math.max(8, width - SPACE.gutter);
 
   const cache = (app._transcriptCache ||= {
-    messages: null, text: null, expandTools: null, toolExpansionVersion: null,
-    lines: null, lastKind: null, imageBlocks: [], toolTriggers: [],
+    messages: null, text: null, expandTools: null, toolExpansionVersion: null, compaction: null,
+    lines: null, lastKind: null, imageBlocks: [], toolTriggers: [], summaryRow: null,
   });
-  if (cache.messages !== app.messages || cache.text !== text
+  if (cache.messages !== app.messages || cache.text !== text || cache.compaction !== app.compaction
     || cache.expandTools !== app.expandTools || cache.toolExpansionVersion !== app.toolExpansionVersion) {
     const built = buildMessageLines(app, theme, text);
     cache.messages = app.messages;
@@ -291,7 +319,10 @@ export function transcriptLines(app, width) {
     cache.lastKind = built.lastKind;
     cache.imageBlocks = built.imageBlocks;
     cache.toolTriggers = built.toolTriggers;
+    cache.summaryRow = built.summaryRow;
+    cache.compaction = app.compaction;
   }
+  app._transcriptSummaryRow = cache.summaryRow;
   // Read by render() below, once it knows which of these logical lines the
   // transcript's current scroll position actually has on screen.
   app._transcriptToolTriggers = cache.toolTriggers;
@@ -462,7 +493,7 @@ export function render(app, region) {
     colour: frameColour(theme, paneFocused),
     busy: app.busy,
     stamp: composerFocused
-      ? (app.busy ? `esc cancels ${mark.dot} ↵ queues` : `↵ execute ${mark.dot} ^J newline`)
+      ? (app.busy ? `^T steers ${mark.dot} ↵ queues ${mark.dot} esc cancels` : `↵ execute ${mark.dot} ^J newline`)
       : 'tab or click to type',
   });
 
@@ -593,6 +624,18 @@ function registerRegions(app, region, { transcriptHeight, composerRows, textWidt
     }
   }
 
+  if (Number.isInteger(app._transcriptSummaryRow)) {
+    const scroll = Number.isFinite(app.transcript.offset) ? app.transcript.offset : 0;
+    const offset = app._transcriptSummaryRow - scroll;
+    if (offset >= 0 && offset < transcriptHeight) {
+      regions.add({
+        row: transcriptTop + offset, column: region.column + 1, width: Math.max(0, textWidth), height: 1,
+        id: 'chat:summary', layer: LAYER.body + 1,
+        onPress: (target) => target.openSessionSummary(),
+      });
+    }
+  }
+
   // A collapsed or partly-expanded tool result's trigger row (see toolLines)
   // is recorded as a position into the same logical buffer starterRows uses,
   // so it translates by the current scroll offset the same way.
@@ -620,6 +663,7 @@ export function handle(app, event) {
     if (app.transcript.handle(event, height)) return true;
     if (event.name === 'tab') { app.focus = 'composer'; return true; }
     if (event.name === 't' && !event.ctrl) { app.expandTools = !app.expandTools; return true; }
+    if (event.name === 's' && !event.ctrl && app.compaction?.summary) { app.openSessionSummary(); return true; }
     if (event.printable && !event.ctrl && !event.alt) { app.focus = 'composer'; app.composer.handle(event); return true; }
     return false;
   }
@@ -633,6 +677,7 @@ export function handle(app, event) {
     app.focus = 'transcript';
     return true;
   }
+  if (event.ctrl && event.name === 't') { app.steerPrompt(); return true; }
   if (event.name === 'enter' && !event.alt && !event.ctrl) { void app.submitPrompt(); return true; }
   if (event.ctrl && event.name === 's') { void app.submitPrompt(); return true; }
   if (event.ctrl && event.name === 'j') { app.composer.insert('\n'); return true; }
@@ -646,7 +691,9 @@ export function handle(app, event) {
 
 export const hints = (app) => (app.focus === 'composer'
   ? [
-    ['↵', 'execute', (target) => void target.submitPrompt()],
+    ...(app.busy
+      ? [['↵', 'queue', (target) => void target.submitPrompt()], ['^T', 'steer now', (target) => target.steerPrompt()]]
+      : [['↵', 'execute', (target) => void target.submitPrompt()]]),
     ['^J', 'newline', (target) => target.composer.insert('\n')],
     ['tab', 'transcript', (target) => { target.focus = 'transcript'; }],
     ['^K', 'palette', (target) => target.openPalette()],
@@ -655,6 +702,7 @@ export const hints = (app) => (app.focus === 'composer'
   : [
     ['↑↓', 'scroll'],
     ['t', 'tool output', (target) => { target.expandTools = !target.expandTools; }],
+    ...(app.compaction?.summary ? [['s', 'summary', (target) => target.openSessionSummary()]] : []),
     ['tab', 'composer', (target) => { target.focus = 'composer'; }],
     ['^K', 'palette', (target) => target.openPalette()],
     ['?', 'help', (target) => target.openHelp()],

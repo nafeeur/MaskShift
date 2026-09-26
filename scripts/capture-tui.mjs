@@ -13,7 +13,7 @@ import { createRuntime } from '../src/runtime.mjs';
 import { MaskShiftTui } from '../src/tui/app.mjs';
 import { Theme, PALETTE } from '../src/tui/theme.mjs';
 import { charWidth } from '../src/tui/text.mjs';
-import { parseArgs } from '../src/core/utils.mjs';
+import { parseArgs, runCommand } from '../src/core/utils.mjs';
 
 const ESC = String.fromCharCode(27);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -191,6 +191,8 @@ try {
     output: new FakeTerminal(COLUMNS, ROWS),
   });
   await app.bootstrap();
+  // Settle bootstrap's own model lookup before the capture sets a profile by hand.
+  await app.refreshModelProfile();
   await app.loadFileTree();
   await app.refreshModShop({ force: true });
   await app.refreshGitView({ force: true });
@@ -225,6 +227,8 @@ try {
   };
   app.tokenHistory = [12, 48, 26, 84, 51, 96, 38, 72, 44, 88];
   app.totals = { input: 18_420, output: 4_180, cost: 0.0241 };
+  app.modelProfile = { contextWindow: 200_000, tier: 'large', source: 'provider', maxOutputTokens: 16_384 };
+  app.contextUsed = 41_200;
   app.startedAt = Date.now() - 112_000;
   app.step = 9;
 
@@ -244,8 +248,68 @@ try {
       await app.loadGitDetail(app.gitList.current);
     }],
     ['palette', 'MaskShift — command palette', () => { app.view = 'chat'; app.openPalette(); app.overlay.field.set('mcp'); }],
+    ['approval', 'MaskShift — approving a tool call', async () => {
+      app.view = 'chat';
+      // Approvals only exist outside overdrive; the next capture puts the mode back.
+      runtime.config.get().permissionMode = 'balanced';
+      void app.requestToolConfirmation({
+        name: 'shell_exec', tool: runtime.toolRegistry.descriptor('shell_exec'),
+        args: { command: 'rm -rf node_modules/.cache && npm ci --no-audit && npm test', cwd: workspacePath },
+      });
+      await new Promise((resolve) => setImmediate(resolve));
+    }],
+    ['changes', 'MaskShift — what the last run changed', async () => {
+      app.view = 'chat';
+      runtime.config.get().permissionMode = 'overdrive';
+      const scratch = await changedRepo();
+      const workspaceId = app.workspaceId;
+      app.workspaceId = scratch.workspaceId;
+      app.lastUndoableRun = () => ({ run: { id: 'capture', prompt: 'Refactor the frame renderer so repaints only rewrite changed rows' }, checkpoint: scratch.checkpoint });
+      await app.openRunChanges();
+      app.snapshot();
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      app.workspaceId = workspaceId;
+    }],
+    ['sessions', 'MaskShift — heist archive', () => {
+      app.view = 'chat';
+      const summary = '## Goal\n- Make repaints rewrite only changed rows, and prove it with a test.\n## Open issues\n- Resize still forces a full repaint.\n- The Windows console path is untested.';
+      const make = (title, prompt, withSummary) => {
+        const session = runtime.engine.createSession({ workspaceId: app.workspaceId, title, modelRef: 'anthropic:claude-sonnet-5' });
+        runtime.store.addMessage({ sessionId: session.id, role: 'user', content: prompt });
+        if (withSummary) runtime.store.updateSession(session.id, { meta: { compaction: { summary, throughMessageId: 'capture' } } });
+        return session;
+      };
+      make('Add a dark-mode toggle', 'Add a dark-mode toggle to settings and persist it', false);
+      make('Flaky CI on Windows', 'Why does the TUI test hang on the Windows runner?', false);
+      const current = make('RENDERER REFACTOR', 'Now handle resize too — the previous frame must be dropped', true);
+      const sessionId = app.sessionId;
+      app.sessionId = current.id;
+      app.openSessionPicker();
+      app.sessionId = sessionId;
+    }],
     ['settings', 'MaskShift — settings', () => { app.view = 'chat'; app.openSettings(); }],
   ];
+
+  // The changes capture needs a real diff, made in a throwaway repository rather than by
+  // checkpointing whatever repository the capture happens to run in.
+  async function changedRepo() {
+    const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'maskshift-capture-repo-'));
+    await fsp.mkdir(path.join(root, 'src/tui'), { recursive: true });
+    const screen = 'export class Screen {\n  paint(frame) {\n    let out = "";\n    for (let row = 0; row < frame.length; row += 1) {\n      out += moveTo(row) + frame[row];\n    }\n    return out;\n  }\n}\n';
+    await fsp.writeFile(path.join(root, 'src/tui/screen.mjs'), screen);
+    await fsp.writeFile(path.join(root, 'src/tui/legacy-paint.mjs'), 'export const legacy = true;\n');
+    await runCommand('git init -q && git config user.email capture@maskshift.invalid && git config user.name capture && git add . && git commit -qm init', { cwd: root });
+    const workspace = await runtime.workspaceManager.open(root);
+    const checkpoint = await runtime.workspaceManager.createCheckpoint(workspace.id, { runId: 'capture' });
+    await fsp.writeFile(path.join(root, 'src/tui/screen.mjs'), screen
+      .replace('    let out = "";', '    let out = "";\n    const previous = this.previous || [];')
+      .replace('      out += moveTo(row) + frame[row];', '      if (previous[row] === frame[row]) continue;\n      out += moveTo(row) + frame[row];')
+      .replace('    return out;', '    this.previous = frame.slice();\n    return out;'));
+    await fsp.mkdir(path.join(root, 'tests'), { recursive: true });
+    await fsp.writeFile(path.join(root, 'tests/screen.test.mjs'), "test('an unchanged frame writes nothing', () => {});\n");
+    await fsp.rm(path.join(root, 'src/tui/legacy-paint.mjs'));
+    return { workspaceId: workspace.id, checkpoint };
+  }
 
   await fsp.mkdir(outputDir, { recursive: true });
   const written = [];

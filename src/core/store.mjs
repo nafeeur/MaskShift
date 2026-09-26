@@ -316,9 +316,11 @@ export class Store {
   }
 
   listMessages(sessionId, limit = 1000) {
+    // Messages written in the same millisecond (a burst of tool results) share created_at, and
+    // SQLite returns ties in no particular order; rowid is insertion order, so it breaks them.
     return this.db.prepare(`SELECT * FROM (
-      SELECT * FROM messages WHERE session_id = ? ORDER BY created_at DESC LIMIT ?
-    ) ORDER BY created_at ASC`).all(sessionId, limit).map((row) => parseFields(row, ['meta']));
+      SELECT *, rowid AS _seq FROM messages WHERE session_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?
+    ) ORDER BY created_at ASC, _seq ASC`).all(sessionId, limit).map(({ _seq, ...row }) => parseFields(row, ['meta']));
   }
 
   /**
@@ -381,7 +383,7 @@ export class Store {
     if (workspaceId) { clauses.push('workspace_id = ?'); args.push(workspaceId); }
     if (since) { clauses.push('started_at >= ?'); args.push(since); }
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
-    const rows = this.db.prepare(`SELECT * FROM runs ${where} ORDER BY started_at DESC LIMIT ?`).all(...args, limit);
+    const rows = this.db.prepare(`SELECT * FROM runs ${where} ORDER BY started_at DESC, rowid DESC LIMIT ?`).all(...args, limit);
     return rows.map((row) => parseFields(row, ['meta']));
   }
 
@@ -393,7 +395,7 @@ export class Store {
   }
 
   listRunEvents(runId, limit = 2000) {
-    return this.db.prepare('SELECT * FROM run_events WHERE run_id = ? ORDER BY created_at ASC LIMIT ?')
+    return this.db.prepare('SELECT * FROM run_events WHERE run_id = ? ORDER BY created_at ASC, rowid ASC LIMIT ?')
       .all(runId, limit).map((row) => parseFields(row, ['payload']));
   }
 
@@ -621,7 +623,7 @@ export class Store {
   }
 
   listCheckpoints(workspaceId, limit = 100) {
-    return this.db.prepare('SELECT * FROM checkpoints WHERE workspace_id = ? ORDER BY created_at DESC LIMIT ?')
+    return this.db.prepare('SELECT * FROM checkpoints WHERE workspace_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?')
       .all(workspaceId, limit).map((row) => parseFields(row, ['manifest']));
   }
 

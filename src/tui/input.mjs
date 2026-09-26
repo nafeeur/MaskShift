@@ -172,6 +172,13 @@ export function decode(chunk) {
     // ESC + printable is Alt+key; ESC ESC is a plain escape.
     if (next === ESC) { events.push(key('escape', { sequence: ESC })); index += 1; continue; }
     const code = next.codePointAt(0);
+    // ESC CR is what nearly every terminal sends for alt+enter. Read as a control character it
+    // would come out as ctrl+alt+m, and no binding written as alt+enter could ever match it.
+    if (next === '\r') {
+      events.push(key('enter', { alt: true, sequence: `${ESC}\r` }));
+      index += 2;
+      continue;
+    }
     if (code < 32) {
       events.push(key(String.fromCharCode(code + 96), { ctrl: true, alt: true, sequence: chunk.slice(index, index + 2) }));
     } else {

@@ -1,5 +1,5 @@
 import { safeJsonParse, truncate } from '../core/utils.mjs';
-import { parseToolCalls, toTextProtocolMessages } from './tool-protocol.mjs';
+import { parseToolCalls, toTextProtocolMessages, visibleStreamingText } from './tool-protocol.mjs';
 import {
   DEFAULT_CONTEXT_WINDOW, familyContextWindow, normalizeWindow, outputTokensFor, parameterBillions, parseContextOverflow, tierFor,
 } from './model-profile.mjs';
@@ -608,9 +608,15 @@ export class ProviderManager {
     const wireTools = useText ? [] : tools;
     const { signal, temperature, maxTokens, onDelta } = options;
     // A text-protocol reply carries the tool-call markup the model was asked to write inline
-    // (parsed out below, after the full content is in) — streaming it to the transcript
-    // un-stripped would show that markup to the operator, so only native-mode deltas forward.
-    const forwardDelta = useText ? undefined : onDelta;
+    // (parsed out below, after the full content is in). Its prose still streams, with any
+    // finished or half-written tool-call block held back so the markup never reaches the screen.
+    let lastVisible = '';
+    const forwardDelta = !useText || !onDelta ? onDelta : (content) => {
+      const visible = visibleStreamingText(content);
+      if (visible === lastVisible) return;
+      lastVisible = visible;
+      onDelta(visible);
+    };
 
     let result;
     if (resolved.provider.type === 'anthropic') result = await this.#anthropic(resolved, outbound, wireTools, { signal, temperature, maxTokens, onDelta: forwardDelta });
@@ -653,8 +659,8 @@ export class ProviderManager {
    * `onDelta`, when given, is called with the assistant's visible text-so-far every time new
    * content arrives from the provider (cumulative, not just the new fragment, so a caller can
    * always just replace what it's showing rather than track its own running concatenation).
-   * It is never called in text-tool-protocol mode — see the note in #dispatch — and a provider
-   * that returns nothing until the response is complete will simply call it once, at the end,
+   * In text-tool-protocol mode it receives the prose only, with tool-call markup held back (see
+   * #dispatch). A provider that returns nothing until the response is complete calls it once, at the end,
    * which degrades to the old non-streaming behavior rather than breaking anything.
    */
   async complete({ modelRef, messages, tools = [], signal, temperature = 0.1, maxTokens = 16_384, onDelta } = {}) {
