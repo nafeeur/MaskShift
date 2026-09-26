@@ -72,6 +72,25 @@ tree, repository instructions, memories, retrieved source, and reserve. The defa
 {"snapshot":0.12,"tree":0.10,"instructions":0.16,"memories":0.12,"source":0.42,"reserve":0.08}
 ```
 
+Not every prompt gets the full budget. Each prompt is classified into a profile, and
+`contextPlanner.scale` sets what fraction of the full budget that profile receives:
+
+| Profile | Triggered by | Default `scale` |
+|---|---|---:|
+| `conversational` | No meaningful words after stopwords ("hi", "thanks, what can you do?") — retrieval is skipped entirely | `0.04` |
+| `focused` | Any ordinary task prompt | `0.12` |
+| `broad` | Prompts over 1200 characters, or refactor/migration/architecture/audit/"across the codebase" wording | `1` |
+
+Repository instructions keep a floor of 12 000 characters (capped at their full-budget share) so a
+smaller profile never squeezes out `AGENTS.md`/`CLAUDE.md`. The model can still pull in anything
+else it needs with `fs_read`, search, and the code graph.
+
+Retrieved source must also clear a relevance bar before it spends budget: at least
+`contextPlanner.minSourceOverlap` (default `0.2`) of the prompt's meaningful words must appear in
+the chunk or its path, or its embedding similarity must reach `contextPlanner.minSemanticScore`
+(default `0.55`). Skill Markdown (`skills/**/*.md`) is never injected as source, since skills have
+their own lazy loader, and other Markdown is only injected when the prompt asks about docs.
+
 `context_plan_explain` reports which sources were selected and why. `memory_save.sources` accepts
 workspace-relative files; their hashes are captured on save and checked before automatic recall.
 

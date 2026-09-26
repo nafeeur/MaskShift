@@ -103,6 +103,12 @@ export function tokenize(value = '') {
     .filter((token) => token.length > 1);
 }
 
+// Words that carry no retrieval signal in a coding prompt; dropped before ranking so "fix the
+// bug in the parser" is matched on "fix", "bug" and "parser" rather than on "the" and "in".
+export const STOPWORDS = new Set(`a an and are as at be but by can could do does for from had has have hello hey hi how i if in
+into is it its just let me my no not of ok okay on or our please should so some thank thanks that the their then there
+these this those to up us was we what when where which who why will with would yes you your`.split(/\s+/));
+
 export function textScore(query, haystack, keywords = []) {
   const q = tokenize(query);
   if (!q.length) return 0;
