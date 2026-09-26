@@ -130,6 +130,10 @@ export function defaultConfig() {
     },
     contextPlanner: {
       weights: { snapshot: 0.12, tree: 0.10, instructions: 0.16, memories: 0.12, source: 0.42, reserve: 0.08 },
+      // Fraction of the full context budget each prompt profile gets (see ContextPlanner.profile).
+      scale: { conversational: 0.04, focused: 0.12, broad: 1 },
+      minSourceOverlap: 0.2,
+      minSemanticScore: 0.55,
     },
     routing: {
       autoSelect: true,
@@ -235,6 +239,7 @@ function mergeConfig(base, override) {
   merged.contextPlanner = {
     ...base.contextPlanner, ...(override?.contextPlanner || {}),
     weights: { ...(base.contextPlanner?.weights || {}), ...(override?.contextPlanner?.weights || {}) },
+    scale: { ...(base.contextPlanner?.scale || {}), ...(override?.contextPlanner?.scale || {}) },
   };
   merged.routing = {
     ...base.routing, ...(override?.routing || {}),

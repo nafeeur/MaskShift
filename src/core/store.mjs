@@ -1,6 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
-import { ensureDir, id, nowIso, safeJsonParse } from './utils.mjs';
+import { STOPWORDS, ensureDir, id, nowIso, safeJsonParse } from './utils.mjs';
 
 function plain(row) {
   return row ? { ...row } : null;
@@ -19,7 +19,8 @@ function ftsQuery(query) {
   const tokens = String(query || '')
     .toLowerCase()
     .match(/[a-z0-9_+#.:-]{2,}/g) || [];
-  return tokens.slice(0, 20).map((token) => `"${token.replaceAll('"', '""')}"*`).join(' OR ') || '""';
+  const meaningful = tokens.filter((token) => !STOPWORDS.has(token));
+  return (meaningful.length ? meaningful : tokens).slice(0, 20).map((token) => `"${token.replaceAll('"', '""')}"*`).join(' OR ') || '""';
 }
 
 export class Store {

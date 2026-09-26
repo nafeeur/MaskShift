@@ -45,12 +45,13 @@ export class ContextBuilder {
       });
     }
 
-    const budgets = this.contextPlanner.budgets();
+    const profile = this.contextPlanner.profile(prompt);
+    const budgets = this.contextPlanner.budgets(undefined, profile);
     const [inspection, tree, instructions, rawRepoHits, rawMemories] = await Promise.all([
       this.workspaceManager.inspect(workspaceId).catch((error) => ({ error: error.message, workspace })),
       this.workspaceManager.listFiles(workspaceId, { depth: 3, maxEntries: 1600, includeHidden: false }).catch(() => ({ entries: [], truncated: false })),
       this.workspaceManager.loadContextFiles(workspace.path).catch(() => []),
-      indexStats?.chunks ? this.indexer.contextFor(workspaceId, prompt, { limit: 40, maxChars: budgets.source * 2 }).catch(() => []) : [],
+      indexStats?.chunks && budgets.source > 0 ? this.indexer.contextFor(workspaceId, prompt, { limit: 40, maxChars: budgets.source * 4 }).catch(() => []) : [],
       this.store.searchMemories(prompt, { workspaceId, limit: 30, decayHalfLifeDays: this.config.get().memory?.decayHalfLifeDays || 30 }),
     ]);
     const validatedMemories = await this.contextPlanner.validateMemories(rawMemories, workspace.path);
@@ -83,6 +84,11 @@ export class ContextBuilder {
     if (repoHits.length) sections.push(`## Retrieved source context\n${renderHits(repoHits)}`);
     sections.push(`## Session metadata\nSession ID: ${sessionId}\nCurrent time: ${new Date().toISOString()}`);
 
-    return { workspace, inspection, tree, instructions, repoHits, memories, impact, indexStats, graphStats, contextPlan: planned.report, text: truncate(sections.join('\n\n'), Math.floor(this.config.get().maxContextChars * 0.72)) };
+    const totalBudget = Object.values(budgets).reduce((sum, value) => sum + value, 0);
+    return {
+      workspace, inspection, tree, instructions, repoHits, memories, impact, indexStats, graphStats,
+      contextPlan: { profile, ...planned.report },
+      text: truncate(sections.join('\n\n'), Math.min(Math.floor(this.config.get().maxContextChars * 0.72), totalBudget)),
+    };
   }
 }

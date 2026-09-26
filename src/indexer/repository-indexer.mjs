@@ -240,7 +240,8 @@ export class RepositoryIndexer {
       .map((row) => ({ ...row, score: cosineSimilarity(queryVector, JSON.parse(row.embedding)) }))
       .sort((a, b) => b.score - a.score)
       .slice(0, Math.max(limit, 40));
-    return fuseResults(ftsHits, semanticHits, limit);
+    const semanticScores = new Map(semanticHits.map((hit) => [hit.id, hit.score]));
+    return fuseResults(ftsHits, semanticHits, limit).map((hit) => ({ ...hit, semanticScore: semanticScores.get(hit.id) ?? null }));
   }
 
   stats(workspaceId) {
@@ -262,7 +263,7 @@ export class RepositoryIndexer {
     for (const hit of hits) {
       if (used >= maxChars) break;
       const text = truncate(hit.content, Math.min(20_000, maxChars - used));
-      selected.push({ path: hit.path, startLine: hit.start_line, endLine: hit.end_line, language: hit.language, content: text });
+      selected.push({ path: hit.path, startLine: hit.start_line, endLine: hit.end_line, language: hit.language, content: text, semanticScore: hit.semanticScore ?? null });
       used += text.length;
     }
     return selected;
