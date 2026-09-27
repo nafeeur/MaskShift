@@ -1179,10 +1179,14 @@ test('a toast never overlaps the composer\'s own border or input row', async (t)
   app.screen.invalidate();
   const frame = app.snapshot().map(stripAnsi);
 
-  const seamIndex = frame.findIndex((line) => line.includes('COMPOSER'));
-  assert.ok(seamIndex >= 0, 'composer seam row should be present');
+  const inputIndex = frame.findIndex((line) => line.includes('❯'));
+  assert.ok(inputIndex >= 1, 'composer input row should be present');
+  const seamIndex = inputIndex - 1;
   assert.ok(seamIndex >= 1, 'sanity: the seam is not the very first row');
-  assert.ok(frame[seamIndex].includes('━━ COMPOSER'), 'the seam divider must render intact, not be cut by a toast');
+  assert.ok(
+    frame[seamIndex].trimStart().startsWith('┣') && frame[seamIndex].trimEnd().endsWith('┫'),
+    'the seam divider must render intact, not be cut by a toast',
+  );
 
   // No blank padding row between the seam and the draft — see chat.mjs's
   // render(). Not one below the draft either: the panel's own border
