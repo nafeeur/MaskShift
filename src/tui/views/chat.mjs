@@ -17,7 +17,6 @@ import { MASK_WIDTH, heroBlock, maskArt } from '../brand.mjs';
 import { diffLines, looksLikeDiff } from '../diff.mjs';
 import { buildImagePreview, isImagePath } from '../image/render.mjs';
 import { renderMarkdown } from '../markdown.mjs';
-import { spin } from '../motion.mjs';
 import { LAYER, Regions } from '../regions.mjs';
 import { hexToRgb } from '../theme.mjs';
 import { center, fit, oneLine, truncate, visibleWidth, wrap } from '../text.mjs';
@@ -483,7 +482,10 @@ export function render(app, region) {
   // the keyboard is named on the rule that bounds it.
   const composerFocused = app.focus === 'composer';
   const paneFocused = composerFocused || app.focus === 'transcript';
-  const seamLabel = app.busy ? `${spin(theme, 'dots')} EXECUTING` : 'COMPOSER';
+  // No text label here: the seam's rule line already sweeps/animates while
+  // busy (see `busy` in rule()/fillRule() in box.mjs), so a word on top of it
+  // would just repeat the same signal.
+  const seamLabel = '';
   const seam = rule(theme, width - 2, seamLabel, {
     active: composerFocused,
     // The seam is part of the frame, so it carries the frame's weight.
