@@ -136,7 +136,7 @@ try {
   });
   await app.bootstrap();
   const frames = {};
-  for (const view of ['chat', 'files', 'arsenal', 'network', 'modshop', 'terminal', 'browser', 'git']) {
+  for (const view of ['chat', 'files', 'capabilities', 'runtime', 'browser', 'git']) {
     app.view = view;
     app.focus = app.defaultFocus();
     app.screen.invalidate();
