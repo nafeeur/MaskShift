@@ -1083,7 +1083,7 @@ test('the interface routes clicks, wheels and drags to what it painted', async (
   app.focus = 'composer';
   at(4, 20);
   assert.equal(app.focus, 'transcript');
-  at(31, 20);
+  at(32, 20);
   assert.equal(app.focus, 'composer');
 
   // Rail sections are tabs now, not just a ctrl+r cycle.
@@ -1184,17 +1184,14 @@ test('a toast never overlaps the composer\'s own border or input row', async (t)
   assert.ok(seamIndex >= 1, 'sanity: the seam is not the very first row');
   assert.ok(frame[seamIndex].includes('━━ COMPOSER'), 'the seam divider must render intact, not be cut by a toast');
 
-  // One blank row of padding sits between the seam and the draft itself —
-  // see chat.mjs's render(). Not a second one below the draft too: the
-  // panel's own border already closes the box there.
-  const blankRow = frame[seamIndex + 1];
-  assert.ok(blankRow.trimEnd().endsWith('┃'), `composer's top padding row should keep its right border, got "${blankRow}"`);
-
-  const inputRow = frame[seamIndex + 2];
+  // No blank padding row between the seam and the draft — see chat.mjs's
+  // render(). Not one below the draft either: the panel's own border
+  // already closes the box there.
+  const inputRow = frame[seamIndex + 1];
   assert.ok(inputRow.trimEnd().endsWith('┃'), `composer input row should keep its right border, got "${inputRow}"`);
   assert.ok(inputRow.includes('❯'), 'composer prompt marker should still be visible');
 
-  const bottomBorder = frame[seamIndex + 3];
+  const bottomBorder = frame[seamIndex + 2];
   assert.ok(bottomBorder.trimEnd().endsWith('┛'), `composer bottom border should be intact, got "${bottomBorder}"`);
 });
 
