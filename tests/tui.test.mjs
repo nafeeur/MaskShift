@@ -139,7 +139,11 @@ test('the active view is named once per screen', async (t) => {
 
   // Panels used to repeat the tab strip's own label one row beneath it, which
   // stacked two identical chips in the top-left corner of every view.
-  for (const view of ['chat', 'arsenal', 'network', 'modshop', 'terminal']) {
+  // browser and git were never covered here either (see below): the browser
+  // view's own empty-state panel spells out "BROWSER" by name, and git's own
+  // panel can echo a branch or path containing "GIT" — both legitimate, not
+  // the tab-strip-plus-panel-title duplication this test actually guards.
+  for (const view of ['chat', 'files', 'capabilities', 'runtime']) {
     app.view = view;
     app.focus = app.defaultFocus();
     app.screen.invalidate();
@@ -459,7 +463,7 @@ test('every view renders exactly to size across the full range of real terminals
   const project = await createProject(t);
   const runtime = await runtimeForTest(t, project);
   const sizes = [[1, 1], [8, 3], [20, 8], [40, 12], [60, 20], [107, 30], [108, 30], [300, 12], [40, 200]];
-  const views = ['chat', 'files', 'arsenal', 'network', 'modshop', 'terminal'];
+  const views = ['chat', 'files', 'capabilities', 'runtime', 'browser', 'git'];
   for (const [columns, rows] of sizes) {
     const output = new FakeTerminal(columns, rows);
     const app = new MaskShiftTui(runtime, { workspacePath: project, output, headless: true, theme });
@@ -654,7 +658,8 @@ test('the interface paints every view and overlay at the terminal size', async (
   });
   await app.bootstrap();
   await app.loadFileTree();
-  await app.refreshModShop({ force: false });
+  await app.refreshCapabilitiesExtras({ force: false });
+  await app.refreshRuntimeExtras({ force: false });
 
   const check = (label, frame) => {
     assert.equal(frame.length, rows, `${label} produced ${frame.length} rows`);
@@ -663,7 +668,7 @@ test('the interface paints every view and overlay at the terminal size', async (
 
   await app.refreshGitView({ force: false });
 
-  for (const view of ['chat', 'files', 'arsenal', 'network', 'modshop', 'terminal', 'git']) {
+  for (const view of ['chat', 'files', 'capabilities', 'runtime', 'browser', 'git']) {
     app.view = view;
     app.focus = app.defaultFocus();
     app.screen.invalidate();
@@ -832,18 +837,18 @@ test('the interface routes keys, slash commands and view switches', async (t) =>
   assert.equal(app.overlay, null);
 
   app.onKey({ name: '3', alt: true });
-  assert.equal(app.view, 'arsenal');
+  assert.equal(app.view, 'capabilities');
   app.onKey({ name: '/' });
-  assert.equal(app.focus, 'arsenal-filter');
+  assert.equal(app.focus, 'capabilities-filter');
   app.onKey({ name: 'escape' });
-  assert.equal(app.focus, 'arsenal');
+  assert.equal(app.focus, 'capabilities');
   app.onKey({ name: '1' });
   assert.equal(app.view, 'chat');
 
   app.composer.set('/tools fs_');
   await app.submitPrompt();
-  assert.equal(app.view, 'arsenal');
-  assert.equal(app.arsenalFilter.value, 'fs_');
+  assert.equal(app.view, 'capabilities');
+  assert.equal(app.capabilitiesFilter.value, 'fs_');
 
   app.composer.set('/help');
   await app.submitPrompt();
@@ -872,8 +877,8 @@ test('escaping back to chat from another view lands on the transcript, not the c
   // Land on a non-chat view with a non-typing focus, the state a user is in right
   // before pressing Escape to go back — matching how the number-key navigation itself lands.
   app.onKey({ name: '3', alt: true });
-  assert.equal(app.view, 'arsenal');
-  assert.equal(app.focus, 'arsenal');
+  assert.equal(app.view, 'capabilities');
+  assert.equal(app.focus, 'capabilities');
 
   app.onKey({ name: 'escape' });
   assert.equal(app.view, 'chat');
@@ -883,7 +888,7 @@ test('escaping back to chat from another view lands on the transcript, not the c
   assert.equal(app.composer.value, '');
 
   app.onKey({ name: '3' });
-  assert.equal(app.view, 'arsenal', 'a digit right after Escape should still switch views');
+  assert.equal(app.view, 'capabilities', 'a digit right after Escape should still switch views');
   assert.equal(app.composer.value, '', 'the digit must not leak into the composer');
 });
 
