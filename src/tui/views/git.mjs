@@ -1,4 +1,4 @@
-// 08 GIT — the dedicated source-control view: working tree changes, commit
+// 06 GIT — the dedicated source-control view: working tree changes, commit
 // history, branches, stash, checkpoints and worktrees, all in one place.
 //
 // Replaces the old small "GIT" tab that used to live in the right-hand rail
@@ -18,6 +18,7 @@ import { glyphs } from '../box.mjs';
 import { fit, oneLine, truncate } from '../text.mjs';
 import { statusGlyph, statusOf } from '../status.mjs';
 import { SPACE } from '../tokens.mjs';
+import { gutter } from '../type.mjs';
 import { detailBlock, handleCatalog, listRow, renderCatalog } from './catalog.mjs';
 import { fuzzy } from '../widgets.mjs';
 
@@ -462,6 +463,40 @@ export function handle(app, event) {
   });
 }
 
+// -------------------------------------------------------------------- rail
+//
+// Recent commit history for whichever changed file is selected in the
+// CHANGES tab — app.loadGitFileHistory fetches and caches it the same way
+// loadGitDetail already caches a diff, since render() has to stay
+// synchronous. Nothing to show for any other tab: a commit, branch, stash
+// or checkpoint isn't "a file", so there's no per-file history to fetch.
+export function rail(app, width) {
+  const { theme } = app;
+  const item = app.gitList.current;
+  const relative = item?.kind === 'change' ? item.raw.path : null;
+  if (!relative) {
+    return [gutter(theme) + theme.paint('Select a changed file to see its recent history.', { fg: theme.roles.muted, italic: true })];
+  }
+  if (!app.gitFileHistoryCache.has(relative)) void app.loadGitFileHistory(relative);
+  const cached = app.gitFileHistoryCache.get(relative);
+  const lines = [];
+  if (!cached || cached.loading) {
+    lines.push(theme.paint('Loading…', { fg: theme.roles.muted, italic: true }));
+  } else if (cached.error) {
+    lines.push(theme.paint(cached.error, { fg: theme.roles.danger }));
+  } else if (!cached.entries.length) {
+    lines.push(theme.paint('No history for this file yet.', { fg: theme.roles.muted, italic: true }));
+  } else {
+    for (const entry of cached.entries.slice(0, 30)) {
+      lines.push(fit(theme.paint(entry.short, { fg: theme.roles.accent, bold: true })
+        + theme.paint(` ${entry.date} `, { fg: theme.roles.faint })
+        + theme.paint(entry.author, { fg: theme.roles.muted }), width));
+      lines.push(gutter(theme) + theme.paint(truncate(entry.subject, width - SPACE.gutter), { fg: theme.roles.text }));
+    }
+  }
+  return lines;
+}
+
 export const hints = (app) => {
   const base = [['tab', 'section'], ['r', 'refresh'], ['/', 'filter'], ['P', 'push'], ['L', 'pull'], ['F', 'fetch']];
   if (app.gitTab === 'changes') return [...base, ['space', 'stage/unstage'], ['a', 'stage all'], ['u', 'unstage all'], ['c', 'commit'], ['d', 'discard']];
@@ -472,4 +507,4 @@ export const hints = (app) => {
   return [...base, ['n', 'new worktree'], ['del', 'remove']];
 };
 
-export const meta = { id: 'git', index: '08', title: 'GIT', shortcut: '8' };
+export const meta = { id: 'git', index: '06', title: 'GIT', shortcut: '6' };

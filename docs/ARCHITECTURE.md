@@ -167,14 +167,20 @@ Primary views:
 
 - 01 HEIST: transcript, composer, plan, live tool calls.
 - 02 FILES: workspace tree and syntax-tinted source preview.
-- 03 ARSENAL: searchable native tools and skills with parameter dossiers.
-- 04 NETWORK: MCP servers, connection state, and the official registry installer.
-- 05 MOD SHOP: automations, plugins, agent bridges, browsers, processes.
-- 06 TERMINAL: direct unrestricted command execution.
+- 03 CAPABILITIES: searchable native tools, skills, MCP servers (installed and
+  the official registry), plugins and agent bridges, one catalogue behind five
+  tabs.
+- 04 RUNTIME: direct unrestricted command execution, plus automations,
+  background processes and browser instances behind a secondary tab strip.
+- 05 BROWSER: a live, clickable view of a running browser tab.
+- 06 GIT: working tree changes, log, branches, stash, checkpoints, worktrees.
 
-The right rail carries the plan, live loadout telemetry, the raw event bus and a
-Git pulse. Below 108 columns the rail hides itself and the header sheds telemetry
-chips, so the interface stays usable at 80×24.
+On 01 HEIST, the right rail carries the plan, live loadout telemetry and the raw
+event bus; every other view gets the same slot for its own context instead (a
+file's place in the code graph, a capability's usage, shell job history, a
+browser tab's console/network tail, or a changed file's commit history). Below
+108 columns the rail hides itself and the header sheds telemetry chips, so the
+interface stays usable at 80×24.
 
 ## Command line
 

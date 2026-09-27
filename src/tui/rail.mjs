@@ -245,3 +245,40 @@ export function handle(app, event) {
   if (event.name === 'c' && app.railTab === 'events') { app.events = []; return true; }
   return app.railView.handle(event, Math.max(1, app.bodyRegion.height - 1));
 }
+
+/**
+ * A single-section rail pane for a non-chat view (see files.mjs, git.mjs,
+ * browser.mjs, runtime.mjs and capabilities.mjs's own `rail()` exports) —
+ * the same one-row heading, click region and scroll wiring `render()` above
+ * gives the plan/loadout/events tabs, without every view reimplementing it.
+ * Each caller passes its own Viewport so scroll position doesn't leak
+ * between views that happen to share the rail slot at different times.
+ */
+export function renderPane(app, region, { title, stamp = '', lines, viewport }) {
+  const { theme } = app;
+  const { width, height } = region;
+  const inner = Math.max(4, width - 2);
+  viewport.set(lines);
+  const out = [
+    heading(theme, title, inner, stamp),
+    ...viewport.render(Math.max(0, height - 1), inner),
+  ];
+  registerPaneRegions(app, region, viewport);
+  return out.slice(0, height).map((line) => ` ${fit(line, inner)}`);
+}
+
+function registerPaneRegions(app, region, viewport) {
+  const regions = app.regions;
+  if (!regions) return;
+  const bodyHeight = Math.max(0, region.height - 1);
+  regions.add({
+    row: region.row + 1,
+    column: region.column,
+    width: region.width,
+    height: bodyHeight,
+    id: 'rail:pane-body',
+    layer: LAYER.rail,
+    onPress: (target) => { target.focus = 'rail'; },
+    onWheel: (target, event) => { viewport.scroll(event.button === 'wheelup' ? -3 : 3, bodyHeight); },
+  });
+}

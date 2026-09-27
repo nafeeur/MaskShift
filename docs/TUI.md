@@ -74,8 +74,8 @@ monochrome; `MASKSHIFT_ASCII=1` swaps every box-drawing glyph for ASCII.
 
 ```
  MASKSHIFT · TARGET repo · branch · PERSONA model   MODE OVERDRIVE · TOOLS 149 · SKILLS 44 · ● LINK
-  01 HEIST │ 02 FILES │ 03 ARSENAL │ 04 NETWORK │ 05 MOD SHOP │ 06 TERMINAL             RAIL PLAN
-┏━ SESSION TITLE ───────────────────────────────────── 42 MESSAGES ━┓ PLAN · LOADOUT · EVENTS · GIT
+  01 HEIST │ 02 FILES │ 03 CAPABILITIES │ 04 RUNTIME │ 05 BROWSER │ 06 GIT      RAIL PLAN
+┏━ SESSION TITLE ───────────────────────────────────── 42 MESSAGES ━┓ PLAN · LOADOUT · EVENTS
 ┃ ▌ OPERATOR                                                  14:22 ┃   Diff frames instead of
 ┃ ▌ Refactor the frame renderer so repaints only rewrite changed …  ┃   repainting the screen.
 ┃                                                                   ┃
@@ -107,24 +107,20 @@ usable at 80×24.
 |---|---|
 | **01 HEIST** | The transcript and composer. Markdown, syntax-tinted code fences, coloured diffs, collapsed tool calls, and a live indicator for in-flight tools. |
 | **02 FILES** | Workspace tree with fold state and a syntax-highlighted preview. `a` attaches the selected file to the composer. |
-| **03 ARSENAL** | Every native tool and skill, fuzzy-searchable, with a dossier pane showing the parameter schema or the skill body. `x` runs a tool directly. |
-| **04 NETWORK** | MCP servers: connect, disconnect, add by hand, search the official registry and install from it. |
-| **05 MOD SHOP** | Automations, plugins, agent bridges, browsers and processes — each with create, arm/pause, reload and delete. |
-| **06 TERMINAL** | The host shell, running with your full account permissions. |
-| **07 BROWSER** | A live, clickable, typeable view of a running browser tab — the same CDP connection the browser tools drive. |
-| **08 GIT** | Working tree changes, commit log, branches, stash, MaskShift checkpoints and worktrees, each with their own actions — plus push/pull/fetch from any tab. |
+| **03 CAPABILITIES** | Every native tool and skill, MCP servers (installed and the official registry), plugins and agent bridges — one catalogue behind five tabs, fuzzy-searchable, with a dossier pane per kind. `x` runs a tool directly. |
+| **04 RUNTIME** | The host shell, running with your full account permissions, plus automations, background processes and browser instances behind a secondary tab strip. |
+| **05 BROWSER** | A live, clickable, typeable view of a running browser tab — the same CDP connection the browser tools drive — with its own instance strip to pick which tab it watches. |
+| **06 GIT** | Working tree changes, commit log, branches, stash, MaskShift checkpoints and worktrees, each with their own actions — plus push/pull/fetch from any tab. |
 
 ![01 HEIST](screenshots/heist.svg)
 
 ![02 FILES](screenshots/files.svg)
 
-![03 ARSENAL](screenshots/arsenal.svg)
+![03 CAPABILITIES](screenshots/capabilities.svg)
 
-![04 NETWORK](screenshots/network.svg)
+![04 RUNTIME](screenshots/runtime.svg)
 
-![05 MOD SHOP](screenshots/modshop.svg)
-
-![08 GIT](screenshots/git.svg)
+![06 GIT](screenshots/git.svg)
 
 `ctrl+k` opens a fuzzy command palette over every action MaskShift can perform, so nothing is
 buried behind a key you have to memorise:
@@ -151,12 +147,17 @@ indexing and checkpoint behaviour — without editing `config.json` by hand:
 
 ![Settings](screenshots/settings.svg)
 
-The right rail carries three sections, spelled out across a single header row so
-its first line of content sits on the same screen row as the first line of the
-pane it is reporting on: **plan** (live multi-stage plan with progress),
-**loadout** (which tools, skills and MCP servers the current run has actually
-summoned, plus token flow) and **events** (the raw runtime bus). Source control
-has its own dedicated view — see **08 GIT** below — rather than a rail summary.
+On **01 HEIST**, the right rail carries three sections, spelled out across a
+single header row so its first line of content sits on the same screen row as
+the first line of the pane it is reporting on: **plan** (live multi-stage plan
+with progress), **loadout** (which tools, skills and MCP servers the current
+run has actually summoned, plus token flow) and **events** (the raw runtime
+bus). Every other view gets the same slot for its own context instead — the
+selected file's outline, imports and likely tests on **02 FILES**, a
+capability's usage on **03 CAPABILITIES**, exit-code history on **04 RUNTIME**,
+a console/network tail on **05 BROWSER**, and recent commit history on
+**06 GIT** — rather than repeating the plan/loadout/events tabs on screens they
+have nothing to do with.
 
 ![Live loadout telemetry](screenshots/loadout.svg)
 
@@ -215,7 +216,7 @@ default.
 | `ctrl+b` | Show or hide the rail |
 | `ctrl+r` | Cycle rail: plan → loadout → events |
 | `ctrl+y` | Focus the rail |
-| `1`…`8`, `alt+1`…`alt+8` | Jump to a view |
+| `1`…`6`, `alt+1`…`alt+6` | Jump to a view |
 | `f1` or `?` | Key reference |
 | `f2` | Settings, including the mouse mode |
 | `f5` | Refresh everything |
@@ -274,17 +275,18 @@ cross session or workspace boundaries.
 | Key | Action |
 |---|---|
 | `/` | Filter |
-| `tab` / `shift+tab` | Cycle the section (tools/skills, installed/registry, mod-shop sections) |
+| `tab` / `shift+tab` | Cycle the section (tools/skills/mcp/plugins/bridges on CAPABILITIES; shell/automations/processes/browsers on RUNTIME) |
+| `g` | Toggle installed/registry (CAPABILITIES, MCP tab) |
 | `→` | Focus the dossier pane |
 | `enter` | The primary action: open, connect, load, run now, toggle |
-| `n` | New automation, plugin or browser (mod shop) |
+| `n` | New automation or browser instance (RUNTIME); install a plugin (CAPABILITIES) |
 | `space` | Arm or pause an automation |
 | `delete` | Remove the selected entry |
 | `r` | Refresh |
 
-### 08 GIT
+### 06 GIT
 
-Built on the same catalogue chrome as ARSENAL/NETWORK/MOD SHOP above — `/`,
+Built on the same catalogue chrome as CAPABILITIES/RUNTIME above — `/`,
 `tab`/`shift+tab`, `→` and `r` all work the same way — plus its own actions,
 some of which only apply on the tab named:
 
@@ -312,6 +314,10 @@ Typed into the composer:
 `/new` `/clear` `/model [REF]` `/sessions` `/search TEXT` `/workspace`
 `/tools [QUERY]` `/skills [QUERY]` `/mcp [QUERY]` `/mods` `/themes` `/files`
 `/terminal` `/browser` `/git` `/doctor` `/logs` `/settings` `/help` `/quit`
+
+`/tools`, `/skills` and `/mcp` all open **03 CAPABILITIES** on the matching tab;
+`/mods` and `/terminal` both open **04 RUNTIME** (`/terminal` lands on its shell
+tab).
 
 | Command | What it does |
 |---|---|
