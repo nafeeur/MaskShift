@@ -194,7 +194,8 @@ try {
   // Settle bootstrap's own model lookup before the capture sets a profile by hand.
   await app.refreshModelProfile();
   await app.loadFileTree();
-  await app.refreshModShop({ force: true });
+  await app.refreshCapabilitiesExtras({ force: true });
+  await app.refreshRuntimeExtras({ force: true });
   await app.refreshGitView({ force: true });
 
   // A representative transcript so the hero capture shows real work.
@@ -236,10 +237,9 @@ try {
     ['heist', 'MaskShift — 01 HEIST', () => { app.view = 'chat'; app.focus = 'composer'; app.railTab = 'plan'; }],
     ['loadout', 'MaskShift — live loadout telemetry', () => { app.view = 'chat'; app.railTab = 'telemetry'; }],
     ['files', 'MaskShift — 02 FILES', () => { app.view = 'files'; app.focus = 'files'; app.fileList.selected = 6; }],
-    ['arsenal', 'MaskShift — 03 ARSENAL', () => { app.view = 'arsenal'; app.focus = 'arsenal'; app.arsenalFilter.set('git'); }],
-    ['network', 'MaskShift — 04 NETWORK', () => { app.view = 'network'; app.focus = 'network'; }],
-    ['modshop', 'MaskShift — 05 MOD SHOP', () => { app.view = 'modshop'; app.modTab = 'bridges'; app.focus = 'modshop'; }],
-    ['git', 'MaskShift — 08 GIT', async () => {
+    ['capabilities', 'MaskShift — 03 CAPABILITIES', () => { app.view = 'capabilities'; app.focus = 'capabilities'; app.capabilitiesTab = 'mcp'; app.capabilitiesFilter.clear(); }],
+    ['runtime', 'MaskShift — 04 RUNTIME', () => { app.view = 'runtime'; app.runtimeTab = 'automations'; app.focus = 'runtime'; }],
+    ['git', 'MaskShift — 06 GIT', async () => {
       app.view = 'git'; app.gitTab = 'changes'; app.focus = 'git';
       // The list is only populated inside the view's own render(), so force
       // one before asking for its current row's diff.

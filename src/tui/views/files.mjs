@@ -10,7 +10,7 @@ import { LAYER, listZone, viewportZone } from '../regions.mjs';
 import { expandTabs, fit, truncate } from '../text.mjs';
 import { hexToRgb } from '../theme.mjs';
 import { SPACE } from '../tokens.mjs';
-import { columns, gutter } from '../type.mjs';
+import { columns, gutter, label as typeLabel } from '../type.mjs';
 import { filterRow, listRow, sidePane } from './catalog.mjs';
 
 const ICONS = {
@@ -249,3 +249,70 @@ export const hints = () => [
 ];
 
 export const meta = { id: 'files', index: '02', title: 'FILES', shortcut: '2' };
+
+// -------------------------------------------------------------------- rail
+//
+// The chat rail's plan/loadout/events tabs are chat-specific (see app.mjs's
+// paint()) — every other view gets this slot for its own context instead.
+// Here that's the selected file's place in the persistent code graph
+// (src/indexer/code-graph.mjs): its symbols, what it imports and what
+// imports it, and which tests a change to it is likely to affect.
+
+function symbolLine(theme, node, width) {
+  return truncate(`${theme.paint(node.kind, { fg: theme.roles.faint })} ${theme.paint(node.name, { fg: theme.roles.text })}`, width + 20);
+}
+
+export function rail(app, width) {
+  const { theme } = app;
+  const item = app.fileList.current;
+  if (!item || item.type !== 'file') {
+    return [gutter(theme) + theme.paint('Select a file to see its place in the code graph.', { fg: theme.roles.muted, italic: true })];
+  }
+  if (!app.workspaceId) return [gutter(theme) + theme.paint('No workspace open.', { fg: theme.roles.muted, italic: true })];
+
+  const stats = app.runtime.store.codeGraphStats(app.workspaceId);
+  if (!stats.nodes) {
+    if (!app._codeGraphBuildRequested) {
+      app._codeGraphBuildRequested = true;
+      void app.runtime.codeGraph.build(app.workspaceId)
+        .catch(() => {})
+        .finally(() => { app._codeGraphBuildRequested = false; app.requestRender(); });
+    }
+    return [gutter(theme) + theme.paint('Building the code graph for the first time…', { fg: theme.roles.muted, italic: true })];
+  }
+
+  const graph = app.runtime.store.codeGraph(app.workspaceId);
+  const relative = item.path;
+  const fileNode = graph.nodes.find((node) => node.kind === 'file' && node.path === relative);
+  const symbols = graph.nodes.filter((node) => node.kind !== 'file' && node.path === relative);
+  const imports = fileNode
+    ? graph.edges.filter((edge) => edge.kind === 'imports' && edge.sourceId === fileNode.id)
+      .map((edge) => graph.nodes.find((node) => node.id === edge.targetId)).filter(Boolean)
+    : [];
+  const importers = fileNode
+    ? graph.edges.filter((edge) => edge.kind === 'imports' && edge.targetId === fileNode.id)
+      .map((edge) => graph.nodes.find((node) => node.id === edge.sourceId)).filter(Boolean)
+    : [];
+  const impact = app.runtime.codeGraph.impact(app.workspaceId, [relative], { depth: 2, limit: 200 });
+
+  const lines = [];
+  const heading = (text, stamp = '') => { if (lines.length) lines.push(''); lines.push(typeLabel(theme, text, { tone: theme.roles.label }) + (stamp ? ` ${theme.paint(stamp, { fg: theme.roles.faint })}` : '')); };
+
+  heading('Outline', symbols.length ? String(symbols.length) : '');
+  if (!symbols.length) lines.push(gutter(theme) + theme.paint('No symbols indexed for this file.', { fg: theme.roles.muted, italic: true }));
+  for (const node of symbols.slice(0, 60)) lines.push(gutter(theme) + symbolLine(theme, node, width));
+
+  heading('Imports', imports.length ? String(imports.length) : '');
+  if (!imports.length) lines.push(gutter(theme) + theme.paint('Imports nothing this graph resolved.', { fg: theme.roles.muted, italic: true }));
+  for (const node of imports.slice(0, 40)) lines.push(gutter(theme) + theme.paint(truncate(node.path, width), { fg: theme.roles.tool }));
+
+  heading('Imported by', importers.length ? String(importers.length) : '');
+  if (!importers.length) lines.push(gutter(theme) + theme.paint('Nothing in this graph imports it.', { fg: theme.roles.muted, italic: true }));
+  for (const node of importers.slice(0, 40)) lines.push(gutter(theme) + theme.paint(truncate(node.path, width), { fg: theme.roles.tool }));
+
+  heading('Likely tests', impact.tests.length ? String(impact.tests.length) : '');
+  if (!impact.tests.length) lines.push(gutter(theme) + theme.paint('None found within two hops.', { fg: theme.roles.muted, italic: true }));
+  for (const testPath of impact.tests.slice(0, 30)) lines.push(gutter(theme) + theme.paint(truncate(testPath, width), { fg: theme.roles.accent }));
+
+  return lines;
+}

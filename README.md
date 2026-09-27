@@ -174,19 +174,17 @@ interface to edit the core settings without touching the file, or use `maskshift
 ## The interface
 
 `maskshift` opens a full-screen terminal application built on a bespoke, zero-dependency
-renderer, driven equally by keyboard and mouse. Eight views switch with `1`–`8`, `ctrl+b` toggles
+renderer, driven equally by keyboard and mouse. Six views switch with `1`–`6`, `ctrl+b` toggles
 the right rail, and `ctrl+k` opens a fuzzy command palette over every action.
 
 | View | Holds |
 |---|---|
 | **01 HEIST** | Transcript and composer — markdown, syntax-tinted code, coloured diffs, live tool calls |
 | **02 FILES** | Workspace tree with a syntax-highlighted preview — images decode and render inline |
-| **03 ARSENAL** | Every native tool and skill, searchable, with parameter schemas — and `x` to run one yourself |
-| **04 NETWORK** | MCP servers: bundled, workspace-configured, or pulled live from the official registry |
-| **05 MOD SHOP** | Automations, plugins, agent bridges, browser profiles and background processes |
-| **06 TERMINAL** | The host shell |
-| **07 BROWSER** | A live, clickable, typeable view of a running browser tab — the same CDP connection the browser tools drive |
-| **08 GIT** | Working tree changes (stage/unstage/discard/commit), commit log, branches, stash, MaskShift checkpoints and worktrees — plus push/pull/fetch from anywhere in the view |
+| **03 CAPABILITIES** | Every native tool and skill, MCP servers (bundled or pulled live from the official registry), plugins and agent bridges — one searchable catalogue, five tabs, `x` to run a tool yourself |
+| **04 RUNTIME** | The host shell, plus automations, background processes and browser instances behind a tab strip |
+| **05 BROWSER** | A live, clickable, typeable view of a running browser tab — the same CDP connection the browser tools drive |
+| **06 GIT** | Working tree changes (stage/unstage/discard/commit), commit log, branches, stash, MaskShift checkpoints and worktrees — plus push/pull/fetch from anywhere in the view |
 
 Inline images — a Files preview, a chat screenshot result, or the live BROWSER view — render
 through whatever the terminal actually supports, picked automatically: the Kitty graphics
@@ -197,20 +195,20 @@ it needs a dependency: the PNG, JPEG and BMP decoders are hand-written against N
 
 <table>
 <tr>
-<td width="50%"><img width="100%" alt="Tools and skills catalogue" src="docs/screenshots/arsenal.svg"><br><sub><b>03 ARSENAL</b> — see exactly what a run can reach before it uses it</sub></td>
-<td width="50%"><img width="100%" alt="MCP network" src="docs/screenshots/network.svg"><br><sub><b>04 NETWORK</b> — connect a server on demand</sub></td>
+<td width="50%"><img width="100%" alt="Tools, skills and MCP catalogue" src="docs/screenshots/capabilities.svg"><br><sub><b>03 CAPABILITIES</b> — see exactly what a run can reach before it uses it</sub></td>
+<td width="50%"><img width="100%" alt="Runtime: automations, processes, browsers" src="docs/screenshots/runtime.svg"><br><sub><b>04 RUNTIME</b> — the shell, automations, processes and browser instances</sub></td>
 </tr>
 <tr>
 <td width="50%"><img width="100%" alt="Command palette" src="docs/screenshots/palette.svg"><br><sub><b>ctrl+k</b> — every action, nothing buried behind a memorised key</sub></td>
 <td width="50%"><img width="100%" alt="Live loadout telemetry" src="docs/screenshots/loadout.svg"><br><sub><b>The rail</b> — plan, loadout telemetry, event bus</sub></td>
 </tr>
 <tr>
-<td width="50%"><img width="100%" alt="Git view" src="docs/screenshots/git.svg"><br><sub><b>08 GIT</b> — changes, log, branches, stash, checkpoints and worktrees, with push/pull/fetch from anywhere</sub></td>
-<td width="50%"><img width="100%" alt="Mod shop" src="docs/screenshots/modshop.svg"><br><sub><b>05 MOD SHOP</b> — automations, plugins, agent bridges and processes</sub></td>
+<td width="50%"><img width="100%" alt="Git view" src="docs/screenshots/git.svg"><br><sub><b>06 GIT</b> — changes, log, branches, stash, checkpoints and worktrees, with push/pull/fetch from anywhere</sub></td>
+<td width="50%"><img width="100%" alt="Files view" src="docs/screenshots/files.svg"><br><sub><b>02 FILES</b> — workspace tree with a syntax-highlighted preview</sub></td>
 </tr>
 </table>
 
-Below 108 columns the rail hides itself and the header sheds telemetry, so the same eight views
+Below 108 columns the rail hides itself and the header sheds telemetry, so the same six views
 work in a narrow split pane. `MASKSHIFT_MOUSE=off` (or `f2`) hands text selection back to the
 terminal, and `NO_COLOR`, `MASKSHIFT_COLOR=off` and `MASKSHIFT_ASCII=1` each produce a clean,
 aligned fallback.
