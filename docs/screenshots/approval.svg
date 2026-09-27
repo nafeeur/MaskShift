@@ -6,14 +6,20 @@
 <text x="66.40" y="30.00" fill="#ece8e0" textLength="42.00" lengthAdjust="spacingAndGlyphs" font-weight="700">SHIFT</text>
 <text x="116.80" y="30.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
 <text x="133.60" y="30.00" fill="#7a8494" textLength="50.40" lengthAdjust="spacingAndGlyphs">TARGET</text>
-<text x="192.40" y="30.00" fill="#ece8e0" textLength="193.20" lengthAdjust="spacingAndGlyphs" font-weight="700">agent-a356af0552adba6ed</text>
-<text x="394.00" y="30.00" fill="#ece8e0" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">·</text>
-<text x="410.80" y="30.00" fill="#ece8e0" textLength="268.80" lengthAdjust="spacingAndGlyphs" font-weight="700">worktree-agent-a356af0552adba6ed</text>
-<text x="688.00" y="30.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="704.80" y="30.00" fill="#7a8494" textLength="58.80" lengthAdjust="spacingAndGlyphs">PERSONA</text>
-<text x="772.00" y="30.00" fill="#ece8e0" textLength="92.40" lengthAdjust="spacingAndGlyphs" font-weight="700">ollama:auto</text>
-<text x="923.20" y="30.00" fill="#7a8494" textLength="33.60" lengthAdjust="spacingAndGlyphs">MODE</text>
-<text x="965.20" y="30.00" fill="#ece8e0" textLength="67.20" lengthAdjust="spacingAndGlyphs" font-weight="700">BALANCED</text>
+<text x="192.40" y="30.00" fill="#ece8e0" textLength="75.60" lengthAdjust="spacingAndGlyphs" font-weight="700">MaskShift</text>
+<text x="276.40" y="30.00" fill="#ece8e0" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">·</text>
+<text x="293.20" y="30.00" fill="#ece8e0" textLength="243.60" lengthAdjust="spacingAndGlyphs" font-weight="700">claude/youthful-carson-le8le1</text>
+<text x="545.20" y="30.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="562.00" y="30.00" fill="#7a8494" textLength="58.80" lengthAdjust="spacingAndGlyphs">PERSONA</text>
+<text x="629.20" y="30.00" fill="#ece8e0" textLength="92.40" lengthAdjust="spacingAndGlyphs" font-weight="700">ollama:auto</text>
+<text x="755.20" y="30.00" fill="#7a8494" textLength="33.60" lengthAdjust="spacingAndGlyphs">MODE</text>
+<text x="797.20" y="30.00" fill="#ece8e0" textLength="67.20" lengthAdjust="spacingAndGlyphs" font-weight="700">BALANCED</text>
+<text x="872.80" y="30.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="889.60" y="30.00" fill="#7a8494" textLength="42.00" lengthAdjust="spacingAndGlyphs">TOOLS</text>
+<text x="940.00" y="30.00" fill="#2bd9c0" textLength="25.20" lengthAdjust="spacingAndGlyphs" font-weight="700">168</text>
+<text x="973.60" y="30.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="990.40" y="30.00" fill="#7a8494" textLength="25.20" lengthAdjust="spacingAndGlyphs">MCP</text>
+<text x="1024.00" y="30.00" fill="#3d8bf5" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">8</text>
 <text x="1040.80" y="30.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
 <text x="1057.60" y="30.00" fill="#7a8494" textLength="8.40" lengthAdjust="spacingAndGlyphs">●</text>
 <text x="1074.40" y="30.00" fill="#7a8494" textLength="33.60" lengthAdjust="spacingAndGlyphs" font-weight="700">DARK</text>
@@ -39,26 +45,26 @@
 <text x="620.80" y="48.00" fill="#7a8494" textLength="25.20" lengthAdjust="spacingAndGlyphs">GIT</text>
 <text x="990.40" y="48.00" fill="#7a8494" textLength="33.60" lengthAdjust="spacingAndGlyphs">RAIL</text>
 <text x="1032.40" y="48.00" fill="#b8c0cb" textLength="75.60" lengthAdjust="spacingAndGlyphs" font-weight="700">TELEMETRY</text>
-<text x="200.80" y="282.00" fill="#352d17" textLength="16.80" lengthAdjust="spacingAndGlyphs">┏━</text>
+<text x="200.80" y="282.00" fill="#372f18" textLength="16.80" lengthAdjust="spacingAndGlyphs">┏━</text>
 <text x="226.00" y="282.00" fill="#ece8e0" textLength="58.80" lengthAdjust="spacingAndGlyphs">APPROVE</text>
 <text x="293.20" y="282.00" fill="#ece8e0" textLength="33.60" lengthAdjust="spacingAndGlyphs">TOOL</text>
 <text x="335.20" y="282.00" fill="#ece8e0" textLength="33.60" lengthAdjust="spacingAndGlyphs">CALL</text>
-<text x="377.20" y="282.00" fill="#352d17" textLength="344.40" lengthAdjust="spacingAndGlyphs">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</text>
+<text x="377.20" y="282.00" fill="#372f18" textLength="344.40" lengthAdjust="spacingAndGlyphs">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</text>
 <text x="730.00" y="282.00" fill="#7a8494" textLength="8.40" lengthAdjust="spacingAndGlyphs">▲</text>
 <text x="746.80" y="282.00" fill="#7a8494" textLength="75.60" lengthAdjust="spacingAndGlyphs">HOST-EXEC</text>
 <text x="830.80" y="282.00" fill="#7a8494" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
 <text x="847.60" y="282.00" fill="#7a8494" textLength="67.20" lengthAdjust="spacingAndGlyphs">BALANCED</text>
-<text x="923.20" y="282.00" fill="#352d17" textLength="16.80" lengthAdjust="spacingAndGlyphs">━┓</text>
-<text x="200.80" y="300.00" fill="#352d17" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
+<text x="923.20" y="282.00" fill="#372f18" textLength="16.80" lengthAdjust="spacingAndGlyphs">━┓</text>
+<text x="200.80" y="300.00" fill="#372f18" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
 <text x="217.60" y="300.00" fill="#2bd9c0" textLength="84.00" lengthAdjust="spacingAndGlyphs" font-weight="700">shell_exec</text>
 <text x="318.40" y="300.00" fill="#7a8494" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
 <text x="343.60" y="300.00" fill="#7a8494" textLength="58.80" lengthAdjust="spacingAndGlyphs">Execute</text>
 <text x="410.80" y="300.00" fill="#7a8494" textLength="42.00" lengthAdjust="spacingAndGlyphs">shell</text>
 <text x="461.20" y="300.00" fill="#7a8494" textLength="58.80" lengthAdjust="spacingAndGlyphs">command</text>
-<text x="931.60" y="300.00" fill="#352d17" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
-<text x="200.80" y="318.00" fill="#352d17" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
-<text x="931.60" y="318.00" fill="#352d17" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
-<text x="200.80" y="336.00" fill="#352d17" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
+<text x="931.60" y="300.00" fill="#372f18" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
+<text x="200.80" y="318.00" fill="#372f18" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
+<text x="931.60" y="318.00" fill="#372f18" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
+<text x="200.80" y="336.00" fill="#372f18" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
 <text x="217.60" y="336.00" fill="#e9a227" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">$</text>
 <text x="234.40" y="336.00" fill="#ffffff" textLength="16.80" lengthAdjust="spacingAndGlyphs" font-weight="700">rm</text>
 <text x="259.60" y="336.00" fill="#ffffff" textLength="25.20" lengthAdjust="spacingAndGlyphs" font-weight="700">-rf</text>
@@ -70,24 +76,24 @@
 <text x="637.60" y="336.00" fill="#ffffff" textLength="16.80" lengthAdjust="spacingAndGlyphs" font-weight="700">&amp;&amp;</text>
 <text x="662.80" y="336.00" fill="#ffffff" textLength="25.20" lengthAdjust="spacingAndGlyphs" font-weight="700">npm</text>
 <text x="696.40" y="336.00" fill="#ffffff" textLength="33.60" lengthAdjust="spacingAndGlyphs" font-weight="700">test</text>
-<text x="931.60" y="336.00" fill="#352d17" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
-<text x="200.80" y="354.00" fill="#352d17" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
-<text x="931.60" y="354.00" fill="#352d17" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
-<text x="200.80" y="372.00" fill="#352d17" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
+<text x="931.60" y="336.00" fill="#372f18" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
+<text x="200.80" y="354.00" fill="#372f18" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
+<text x="931.60" y="354.00" fill="#372f18" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
+<text x="200.80" y="372.00" fill="#372f18" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
 <text x="217.60" y="372.00" fill="#7a8494" textLength="25.20" lengthAdjust="spacingAndGlyphs">cwd</text>
-<text x="268.00" y="372.00" fill="#ece8e0" textLength="520.80" lengthAdjust="spacingAndGlyphs">/home/user/MaskShift/.claude/worktrees/agent-a356af0552adba6ed</text>
-<text x="931.60" y="372.00" fill="#352d17" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
-<text x="200.80" y="390.00" fill="#352d17" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
-<text x="931.60" y="390.00" fill="#352d17" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
-<text x="200.80" y="408.00" fill="#352d17" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
+<text x="268.00" y="372.00" fill="#ece8e0" textLength="168.00" lengthAdjust="spacingAndGlyphs">/home/user/MaskShift</text>
+<text x="931.60" y="372.00" fill="#372f18" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
+<text x="200.80" y="390.00" fill="#372f18" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
+<text x="931.60" y="390.00" fill="#372f18" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
+<text x="200.80" y="408.00" fill="#372f18" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
 <text x="226.00" y="408.00" fill="#7a8494" textLength="25.20" lengthAdjust="spacingAndGlyphs">YES</text>
 <rect x="276.40" y="394.00" width="33.60" height="18" fill="#e9a227"/>
 <text x="284.80" y="408.00" fill="#08090c" textLength="16.80" lengthAdjust="spacingAndGlyphs" font-weight="700">NO</text>
 <text x="335.20" y="408.00" fill="#7a8494" textLength="50.40" lengthAdjust="spacingAndGlyphs">ALWAYS</text>
 <text x="394.00" y="408.00" fill="#7a8494" textLength="33.60" lengthAdjust="spacingAndGlyphs">THIS</text>
 <text x="436.00" y="408.00" fill="#7a8494" textLength="58.80" lengthAdjust="spacingAndGlyphs">SESSION</text>
-<text x="931.60" y="408.00" fill="#352d17" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
-<text x="200.80" y="426.00" fill="#352d17" textLength="537.60" lengthAdjust="spacingAndGlyphs">┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</text>
+<text x="931.60" y="408.00" fill="#372f18" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
+<text x="200.80" y="426.00" fill="#372f18" textLength="537.60" lengthAdjust="spacingAndGlyphs">┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</text>
 <text x="746.80" y="426.00" fill="#7a8494" textLength="8.40" lengthAdjust="spacingAndGlyphs">y</text>
 <text x="763.60" y="426.00" fill="#7a8494" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
 <text x="780.40" y="426.00" fill="#7a8494" textLength="8.40" lengthAdjust="spacingAndGlyphs">n</text>
@@ -96,7 +102,7 @@
 <text x="839.20" y="426.00" fill="#7a8494" textLength="16.80" lengthAdjust="spacingAndGlyphs">or</text>
 <text x="872.80" y="426.00" fill="#7a8494" textLength="25.20" lengthAdjust="spacingAndGlyphs">←/→</text>
 <text x="906.40" y="426.00" fill="#7a8494" textLength="8.40" lengthAdjust="spacingAndGlyphs">↵</text>
-<text x="923.20" y="426.00" fill="#352d17" textLength="16.80" lengthAdjust="spacingAndGlyphs">━┛</text>
+<text x="923.20" y="426.00" fill="#372f18" textLength="16.80" lengthAdjust="spacingAndGlyphs">━┛</text>
 <text x="32.80" y="678.00" fill="#7a8494" textLength="8.40" lengthAdjust="spacingAndGlyphs">○</text>
 <text x="49.60" y="678.00" fill="#7a8494" textLength="33.60" lengthAdjust="spacingAndGlyphs" font-weight="700">IDLE</text>
 <text x="100.00" y="678.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>

@@ -427,16 +427,14 @@ export function render(app, region) {
   const { width, height } = region;
 
   // Frame + seam is three rows; the composer takes what it needs from the
-  // rest, plus one blank row between the seam and the draft — enough that
-  // the text doesn't sit flush against the "COMPOSER" label, without also
-  // padding the bottom, where the panel's own border already closes the box
-  // and a second blank row just made an otherwise one-line composer three
-  // rows tall for no reason.
+  // rest. No blank row between the seam and the draft — every other labelled
+  // divider in the app (the rail's section row, a pane's own title rule) sits
+  // directly above its content with no gap, and a pad row here just read as
+  // dead space above the caret while starving the transcript of a row.
   const composerWidth = Math.max(8, width - 6);
   const draftRows = app.composer.layout(composerWidth, 6).total;
-  const composerPadY = 1;
-  const draftVisibleRows = Math.max(1, Math.min(6, draftRows, Math.max(1, height - 8 - composerPadY)));
-  const composerRows = draftVisibleRows + composerPadY;
+  const draftVisibleRows = Math.max(1, Math.min(6, draftRows, Math.max(1, height - 8)));
+  const composerRows = draftVisibleRows;
   const transcriptHeight = Math.max(1, height - 3 - composerRows);
 
   // One column of scrollbar and one of breathing room sit to the right of the
@@ -501,7 +499,7 @@ export function render(app, region) {
   // breathing room before the draft text starts than a list row's marker does.
   const composerGutterWidth = SPACE.gutter + 1;
   const layout = app.composer.layout(composerWidth, draftVisibleRows);
-  const composerBody = Array(composerPadY).fill('');
+  const composerBody = [];
   for (let index = 0; index < draftVisibleRows; index += 1) {
     const row = layout.rows[index];
     // The caret lives in the same gutter every other row in the pane uses, so
@@ -542,7 +540,7 @@ export function render(app, region) {
 
   const cursor = composerFocused
     ? {
-      row: region.row + 1 + transcriptHeight + 1 + composerPadY + layout.caret.row,
+      row: region.row + 1 + transcriptHeight + 1 + layout.caret.row,
       column: region.column + 2 + composerGutterWidth + layout.caret.column,
     }
     : null;
