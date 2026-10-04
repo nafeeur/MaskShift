@@ -78,7 +78,7 @@ export async function createRuntime({ configPath, configOverrides = {}, workspac
   const promptBuilder = new PromptBuilder({ config, capabilityController });
   engine = new AgentEngine({
     store, config, logger, eventBus, hooks, providerManager, workspaceManager, intelligenceRouter,
-    indexer, toolRegistry, capabilityController, promptBuilder, contextBuilder, mcpManager, personaManager,
+    indexer, toolRegistry, capabilityController, promptBuilder, contextBuilder, mcpManager, personaManager, lspManager,
   });
   automationScheduler.start();
 

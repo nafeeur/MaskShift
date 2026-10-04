@@ -1,9 +1,13 @@
+import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { nowIso, runCommand, sha256, truncate } from '../core/utils.mjs';
 import { estimateUsageCost, summarizeCosts } from '../core/pricing.mjs';
 import { repairPrompt } from './tool-protocol.mjs';
 import { elideStaleToolResults, estimateHistoryTokens, fitHistory, groupTurns, historyBudget } from './context-budget.mjs';
 import { compactTurns } from './compaction.mjs';
+import { shapeObservation } from './observation.mjs';
+import { EditFeedback } from './feedback.mjs';
+import { missingArgumentMessage, missingRequired, normalizeArgs, resolveToolName, unknownToolMessage } from './call-repair.mjs';
 import {
   PROGRESS_FILE, StagnationDetector, fallbackSummary, guardrailSettings, handoffMessage, renderProgress,
   runVerification, stagnationNudge, verificationFeedback, verificationSummary, writeProgressFile,
@@ -58,6 +62,10 @@ function renderToolResult(value, maxChars) {
   try { return truncate(JSON.stringify(value, null, 2), maxChars); } catch { return truncate(String(value), maxChars); }
 }
 
+function withNotes(content, notes) {
+  return notes.length ? `${content}\n\n[Harness] ${notes.join(' ')}` : content;
+}
+
 function isAbort(error, signal) {
   return signal?.aborted || error?.name === 'AbortError' || /aborted|cancelled/i.test(error?.message || '');
 }
@@ -65,7 +73,7 @@ function isAbort(error, signal) {
 export class AgentEngine {
   constructor({
     store, config, logger, eventBus, hooks, providerManager, workspaceManager,
-    indexer, toolRegistry, capabilityController, promptBuilder, contextBuilder, mcpManager, intelligenceRouter, personaManager,
+    indexer, toolRegistry, capabilityController, promptBuilder, contextBuilder, mcpManager, intelligenceRouter, personaManager, lspManager = null,
   }) {
     this.store = store;
     this.config = config;
@@ -82,6 +90,7 @@ export class AgentEngine {
     this.mcpManager = mcpManager;
     this.intelligenceRouter = intelligenceRouter;
     this.personaManager = personaManager;
+    this.feedback = new EditFeedback({ config, lspManager, logger });
     this.active = new Map();
     this.recentCompletions = new Map();
   }
@@ -646,8 +655,13 @@ export class AgentEngine {
           return completed;
         }
 
+        const maxToolChars = this.config.get().maxToolOutputChars;
+        const observation = {
+          budget: modelProfile?.contextWindow ? Math.max(3_000, Math.min(maxToolChars, Math.floor(modelProfile.contextWindow * 4 * 0.1))) : maxToolChars,
+          spill: (text, where) => this.#spill(text, where),
+        };
         const results = await this.#executeToolCalls(response.toolCalls, {
-          run, session, entry, workspacePath, signal, scope, capabilityState,
+          run, session, entry, workspacePath, signal, scope, capabilityState, observation,
         });
         for (const result of results) {
           const toolMessage = {
@@ -743,14 +757,75 @@ export class AgentEngine {
       this.#event(run.id, 'tool-intent', { toolCallId: call.id, tool: call.name, argsHash: sha256(JSON.stringify(call.args || {})) }, scope);
     }
     try {
-      let value;
-      if (this.toolRegistry.has(call.name)) value = await this.toolRegistry.execute(call.name, call.args || {}, toolContext);
-      else if (call.name.startsWith('mcp__')) value = await this.mcpManager.callQualified(call.name, call.args || {}, { workspaceId: run.workspace_id, signal });
-      else throw new Error(`Tool '${call.name}' is not active or does not exist. Search and activate the capability first.`);
-      return { call, content: renderToolResult(value, this.config.get().maxToolOutputChars), isError: false };
+      let name = call.name;
+      let args = call.args || {};
+      const notes = [];
+      if (!name.startsWith('mcp__') || !this.toolRegistry.has(name)) {
+        // A near-miss on the name is resolved here rather than sent back as an error: the error
+        // would cost a whole model turn, and the model already knew which tool it meant.
+        if (!this.toolRegistry.has(name) && !name.startsWith('mcp__')) {
+          const resolved = resolveToolName(name, this.toolRegistry.list({ includeSchema: false }).map((tool) => tool.name));
+          if (!resolved.name) throw new Error(unknownToolMessage(name, resolved.suggestions));
+          notes.push(`"${name}" is not a tool; ran \`${resolved.name}\` instead — use that name next time.`);
+          name = resolved.name;
+        }
+      }
+      if (this.toolRegistry.has(name)) {
+        const schema = this.toolRegistry.descriptor(name)?.inputSchema;
+        const normalized = normalizeArgs(args, schema);
+        args = normalized.args;
+        if (normalized.repairs.length) this.#event(run.id, 'tool-call-repaired', { tool: name, requested: call.name, repairs: normalized.repairs.slice(0, 12) }, scope);
+        const missing = missingRequired(args, schema);
+        if (missing.length) throw new Error(missingArgumentMessage(name, schema, missing, args));
+        const value = await this.toolRegistry.execute(name, args, toolContext);
+        let content = withNotes(await this.#observe(value, context), notes);
+        const check = await this.feedback.check({ name, args, value, workspaceId: run.workspace_id, workspacePath, signal });
+        if (check) {
+          content += `\n\n${check.text}`;
+          this.#event(run.id, 'edit-check', { tool: name, problems: check.problems }, scope);
+        }
+        return { call, content, isError: false, name, args, value };
+      }
+      if (name.startsWith('mcp__')) {
+        const value = await this.mcpManager.callQualified(name, args, { workspaceId: run.workspace_id, signal });
+        return { call, content: await this.#observe(value, context), isError: false, name, args, value };
+      }
+      throw new Error(unknownToolMessage(name, []));
     } catch (error) {
       return { call, content: renderToolResult({ error: error.message, tool: call.name }, this.config.get().maxToolOutputChars), isError: true };
     }
+  }
+
+  // What the model sees of a tool result: noise removed, rendered compactly, kept within what the
+  // model's window can afford, with the complete text saved to disk when something was left out.
+  async #observe(value, context) {
+    const maxChars = this.config.get().maxToolOutputChars;
+    const { observation, workspacePath, run } = context;
+    try {
+      const shaped = await shapeObservation(value, {
+        budget: observation?.budget || maxChars,
+        spill: observation?.spill && workspacePath ? (text) => observation.spill(text, { workspacePath, runId: run.id }) : null,
+      });
+      return shaped.text;
+    } catch {
+      return renderToolResult(value, maxChars);
+    }
+  }
+
+  async #spill(text, { workspacePath, runId }) {
+    const dir = path.join(workspacePath, '.maskshift', 'outputs');
+    await fsp.mkdir(dir, { recursive: true });
+    this.spillCounter = (this.spillCounter || 0) + 1;
+    const file = path.join(dir, `${runId}-${this.spillCounter}.txt`);
+    await fsp.writeFile(file, text);
+    // Bounded: this is a convenience for re-reading, not an archive.
+    const names = (await fsp.readdir(dir).catch(() => [])).filter((name) => name.endsWith('.txt'));
+    if (names.length > 200) {
+      const stats = await Promise.all(names.map(async (name) => ({ name, mtime: (await fsp.stat(path.join(dir, name)).catch(() => null))?.mtimeMs || 0 })));
+      stats.sort((a, b) => a.mtime - b.mtime);
+      await Promise.all(stats.slice(0, names.length - 150).map((entry) => fsp.rm(path.join(dir, entry.name), { force: true })));
+    }
+    return path.relative(workspacePath, file);
   }
 
   #event(runId, type, payload, scope) {

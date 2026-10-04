@@ -1,4 +1,5 @@
 import { registerFilesystemTools } from './filesystem-tools.mjs';
+import { registerSymbolTools } from './symbol-tools.mjs';
 import { registerShellTools } from './shell-tools.mjs';
 import { registerSearchTools } from './search-tools.mjs';
 import { registerGitTools } from './git-tools.mjs';
@@ -22,6 +23,7 @@ import { registerIntelligenceTools } from './intelligence-tools.mjs';
 
 export function registerAllTools(registry, dependencies) {
   registerFilesystemTools(registry, dependencies);
+  registerSymbolTools(registry, dependencies);
   registerShellTools(registry, dependencies);
   registerSearchTools(registry, dependencies);
   registerGitTools(registry, dependencies);

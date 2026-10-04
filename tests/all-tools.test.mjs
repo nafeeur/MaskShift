@@ -80,6 +80,12 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
     await call('fs_patch', { path: 'nested/a.txt', edits: [{ oldText: 'beta', newText: 'gamma' }] }, r => assert.equal(r.applied[0].replacements, 1));
     await call('fs_apply_patch', { patch: '--- a/nested/a.txt\n+++ b/nested/a.txt\n@@ -1,2 +1,2 @@\n alpha\n-gamma\n+delta\n' }, r => assert.equal(r.applied, true));
     assert.equal(await fsp.readFile(path.join(project, 'nested/a.txt'), 'utf8'), 'alpha\ndelta\n');
+    await fsp.writeFile(path.join(project, 'nested/sym.js'), 'export function one() {\n  return 1;\n}\n\nexport function two() {\n  return 2;\n}\n');
+    await call('symbol_read', { path: 'nested/sym.js' }, r => assert.deepEqual(r.symbols.map(s => s.name), ['one', 'two']));
+    await call('symbol_read', { path: 'nested/sym.js', symbol: 'two' }, r => { assert.equal(r.startLine, 5); assert.equal(r.endLine, 7); });
+    await call('symbol_replace', { path: 'nested/sym.js', symbol: 'two', newText: 'export function two() {\n  return 22;\n}' }, r => assert.deepEqual(r.replacedLines, [5, 7]));
+    await call('fs_replace_lines', { path: 'nested/sym.js', startLine: 2, endLine: 2, newText: '  return 11;', expect: 'return 1;' }, r => assert.equal(r.replacedLines, 1));
+    assert.equal(await fsp.readFile(path.join(project, 'nested/sym.js'), 'utf8'), 'export function one() {\n  return 11;\n}\n\nexport function two() {\n  return 22;\n}\n');
     await call('fs_move', { from: 'nested/a.txt', to: 'nested/b.txt' });
     assert.equal(await fsp.readFile(path.join(project, 'nested/b.txt'), 'utf8'), 'alpha\ndelta\n');
     await call('fs_delete', { path: 'nested/b.txt' }, r => assert.equal(r.deleted, true));
