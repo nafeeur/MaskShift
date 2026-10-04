@@ -1,6 +1,6 @@
 # Native Tool Inventory
 
-Generated from the MaskShift 1.4.1 runtime. **193 native tools** are available before plugins or MCP servers add more capabilities.
+Generated from the MaskShift 1.4.1 runtime. **201 native tools** are available before plugins or MCP servers add more capabilities.
 
 Only activated descriptors enter a model request; this document is the complete local catalog.
 
@@ -63,15 +63,17 @@ Only activated descriptors enter a model request; this document is the complete 
 | `browser_type` | write | external-action | Focus an optional CSS selector, type text, and optionally submit with Enter. |
 | `browser_wait_for` | read | normal | Wait for a CSS selector to become visible, hidden, attached, or detached. |
 
-## code-intelligence (10)
+## code-intelligence (12)
 
 | Tool | Access | Risk | Description |
 |---|---|---|---|
+| `lsp_code_actions` | write | write | List the refactors and quick fixes the language server offers at a position or range (fix this error, extract a function, add a missing import…) and optionally apply one by index, by title, or the preferred one. Prefer this over hand-editing for mechanical refactors. |
 | `lsp_definition` | read | normal | Resolve the definition location for a symbol at a source position. |
 | `lsp_diagnostics` | read | normal | Return language-server errors, warnings, hints, and related information for a file. |
 | `lsp_discover` | read | normal | Detect installed language servers for TypeScript, Python, C/C++, Rust, Go, Java, Ruby, Lua, JSON, HTML, CSS, and YAML. |
 | `lsp_format` | write | write | Ask the language server to format a document and optionally apply the edits. |
 | `lsp_hover` | read | normal | Get type, signature, and documentation information at a 1-based source position. |
+| `lsp_organize_imports` | write | write | Sort and prune a file's imports with the language server. |
 | `lsp_references` | read | normal | Find language-aware references for a symbol at a source position. |
 | `lsp_rename` | write | write | Compute and optionally apply a workspace-wide language-aware symbol rename. |
 | `lsp_status` | read | normal | List active workspace language server processes and capabilities. |
@@ -130,7 +132,7 @@ Only activated descriptors enter a model request; this document is the complete 
 | `symbol_replace` | write | write | Replace one definition by name with new source. You supply only the new text; the old text is located for you, so it never has to be reproduced exactly. Use Class.method for methods. |
 | `text_stats` | read | normal | Report line, word, and byte counts for one or more text files (like wc) without spending context on their contents — use before deciding whether to read a file in full. |
 
-## fleet (8)
+## fleet (9)
 
 | Tool | Access | Risk | Description |
 |---|---|---|---|
@@ -142,6 +144,7 @@ Only activated descriptors enter a model request; this document is the complete 
 | `fleet_send` | write | state | Queue a message from one member (or you) to another, or to="*" for everyone, without running anyone yet. It is delivered the next time the recipient takes a turn. |
 | `fleet_spawn` | write | agent | Create a persistent, named fleet member backed by claude, codex, opencode, hermes, copilot, aider, any configured custom bridge, or maskshift (the built-in engine). Several members may share a harness. Members keep their history and inbox between turns and can message each other. Use isolated=true to give an editing member its own Git worktree. |
 | `fleet_stop` | write | agent | Cancel a member's current turn, optionally removing it from the fleet. With no name, cancels every member and running relay. |
+| `fleet_suggest` | read | normal | Rank the installed agent harnesses (Claude Code, Codex, OpenCode, Hermes, …) for a task by how each has actually done on similar tasks before, with the evidence behind the ranking. |
 
 ## git (10)
 
@@ -167,6 +170,16 @@ Only activated descriptors enter a model request; this document is the complete 
 | `user_ask` | read | normal | Ask the person for a short piece of free text (a delivery address, a date, a preference) and return it. Never use it for passwords or codes; browser_login handles those. |
 | `user_choose` | read | normal | Show a short list of options and return the person's choice. Use it instead of guessing when a decision belongs to them. |
 | `user_confirm` | read | normal | Ask a yes/no question before something irreversible, such as paying or sending, and return the answer. Include the facts they need to decide (item, total, address). |
+
+## learning (5)
+
+| Tool | Access | Risk | Description |
+|---|---|---|---|
+| `learn_forget` | write | write | Remove one learned lesson or preference by id (from learn_status). Use it when something MaskShift learned is wrong or no longer applies. |
+| `learn_status` | read | normal | Show what MaskShift has learned from its own runs on this machine: lessons from earlier runs, preferences noticed from your messages, how each model and harness has done on which kinds of task, workflows it could turn into skills, and how well context was used. |
+| `router_explain` | read | normal | Show how MaskShift would route a task: the models and the installed agent harnesses ranked by how they have actually done on similar tasks (success rate, cost), and how much evidence is behind each. |
+| `skill_mine` | write | state | Look through recent runs for sequences of steps repeated across several runs that mostly went well, and draft a skill for each. Nothing is installed until skill_mine_accept. |
+| `skill_mine_accept` | write | write | Install a skill drafted by skill_mine (by name or id), or dismiss it so it is not suggested again. |
 
 ## mcp (11)
 

@@ -57,7 +57,8 @@ export class ContextBuilder {
     const validatedMemories = await this.contextPlanner.validateMemories(rawMemories, workspace.path);
     const planned = this.contextPlanner.select({ prompt, repoHits: rawRepoHits, memories: validatedMemories, budgets });
     const repoHits = planned.repoHits;
-    const memories = planned.memories;
+    // Lessons and preferences are shown in their own sections, so the generic memory list leaves them out.
+    const memories = planned.memories.filter((memory) => !['lesson', 'fact', 'preference'].includes(memory.meta?.kind));
     const graphStats = graphEnabled ? this.codeGraph?.stats(workspaceId) : { enabled: false, nodes: 0, edges: 0 };
     let impact = null;
     if (graphEnabled && graphStats?.nodes) {
@@ -79,6 +80,8 @@ export class ContextBuilder {
       truncate(treeSection, budgets.tree),
     ];
     if (instructions.length) sections.push(truncate(`## Hierarchical repository instructions\n${instructions.map((item) => `### ${path.relative(workspace.path, item.path) || path.basename(item.path)}\n${item.content}`).join('\n\n')}`, budgets.instructions));
+    const learned = this.learning?.contextSections({ workspaceId, prompt, hasHistory: Boolean(sessionId && this.store.listMessages(sessionId, 3).length > 1) }) || { text: '', notes: [], ids: { lessons: [], preferences: [] } };
+    if (learned.text) sections.push(learned.text);
     if (memories.length) sections.push(`## Relevant persistent memory\n${memories.map((item) => `### ${item.title} [${item.scope}]\n${item.content}\nTags: ${(item.tags || []).join(', ')}`).join('\n\n')}`);
     if (impact?.files?.length) sections.push(`## Predicted change impact\nTargets: ${impact.targets.join(', ')}\nAffected files: ${impact.files.slice(0, 40).join(', ')}\nLikely tests: ${impact.tests.join(', ') || '(none identified)'}`);
     if (repoHits.length) sections.push(`## Retrieved source context\n${renderHits(repoHits)}`);
@@ -86,7 +89,7 @@ export class ContextBuilder {
 
     const totalBudget = Object.values(budgets).reduce((sum, value) => sum + value, 0);
     return {
-      workspace, inspection, tree, instructions, repoHits, memories, impact, indexStats, graphStats,
+      workspace, inspection, tree, instructions, repoHits, memories, impact, indexStats, graphStats, learned,
       contextPlan: { profile, ...planned.report },
       text: truncate(sections.join('\n\n'), Math.min(Math.floor(this.config.get().maxContextChars * 0.72), totalBudget)),
     };

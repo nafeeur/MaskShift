@@ -121,6 +121,17 @@ export function defaultConfig() {
     fleet: {},
     // Disk use. Every limit is worked out from this machine (disk size and free space, memory) unless set here; see
     // docs/STORAGE.md. null = derive it. auto:false turns the background upkeep off (maskshift storage prune still works).
+    // What MaskShift learns from its own runs, and how it decides when to ask or stop; see docs/LEARNING.md. Everything is on by
+    // default and local to this machine. enabled:false switches the whole layer off.
+    learning: {
+      enabled: true, lessons: true, preferences: true, prefetch: true, consolidate: true,
+      routing: { learned: true, escalate: true, maxEscalations: 1, explore: 0.1, costWeight: 0.15, minEvidence: 3 },
+      skills: { mine: true, minRuns: 3, autoAccept: false },
+      context: { adapt: true },
+      progress: { enabled: true, warnAfter: 8, stopAfter: 16, errorStreak: 5 },
+      uncertainty: { mode: 'guard', headless: 'block', ambiguity: true },
+      tools: { cache: true, batch: true },
+    },
     storage: {
       auto: true, maxGb: null, indexMaxMb: null, indexMaxFiles: null, staleIndexDays: null,
       keepCheckpoints: null, checkpointMaxAgeDays: null, runEventDays: null,
@@ -262,6 +273,15 @@ function mergeConfig(base, override) {
   merged.agentBridges = { ...base.agentBridges, ...(override?.agentBridges || {}) };
   merged.fleet = { ...base.fleet, ...(override?.fleet || {}) };
   merged.storage = { ...base.storage, ...(override?.storage || {}) };
+  merged.learning = {
+    ...base.learning, ...(override?.learning || {}),
+    routing: { ...base.learning?.routing, ...(override?.learning?.routing || {}) },
+    skills: { ...base.learning?.skills, ...(override?.learning?.skills || {}) },
+    context: { ...base.learning?.context, ...(override?.learning?.context || {}) },
+    progress: { ...base.learning?.progress, ...(override?.learning?.progress || {}) },
+    uncertainty: { ...base.learning?.uncertainty, ...(override?.learning?.uncertainty || {}) },
+    tools: { ...base.learning?.tools, ...(override?.learning?.tools || {}) },
+  };
   merged.automations = { ...base.automations, ...(override?.automations || {}) };
   merged.browser = { ...base.browser, ...(override?.browser || {}) };
   merged.indexing = { ...base.indexing, ...(override?.indexing || {}) };

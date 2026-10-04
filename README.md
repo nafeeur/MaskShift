@@ -39,7 +39,7 @@ recurring report. The model is a line of configuration; the tools are the same w
 - **Reliable tool use.** Near-miss tool names and arguments are repaired in code, edits tolerate
   whitespace and indentation drift, tool output is cleaned and fitted to the model's window, and every
   file edit is checked immediately. → [run guardrails](docs/CONFIGURATION.md#run-guardrails)
-- **Loaded on demand.** 193 native tools, 50 skills and any number of MCP servers are available, but
+- **Loaded on demand.** 201 native tools, 50 skills and any number of MCP servers are available, but
   only what the current step needs enters the model's context.
   → [tools](docs/TOOLS.md) · [skills](docs/SKILLS.md)
 - **Controlled by design.** Automatic checkpoints before each run, an append-only audit log, and three
@@ -49,6 +49,10 @@ recurring report. The model is a line of configuration; the tools are the same w
   ever seeing them, and CAPTCHAs are handed to you in the live Browser view. → [web tasks](docs/WEB_TASKS.md)
 - **Remembers and improves.** Persistent memory that notices when its sources change, reusable skills,
   and skill upgrades promoted only after measured A/B trials.
+- **Learns from its own runs.** Routes tasks to the model or agent with the best record on that kind of work (and
+  moves a stuck run up to the next candidate), remembers what failed and what fixed it, notices how you want things done,
+  turns repeated workflows into skills, asks before irreversible commands, and stops a run that is going nowhere with a
+  plain report. Local, visible and removable. → [learning](docs/LEARNING.md)
 - **Keeps its disk use in check.** Indexing, checkpoints, logs and the database stay inside a budget worked out
   from your machine's disk and memory, shrinking retention as free space gets scarce, and never touching your chats,
   memory or files. → [disk use](docs/STORAGE.md)

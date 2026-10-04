@@ -51,7 +51,8 @@ export class ContextPlanner {
       tree: configured.tree ?? 0.10,
       instructions: configured.instructions ?? 0.16,
       memories: configured.memories ?? 0.12,
-      source: profile === 'conversational' ? 0 : (configured.source ?? 0.42),
+      // The source share is nudged by how much of it past runs of this kind actually used (see learning/context-feedback.mjs).
+      source: profile === 'conversational' ? 0 : (configured.source ?? 0.42) * (this.learnedMultiplier?.(profile) ?? 1),
       reserve: configured.reserve ?? 0.08,
     };
     const budgets = allocate(total, weights);

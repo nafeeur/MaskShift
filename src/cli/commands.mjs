@@ -1359,6 +1359,135 @@ const storageCommands = {
   },
 };
 
+// ------------------------------------------------------------------- learning
+
+const pct = (value) => (value === null || value === undefined ? '—' : `${Math.round(value * 100)}%`);
+
+const learnCommands = {
+  status: {
+    usage: 'learn status',
+    summary: 'What MaskShift has learned on this machine: lessons, preferences, how models and harnesses have done',
+    async run(context) {
+      const workspace = await resolveWorkspace(context);
+      const status = context.runtime.learningManager.status({ workspaceId: workspace.id });
+      if (context.ui.emit(status)) return;
+      context.ui.fields([
+        ['runs learned from', String(status.runs)], ['lessons', String(status.lessons.length)],
+        ['preferences', `${status.preferences.length} (${status.preferences.filter((item) => item.active).length} active)`],
+        ['skills proposed', String(status.skills.filter((item) => item.status === 'proposed').length)],
+      ]);
+      if (status.executors.length) {
+        context.ui.section('track record');
+        context.ui.table([
+          { key: 'executor', label: 'who' }, { key: 'runs', label: 'runs', align: 'right' },
+          { key: 'rate', label: 'succeeded', align: 'right', value: (row) => pct(row.rate) },
+          { key: 'cost', label: 'avg cost', align: 'right', value: (row) => (row.runs && row.cost ? `$${(row.cost / row.runs).toFixed(3)}` : '—') },
+        ], status.executors.slice(0, 12));
+      } else context.ui.info('Nothing learned yet. It builds up as you use MaskShift.');
+    },
+  },
+  lessons: {
+    usage: 'learn lessons',
+    summary: 'Lessons learned from earlier runs, with how often each was shown and how those runs went',
+    async run(context) {
+      const workspace = await resolveWorkspace(context);
+      const lessons = context.runtime.learningManager.lessons.list({ workspaceId: workspace.id });
+      if (context.ui.emit(lessons)) return;
+      if (!lessons.length) { context.ui.info('No lessons yet.'); return; }
+      context.ui.table([
+        { key: 'id', label: 'id', max: 14 }, { key: 'kind', label: 'kind' }, { key: 'text', label: 'lesson', max: 70 },
+        { key: 'occurrences', label: 'seen', align: 'right' }, { key: 'shown', label: 'shown', align: 'right' },
+        { key: 'confidence', label: 'trust', align: 'right', value: (row) => pct(row.confidence) },
+      ], lessons);
+    },
+  },
+  preferences: {
+    usage: 'learn preferences',
+    summary: 'Preferences noticed from your messages ("always…", "never…", "use X instead of Y")',
+    async run(context) {
+      const workspace = await resolveWorkspace(context);
+      const items = context.runtime.learningManager.preferences.list({ workspaceId: workspace.id });
+      if (context.ui.emit(items)) return;
+      if (!items.length) { context.ui.info('No preferences noticed yet.'); return; }
+      context.ui.table([
+        { key: 'id', label: 'id', max: 14 }, { key: 'text', label: 'preference', max: 70 }, { key: 'scope', label: 'scope' },
+        { key: 'occurrences', label: 'said', align: 'right' },
+        { key: 'active', label: 'in use', value: (row) => (row.active ? 'yes' : 'not yet'), tone: (row, theme) => (row.active ? theme.roles.success : theme.roles.muted) },
+      ], items);
+    },
+  },
+  forget: {
+    usage: 'learn forget ID...',
+    summary: 'Remove a learned lesson or preference',
+    run(context) {
+      if (!context.positional.length) throw new Error('Missing required argument: ID');
+      const out = context.positional.map((id) => context.runtime.learningManager.forget(id));
+      if (context.ui.emit(out)) return;
+      for (const item of out) context.ui.ok(`Forgot ${item.kind}: ${oneLine(item.text, 80)}`);
+    },
+  },
+  skills: {
+    usage: 'learn skills [mine|accept NAME|dismiss NAME]',
+    summary: 'Workflows repeated across your runs, drafted as skills. Nothing is installed until you accept it',
+    async run(context) {
+      const workspace = await resolveWorkspace(context);
+      const { miner } = context.runtime.learningManager;
+      const [action, name] = context.positional;
+      if (action === 'accept') {
+        const skill = await miner.accept(workspace.id, name);
+        if (context.ui.emit(skill)) return;
+        context.ui.ok(`Installed skill ${skill.name || name}`);
+        return;
+      }
+      if (action === 'dismiss') {
+        const item = miner.dismiss(workspace.id, name);
+        if (context.ui.emit(item)) return;
+        context.ui.ok(`Dismissed ${item.name}`);
+        return;
+      }
+      const found = action === 'mine' || !miner.candidates(workspace.id).length ? miner.mine({ workspaceId: workspace.id }) : miner.candidates(workspace.id);
+      if (context.ui.emit(found)) return;
+      if (!found.length) { context.ui.info('No repeated workflows found yet. They need to show up in at least three runs.'); return; }
+      context.ui.table([
+        { key: 'name', label: 'skill' }, { key: 'status', label: 'status' }, { key: 'support', label: 'runs', align: 'right' },
+        { key: 'successRate', label: 'went well', align: 'right', value: (row) => pct(row.successRate) },
+        { key: 'steps', label: 'steps', max: 50, value: (row) => row.steps.map((step) => step.replace(/^shell:/, '')).join(' → ') },
+      ], found);
+      context.ui.info('Install one with: maskshift learn skills accept NAME');
+    },
+  },
+  routing: {
+    usage: 'learn routing TASK...',
+    summary: 'How a task would be routed: models and installed agent harnesses ranked by their record on similar tasks',
+    async run(context) {
+      const task = context.positional.join(' ');
+      if (!task) throw new Error('Missing required argument: TASK');
+      const workspace = await resolveWorkspace(context);
+      const { intelligenceRouter, config } = context.runtime;
+      const model = intelligenceRouter.routeModel(task, { workspaceId: workspace.id, fallback: config.get().defaultModel });
+      const agent = await intelligenceRouter.routeAgent(task, { workspaceId: workspace.id });
+      if (context.ui.emit({ model, agent })) return;
+      context.ui.section(`task looks like: ${model.taskProfile.tags.join(', ')} (${model.taskProfile.complexity})`);
+      context.ui.fields([['model', model.selected], ['why', model.reason], ['agent', `${agent.selected.type}:${agent.selected.name}`], ['why', agent.reason]]);
+      for (const line of [...model.explanation, ...agent.ranking]) context.ui.bullet(line);
+    },
+  },
+  consolidate: {
+    usage: 'learn consolidate [--apply]',
+    summary: 'Merge memories that say the same thing in different words (a dry run unless --apply)',
+    async run(context) {
+      const { store } = context.runtime;
+      const { planConsolidation, applyConsolidation } = await import('../learning/consolidate.mjs');
+      const plans = planConsolidation(store.listMemories({ limit: 5000 }));
+      const merged = context.args.apply ? applyConsolidation(store, plans) : 0;
+      if (context.ui.emit({ applied: Boolean(context.args.apply), groups: plans.length, merged, plans })) return;
+      if (!plans.length) { context.ui.ok('Nothing to merge'); return; }
+      context.ui.table([{ key: 'title', label: 'keeps', max: 44 }, { key: 'mergedIds', label: 'absorbs', align: 'right', value: (row) => row.mergedIds.length }], plans);
+      if (context.args.apply) context.ui.ok(`Merged ${merged} memories`); else context.ui.info('Run with --apply to merge them.');
+    },
+  },
+};
+
 export const GROUPS = {
   workspace: { title: 'Workspace', commands: workspaceCommands, defaultCommand: 'info' },
   session: { title: 'Chats', commands: sessionCommands, defaultCommand: 'list' },
@@ -1369,6 +1498,7 @@ export const GROUPS = {
   mcp: { title: 'MCP network', commands: mcpCommands, defaultCommand: 'list' },
   fleet: { title: 'Agent fleet', commands: fleetCommands, defaultCommand: 'list' },
   storage: { title: 'Disk use', commands: storageCommands, defaultCommand: 'status' },
+  learn: { title: 'Learning', commands: learnCommands, defaultCommand: 'status' },
   plugins: { title: 'Plugins', commands: pluginCommands, defaultCommand: 'list' },
   automation: { title: 'Automations', commands: automationCommands, defaultCommand: 'list' },
   browser: { title: 'Browser', commands: browserCommands, defaultCommand: 'list' },

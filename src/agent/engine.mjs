@@ -8,6 +8,11 @@ import { compactTurns } from './compaction.mjs';
 import { shapeObservation } from './observation.mjs';
 import { EditFeedback, EDIT_TOOLS } from './feedback.mjs';
 import { CapabilityRegistry } from './capability-profile.mjs';
+import { ToolCache, planBatches } from './tool-cache.mjs';
+import { ProgressMonitor, progressSettings, stuckNudge } from '../learning/progress.mjs';
+import { assessCall } from '../learning/uncertainty.mjs';
+import { emptyState, extractState, renderState } from '../learning/state.mjs';
+import { commandKey, pathsOf } from '../learning/trace.mjs';
 import { missingArgumentMessage, missingRequired, normalizeArgs, resolveToolName, unknownToolMessage } from './call-repair.mjs';
 import {
   PROGRESS_FILE, StagnationDetector, fallbackSummary, guardrailSettings, handoffMessage, renderProgress,
@@ -76,6 +81,7 @@ export class AgentEngine {
   constructor({
     store, config, logger, eventBus, hooks, providerManager, workspaceManager,
     indexer, toolRegistry, capabilityController, promptBuilder, contextBuilder, mcpManager, intelligenceRouter, personaManager, lspManager = null,
+    learning = null, interaction = null,
   }) {
     this.store = store;
     this.config = config;
@@ -94,6 +100,8 @@ export class AgentEngine {
     this.personaManager = personaManager;
     this.feedback = new EditFeedback({ config, lspManager, logger });
     this.capabilities = new CapabilityRegistry({ store });
+    this.learning = learning;
+    this.interaction = interaction;
     this.active = new Map();
     this.recentCompletions = new Map();
   }
@@ -376,7 +384,7 @@ export class AgentEngine {
       let modelProfile = await this.providerManager.modelProfile(run.model_id).catch(() => null);
       // How much help this model gets: measured, else observed, else a prior from its size; and it
       // can rise during the run if the model keeps stumbling.
-      const scaffold = this.capabilities.begin(modelProfile?.ref || run.model_id, modelProfile, {
+      let scaffold = this.capabilities.begin(modelProfile?.ref || run.model_id, modelProfile, {
         onChange: (change) => this.#event(run.id, 'scaffold-level', change, scope),
       });
       entry.scaffold = scaffold;
@@ -392,6 +400,22 @@ export class AgentEngine {
       const capabilityState = this.capabilityController.createState({ runId: run.id, workspaceId: run.workspace_id });
       entry.capabilityState = capabilityState;
       await this.capabilityController.autoPrime(capabilityState, run.prompt);
+
+      // What the learning layer put in front of the model, remembered on the run so that afterwards each lesson can be
+      // credited (or not) with how the run went; plus the run-scoped helpers the tool path uses.
+      const learnedContext = workspaceContext.learned || { notes: [], ids: { lessons: [], preferences: [] } };
+      if (learnedContext.ids.lessons.length || learnedContext.ids.preferences.length) {
+        this.store.updateRun(run.id, { meta: { ...this.store.getRun(run.id).meta, learned: { lessonIds: learnedContext.ids.lessons, preferenceIds: learnedContext.ids.preferences } } });
+      }
+      const learningSettings = this.learning?.settings();
+      entry.toolCache = new ToolCache({ enabled: learningSettings?.tools.cache !== false });
+      entry.readInRun = new Set();
+      entry.approved = new Set();
+      entry.prefetched = new Set();
+      const progressConfig = progressSettings(this.config.get());
+      const progress = learningSettings?.enabled === false || !progressConfig.enabled ? null : new ProgressMonitor(progressConfig);
+      const triedModels = [run.model_id];
+      let escalations = 0;
 
       // The whole session, not a recent slice: fitHistory and compaction decide what fits, so
       // nothing older silently disappears without being summarized first.
@@ -426,6 +450,8 @@ export class AgentEngine {
         throughMessageId: savedCompaction.throughMessageId || null,
         forced: Boolean(savedCompaction.forced && forcedCut >= 0),
         lastFailedStep: -Infinity,
+        // Files, commands and errors read straight off the tool calls: survives a summary that fails or loses detail.
+        state: savedCompaction.state || emptyState(),
       };
       let overflowRetries = 0;
 
@@ -457,7 +483,7 @@ export class AgentEngine {
         contextResets += 1;
         const progress = renderProgress({
           runId: run.id, prompt: run.prompt, planState: entry.planState,
-          summary: compacted.usage ? compacted.summary : fallbackSummary(history),
+          summary: `${compacted.usage ? compacted.summary : fallbackSummary(history)}\n\n${renderState(extractState(history, compaction.state))}`.trim(),
           verification: lastVerification ? verificationSummary(lastVerification) : null,
           workingTree: tree?.code === 0 ? tree.stdout.trim() : '',
           resets: contextResets,
@@ -479,6 +505,33 @@ export class AgentEngine {
         this.#event(run.id, 'context-reset', { resets: contextResets, file, summarized: Boolean(compacted.usage) }, scope);
       };
 
+      // A run that was routed automatically and cannot get there with the model it started on is handed to the next-best
+      // candidate for this kind of task, mid-run, with everything it has learned so far. Never for a model the user chose.
+      const tryEscalate = async (reason) => {
+        const routing = this.learning?.settings().routing;
+        const route = this.store.getRun(run.id).meta?.route;
+        if (!routing?.escalate || !route || escalations >= routing.maxEscalations) return false;
+        const next = this.intelligenceRouter.escalation(route, triedModels);
+        if (!next) return false;
+        try { if (scaffoldController) this.capabilities.record(scaffoldRef, scaffoldController.summary()); } catch { /* the record is advisory */ }
+        const before = this.store.getRun(run.id);
+        triedModels.push(next.model);
+        escalations += 1;
+        this.store.updateRun(run.id, { model_id: next.model, meta: { ...before.meta, escalatedFrom: before.model_id, escalations } });
+        this.store.updateSession(session.id, { model_id: next.model });
+        modelProfile = await this.providerManager.modelProfile(next.model).catch(() => null);
+        scaffold = this.capabilities.begin(modelProfile?.ref || next.model, modelProfile, { onChange: (change) => this.#event(run.id, 'scaffold-level', change, scope) });
+        entry.scaffold = scaffold;
+        scaffoldRef = modelProfile?.ref || next.model;
+        scaffoldController = scaffold;
+        detector.reset();
+        progress?.reset(step);
+        const note = `[Harness notice] ${next.reason} You are continuing this task from where it stopped (${reason}). Do not start over: use the history and working state here, and take a different approach to whatever was failing.\n\n${renderState(extractState(history, compaction.state))}`;
+        remember({ role: 'user', content: note }, this.store.addMessage({ sessionId: session.id, role: 'user', content: note, meta: { runId: run.id, synthetic: true, escalation: escalations } }));
+        this.#event(run.id, 'escalated', { from: before.model_id, to: next.model, reason }, scope);
+        return true;
+      };
+
       while (step < maxSteps) {
         if (signal.aborted) throw signal.reason || new Error('Run cancelled');
         while (entry.steering.length) {
@@ -492,7 +545,7 @@ export class AgentEngine {
         this.store.updateRun(run.id, { step_count: step });
         const currentRun = this.store.getRun(run.id);
         const currentSession = this.store.getSession(session.id);
-        const system = this.promptBuilder.system({ workspaceContext, capabilityState, planState: entry.planState, run: currentRun, session: currentSession, modelProfile, knobs: scaffold.knobs });
+        const system = this.promptBuilder.system({ workspaceContext, capabilityState, planState: entry.planState, run: currentRun, session: currentSession, modelProfile, knobs: scaffold.knobs, notes: learnedContext.notes });
         const tools = compactToolsFor(scaffold.knobs, await this.capabilityController.descriptors(capabilityState), capabilityState);
         this.#event(run.id, 'model-turn', { step, tools: tools.map((tool) => tool.name), skillCount: capabilityState.skills.size }, scope);
         const maxTokens = entry.options.maxTokens || modelProfile?.maxOutputTokens || 16_384;
@@ -522,6 +575,7 @@ export class AgentEngine {
             const positionOf = (turn) => positions.get(messageIds.get(turn.at(-1))) ?? -1;
             const coveredThrough = compaction.throughMessageId ? (positions.get(compaction.throughMessageId) ?? -1) : -1;
             const newlyDropped = fitted.droppedTurns.filter((turn) => positionOf(turn) > coveredThrough);
+            if (newlyDropped.length) compaction.state = extractState(newlyDropped.flat(), compaction.state);
             if (newlyDropped.length && step - compaction.lastFailedStep >= 5) {
               await this.hooks?.run('PreCompact', { ...scope, workspacePath, omittedTurns: fitted.omitted, droppedTurns: newlyDropped, previousSummary: compaction.summary });
               const compacted = await compactTurns(this.providerManager, {
@@ -533,7 +587,7 @@ export class AgentEngine {
                 compaction.throughMessageId = messageIds.get(newlyDropped.at(-1).at(-1)) || compaction.throughMessageId;
                 const sessionMeta = this.store.getSession(session.id)?.meta || {};
                 this.store.updateSession(session.id, {
-                  meta: { ...sessionMeta, compaction: { summary: compaction.summary, throughMessageId: compaction.throughMessageId, forced: compaction.forced, updatedAt: nowIso() } },
+                  meta: { ...sessionMeta, compaction: { summary: compaction.summary, state: compaction.state, throughMessageId: compaction.throughMessageId, forced: compaction.forced, updatedAt: nowIso() } },
                 });
                 usage.push(compacted.usage);
                 costs.push(tagCost(estimateUsageCost(this.config.get(), compacted.providerId, compacted.providerType, compacted.model, compacted.usage), 'compaction'));
@@ -545,9 +599,10 @@ export class AgentEngine {
             // fitted.history[0] is fitHistory's own generic "(N turns omitted)" placeholder —
             // replaced with the real summary when there is one, so the model keeps the concrete
             // facts from those turns instead of just being told they existed.
-            if (compaction.summary) {
+            const stateText = renderState(compaction.state);
+            if (compaction.summary || stateText) {
               outboundHistory = [
-                { role: 'user', content: `[Summary of ${fitted.omitted} earlier turn${fitted.omitted === 1 ? '' : 's'}, dropped to fit this model's context window]\n\n${compaction.summary}` },
+                { role: 'user', content: `[Summary of ${fitted.omitted} earlier turn${fitted.omitted === 1 ? '' : 's'}, dropped to fit this model's context window]\n\n${[compaction.summary, stateText].filter(Boolean).join('\n\n')}` },
                 ...fitted.history.slice(1),
               ];
             }
@@ -641,12 +696,21 @@ export class AgentEngine {
           }, scope);
           if (outcome.ok) {
             unverifiedChanges = false;
+            progress?.verificationPassed(step);
           } else if (verificationAttempts < guardrails.verification.maxAttempts) {
             scaffold.signal('verification-fail');
             const feedback = verificationFeedback(outcome, { attempt: verificationAttempts, maxAttempts: guardrails.verification.maxAttempts });
             remember({ role: 'user', content: feedback }, this.store.addMessage({
               sessionId: session.id, role: 'user', content: feedback, meta: { runId: run.id, synthetic: true, verification: verificationAttempts },
             }));
+            turnSource = 'verification';
+            continue;
+          } else if (await tryEscalate(`verification was still failing after ${verificationAttempts} attempts`)) {
+            const feedback = verificationFeedback(outcome, { attempt: verificationAttempts, maxAttempts: guardrails.verification.maxAttempts });
+            remember({ role: 'user', content: feedback }, this.store.addMessage({
+              sessionId: session.id, role: 'user', content: feedback, meta: { runId: run.id, synthetic: true, verification: verificationAttempts },
+            }));
+            verificationAttempts = 0;
             turnSource = 'verification';
             continue;
           } else {
@@ -705,16 +769,35 @@ export class AgentEngine {
           if (result.value?.applied?.some?.((entry) => entry.matchedBy)) stumbled.push('fuzzy-edit');
           if (result.checkProblems) stumbled.push('edit-problem');
           scaffold.result(stumbled);
-          if (guardrails.stagnation.enabled) detector.observe(result.call, result);
+          // A repeat answered from the cache is still a repeat: it is judged by the original result, not the note about it.
+          if (guardrails.stagnation.enabled) detector.observe(result.call, { ...result, content: result.signatureContent ?? result.content });
         }
+        progress?.observe(step, results);
 
         // A model that needs more help is also given less rope before the harness steps in.
         detector.repeatThreshold = Math.min(guardrails.stagnation.repeatThreshold, scaffold.knobs.stagnationRepeat);
         detector.stopThreshold = Math.max(detector.repeatThreshold + 1, guardrails.stagnation.stopThreshold);
         const finding = guardrails.stagnation.enabled ? detector.check() : null;
         if (finding?.level === 'stop') {
+          if (await tryEscalate(`it kept repeating ${finding.tool || 'the same action'} with the same result`)) continue;
           stagnated = finding;
           break;
+        }
+        // Busy but not getting anywhere is a different failure from repeating itself: see learning/progress.mjs.
+        const stuck = finding ? null : progress?.check(step);
+        if (stuck?.level === 'stop') {
+          this.#event(run.id, 'stuck', { level: 'stop', ...stuck }, scope);
+          if (await tryEscalate(stuck.reason)) continue;
+          stagnated = { count: stuck.turns, reason: 'no-progress', tool: null, detail: stuck.reason, report: progress.report(stuck) };
+          break;
+        }
+        if (stuck?.level === 'warn') {
+          const nudge = stuckNudge(stuck);
+          remember({ role: 'user', content: nudge }, this.store.addMessage({
+            sessionId: session.id, role: 'user', content: nudge, meta: { runId: run.id, synthetic: true, stuck: stuck.turns },
+          }));
+          turnSource = 'nudge';
+          this.#event(run.id, 'stuck', { level: 'warn', ...stuck }, scope);
         }
         if (finding?.level === 'warn') {
           const nudge = stagnationNudge(finding);
@@ -727,10 +810,16 @@ export class AgentEngine {
         }
       }
 
-      const message = stagnated
+      const message = stagnated?.reason === 'no-progress'
+        ? `Run stopped: ${stagnated.detail}.`
+        : stagnated
         ? `Run stopped after ${stagnated.count} repeated ${stagnated.reason === 'oscillation' ? 'alternating ' : ''}actions with no change in result${stagnated.tool ? ` (${stagnated.tool})` : ''}.`
         : `Run reached the configured maximum of ${maxSteps} model turns.`;
-      if (!finalContent) {
+      if (stagnated?.report) {
+        // Say plainly what was tried and what is needed, rather than leaving the last mid-work message as the answer.
+        finalContent = stagnated.report;
+        this.store.addMessage({ sessionId: session.id, role: 'assistant', content: stagnated.report, meta: { runId: run.id, synthetic: true, stuck: true } });
+      } else if (!finalContent) {
         finalContent = message;
         this.store.addMessage({ sessionId: session.id, role: 'assistant', content: message, meta: { runId: run.id, synthetic: true } });
       }
@@ -764,19 +853,70 @@ export class AgentEngine {
       try { if (scaffoldController) this.capabilities.record(scaffoldRef, scaffoldController.summary()); } catch (error) { this.logger.warn('Could not record model track record', { error: error.message }); }
       if (sessionEndOutcome) {
         await this.hooks?.run('SessionEnd', { ...scope, workspacePath, ...sessionEndOutcome }).catch(() => {});
+        // What this run taught: its outcome, lessons, preferences. In the background, and never able to change the result.
+        void this.learning?.afterRun(run.id);
       }
     }
   }
 
   async #executeToolCalls(calls, context) {
-    const allReadOnly = calls.every((call) => {
-      const descriptor = this.toolRegistry.descriptor(call.name);
-      return descriptor?.readOnly === true;
-    });
-    if (allReadOnly && calls.length > 1) return Promise.all(calls.map((call) => this.#executeToolCall(call, context)));
+    const readOnly = (call) => this.toolRegistry.descriptor(call.name)?.readOnly === true;
     const results = [];
-    for (const call of calls) results.push(await this.#executeToolCall(call, context));
+    if (this.learning && this.learning.settings().tools.batch === false) {
+      if (calls.length > 1 && calls.every(readOnly)) return Promise.all(calls.map((call) => this.#executeToolCall(call, context)));
+      for (const call of calls) results.push(await this.#executeToolCall(call, context));
+      return results;
+    }
+    // Reads that follow one another run together; anything that may change something runs alone and in the order asked,
+    // so a write is still visible to every read after it. Identical calls within a group run once.
+    for (const batch of planBatches(calls, readOnly)) {
+      if (!batch.parallel || batch.calls.length === 1) {
+        for (const call of batch.calls) results.push(await this.#executeToolCall(call, context));
+        continue;
+      }
+      const shared = new Map();
+      const pending = batch.calls.map((call) => {
+        const key = `${call.name}:${JSON.stringify(call.args || {})}`;
+        if (!shared.has(key)) shared.set(key, this.#executeToolCall(call, context));
+        return shared.get(key).then((result) => ({ ...result, call }));
+      });
+      results.push(...await Promise.all(pending));
+    }
     return results;
+  }
+
+  /**
+   * Before a risky call in the autonomous mode: ask, or say why not. Returns { blocked } to refuse, { note } to proceed with a
+   * caution attached, or {} to proceed. See learning/uncertainty.mjs for what counts as risky.
+   */
+  async #guard({ name, args, entry, workspacePath, signal, run }) {
+    const settings = this.learning?.settings();
+    if (!settings || settings.enabled === false || settings.uncertainty.mode === 'off') return {};
+    // The other permission modes already ask about these tiers; this exists for the mode that asks about nothing.
+    if (this.config.get().permissionMode !== 'autonomous') return {};
+    const assessment = assessCall({ name, args, workspacePath, readInRun: entry.readInRun });
+    if (assessment.level === 'none') return {};
+    const what = assessment.reasons.join('; ');
+    const key = `${name}:${name === 'shell_exec' ? commandKey(args.command) + ':' + String(args.command).slice(0, 200) : JSON.stringify(args).slice(0, 200)}`;
+    if (entry.approved.has(key)) return {};
+    if (assessment.level === 'caution' || settings.uncertainty.mode === 'advise') return { note: `Caution: this ${what}. Make sure that is what you intend.` };
+    const scope = { runId: run.id, sessionId: run.session_id, workspaceId: run.workspace_id };
+    this.#event(run.id, 'uncertain', { tool: name, reasons: assessment.reasons, level: assessment.level }, scope);
+    if (this.interaction?.supports('confirm')) {
+      let approved = false;
+      try {
+        approved = await this.interaction.confirm({
+          title: 'This looks hard to undo', danger: true, scope,
+          message: `MaskShift is about to run ${name === 'shell_exec' ? 'a command' : name} that ${what}.`,
+          details: [truncate(name === 'shell_exec' ? String(args.command) : JSON.stringify(args), 300)],
+        });
+      } catch { approved = false; }
+      if (signal.aborted) throw signal.reason || new Error('Run cancelled');
+      if (approved) { entry.approved.add(key); return { note: 'The user approved this action.' }; }
+      return { blocked: `The user declined this action (it ${what}). Do not retry it or a variation of it; find another way to reach the goal, or ask the user what they would like instead.` };
+    }
+    if (settings.uncertainty.headless === 'allow') return { note: `Caution: this ${what}. No one was available to confirm it.` };
+    return { blocked: `Blocked before running: this ${what}. It is hard or impossible to undo and nobody is attached to confirm it. Choose a safer way to do the same thing, or finish the rest of the task and tell the user plainly what you did not do and why. (Set learning.uncertainty.headless to "allow" to let unattended runs do this.)` };
   }
 
   async #executeToolCall(call, context) {
@@ -816,8 +956,30 @@ export class AgentEngine {
         if (normalized.repairs.length) this.#event(run.id, 'tool-call-repaired', { tool: name, requested: call.name, repairs: normalized.repairs.slice(0, 12) }, scope);
         const missing = repairOn ? missingRequired(args, schema) : [];
         if (missing.length) throw new Error(missingArgumentMessage(name, schema, missing, args));
+        const guard = await this.#guard({ name, args, entry, workspacePath, signal, run });
+        if (guard.blocked) throw new Error(guard.blocked);
+        if (guard.note) notes.push(guard.note);
+        const effectful = this.toolRegistry.descriptor(name)?.readOnly !== true;
+        // The same read, asked again, with nothing changed since: answer from the earlier result and say so.
+        const cached = await entry.toolCache?.get(name, args, { workspacePath });
+        if (cached) {
+          this.#event(run.id, 'tool-cache-hit', { tool: name, firstStep: cached.step }, scope);
+          return { call, content: `[Harness] Identical to your call at step ${cached.step}, and nothing has changed since, so the result is the same:\n\n${cached.value.content}`, signatureContent: cached.value.content, isError: false, name, args, value: cached.value.value, cached: true };
+        }
         const value = await this.toolRegistry.execute(name, args, toolContext);
+        if (effectful) entry.toolCache?.invalidate();
         let content = withNotes(await this.#observe(value, context), notes);
+        if (!effectful) for (const file of pathsOf(args)) entry.readInRun?.add(file);
+        await entry.toolCache?.set(name, args, { value, content }, { workspacePath, step: this.store.getRun(run.id)?.step_count });
+        // A first look at a file also says what depends on it and where its tests are, which saves the searches that would find out.
+        if (!effectful && (name === 'fs_read' || name === 'symbol_read') && typeof args.path === 'string' && run.workspace_id) {
+          const relative = args.path.replace(/^\.\//, '');
+          if (!entry.prefetched?.has(relative)) {
+            entry.prefetched?.add(relative);
+            const hint = this.learning?.neighbourHint(run.workspace_id, relative);
+            if (hint) content += `\n\n${hint}`;
+          }
+        }
         let checkProblems = 0;
         const check = await this.feedback.check({ name, args, value, workspaceId: run.workspace_id, workspacePath, signal });
         if (check) {

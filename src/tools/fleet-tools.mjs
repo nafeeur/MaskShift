@@ -11,6 +11,15 @@ export function registerFleetTools(registry, { fleetManager }) {
   });
 
   registry.register({
+    name: 'fleet_suggest', title: 'Which harness suits this task',
+    description: 'Rank the installed agent harnesses (Claude Code, Codex, OpenCode, Hermes, …) for a task by how each has actually done on similar tasks before, with the evidence behind the ranking.',
+    category: 'fleet', readOnly: true,
+    keywords: ['fleet', 'choose harness', 'which agent', 'assign task', 'routing'],
+    inputSchema: { type: 'object', required: ['task'], properties: { task: { type: 'string' } } },
+    execute: async (args) => fleetManager.suggest(args.task),
+  });
+
+  registry.register({
     name: 'fleet_spawn', title: 'Add an agent to the fleet',
     description: `Create a persistent, named fleet member backed by ${HARNESS_HINT}. Several members may share a harness. Members keep their history and inbox between turns and can message each other. Use isolated=true to give an editing member its own Git worktree.`,
     category: 'fleet', risk: 'agent',

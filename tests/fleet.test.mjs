@@ -287,3 +287,28 @@ test('a MaskShift engine member joins a team and keeps one session across turns'
   assert.equal(sessions.size, 1);
   assert.ok(prompts[1].includes('engine reply 1'), 'the second turn sees the first inside the same session');
 });
+
+test('every fleet turn is recorded, and the router then prefers the harness that has done well on that kind of task', async (t) => {
+  const { runtime, fleet } = await fleetRuntime(t);
+  const ledger = runtime.learningManager.ledger;
+  await fleet.spawn({ harness: 'alpha', name: 'a1' });
+  await fleet.ask('a1', { message: 'fix the failing parser test' });
+  const recorded = runtime.store.listOutcomes({ kind: 'harness' });
+  assert.equal(recorded.length, 1);
+  assert.equal(recorded[0].executor, 'harness:alpha');
+  assert.equal(recorded[0].success, 1);
+
+  assert.equal((await fleet.suggest('fix the failing parser test')).informed, false, 'one run is not a track record');
+  for (let i = 0; i < 6; i += 1) {
+    ledger.recordHarnessTurn({ harness: 'alpha', task: 'fix the failing parser test', ok: true, durationMs: 1000 });
+    ledger.recordHarnessTurn({ harness: 'beta', task: 'fix the failing parser test', ok: i === 0, durationMs: 1000 });
+  }
+  const suggestion = await fleet.suggest('fix the failing parser bug');
+  assert.equal(suggestion.informed, true);
+  assert.equal(suggestion.best, 'alpha');
+  assert.ok(suggestion.ranking.find((item) => item.name === 'alpha').expected > suggestion.ranking.find((item) => item.name === 'beta').expected);
+  const routed = await runtime.intelligenceRouter.routeAgent('fix the failing parser bug', {});
+  assert.deepEqual(routed.selected, { type: 'bridge', name: 'alpha' });
+  assert.equal(routed.informed, true);
+  assert.match(routed.ranking[0], /harness:alpha/);
+});
