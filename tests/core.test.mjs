@@ -92,3 +92,17 @@ test('searchMessages greps every session in a workspace, not just the open one',
   store.addMessage({ sessionId: sessionA.id, role: 'user', content: 'discount: 50%_off applies' });
   assert.equal(store.searchMessages('50%_off', { workspaceId: workspace.id }).length, 1);
 });
+
+test('guardrail config groups merge individually and keep their other defaults', async (t) => {
+  const home = await tempDir(t, 'maskshift-cfg-');
+  const config = new ConfigManager({
+    configPath: path.join(home, 'config.json'),
+    overrides: { home, guardrails: { verification: { commands: ['npm test'] }, features: { fuzzyEdits: false } } },
+  });
+  await config.load();
+  const { guardrails } = config.get();
+  assert.deepEqual(guardrails.verification.commands, ['npm test']);
+  assert.equal(guardrails.verification.maxAttempts, 3, 'untouched keys in the same group survive');
+  assert.equal(guardrails.stagnation.repeatThreshold, 3, 'untouched groups survive');
+  assert.deepEqual([guardrails.features.fuzzyEdits, guardrails.features.callRepair], [false, true]);
+});

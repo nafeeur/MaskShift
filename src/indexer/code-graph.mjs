@@ -2,7 +2,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { nowIso, sha256 } from '../core/utils.mjs';
 
-const DEF_PATTERNS = [
+export const DEF_PATTERNS = [
   { kind: 'class', pattern: /^\s*(?:export\s+)?(?:default\s+)?class\s+([A-Za-z_$][\w$]*)/ },
   { kind: 'interface', pattern: /^\s*(?:export\s+)?interface\s+([A-Za-z_$][\w$]*)/ },
   { kind: 'type', pattern: /^\s*(?:export\s+)?(?:type|enum|struct|trait)\s+([A-Za-z_$][\w$]*)/ },

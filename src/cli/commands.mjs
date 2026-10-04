@@ -431,6 +431,114 @@ const skillCommands = {
   },
 };
 
+// ---------------------------------------------------------------------------- model
+
+const modelCommands = {
+  profile: {
+    usage: 'model profile [--model REF]',
+    summary: 'Show how much help the harness gives a model, and why',
+    async run(context) {
+      const ref = context.args.model || context.runtime.config.get().defaultModel;
+      const profile = await context.runtime.providerManager.modelProfile(ref);
+      const described = context.runtime.engine.capabilities.describe(profile.ref, profile);
+      if (context.ui.emit(described)) return;
+      context.ui.heading(described.ref, `level ${described.level} of 3 (${described.source})`);
+      context.ui.key('window', `${profile.contextWindow} tokens, tier ${profile.tier}`, 18);
+      context.ui.key('score', String(Math.round(described.score * 100) / 100), 18);
+      context.ui.key('help', Object.entries(described.knobs).filter(([name]) => name !== 'level').map(([name, value]) => `${name}=${value}`).join('  '), 18);
+      if (described.calibration) {
+        context.ui.key('calibrated', `${described.calibration.at}`, 18);
+        for (const probe of described.calibration.probes || []) context.ui.key(`  ${probe.name}`, `${probe.score}  ${probe.detail}`, 18);
+      } else context.ui.info('Not calibrated: run `maskshift model calibrate` to measure it instead of estimating from its size.');
+      if (described.observed) context.ui.key('observed', `${described.observed.runs} runs, stumble rate ${Math.round(described.observed.ema * 100) / 100}`, 18);
+    },
+  },
+  calibrate: {
+    usage: 'model calibrate [--model REF]',
+    summary: 'Measure a model with short probes (a few thousand tokens) and store the result',
+    async run(context) {
+      const ref = context.args.model || context.runtime.config.get().defaultModel;
+      const workspace = await resolveWorkspace(context);
+      const result = await context.runtime.toolRegistry.execute('model_calibrate', { model: ref }, toolContext(context.runtime, workspace));
+      if (context.ui.emit(result)) return;
+      context.ui.heading(result.ref, `composite ${result.composite} → level ${result.decision.level}`);
+      for (const probe of result.probes) context.ui.key(probe.name, `${probe.score}  ${probe.detail}`, 14);
+      context.ui.info(`${result.tokens.input + result.tokens.output} tokens used`);
+    },
+  },
+};
+
+// --------------------------------------------------------------------------- bench
+
+const benchCommands = {
+  list: {
+    usage: 'bench list',
+    summary: 'List the benchmark tasks',
+    async run(context) {
+      const { TASKS } = await import('../bench/tasks.mjs');
+      const rows = TASKS.map((task) => ({ id: task.id, title: task.title, tags: task.tags.join(', ') }));
+      if (context.ui.emit(rows)) return;
+      context.ui.table([{ key: 'id', label: 'task' }, { key: 'title', label: 'what it asks', max: 54 }, { key: 'tags', label: 'tags' }], rows);
+    },
+  },
+  verify: {
+    usage: 'bench verify',
+    summary: 'Check every task fails untouched and passes after its reference solution (no model needed)',
+    async run(context) {
+      const { verifyTasks } = await import('../bench/runner.mjs');
+      const results = await verifyTasks({ runtime: context.runtime });
+      if (context.ui.emit(results)) return;
+      for (const entry of results) context.ui.key(entry.id, entry.ok ? 'ok' : `BROKEN (${entry.error || entry.detail || 'check did not flip'})`, 24);
+      if (results.some((entry) => !entry.ok)) throw new Error('One or more benchmark tasks are not sound');
+    },
+  },
+  run: {
+    usage: 'bench run [--model REF] [--tasks a,b] [--repeat N] [--without callRepair,fuzzyEdits,observation,editFeedback] [--out FILE]',
+    summary: 'Run the tasks against a model and report pass rate, turns and tokens per solved task',
+    async run(context) {
+      const { runBenchmark } = await import('../bench/runner.mjs');
+      const { TASKS } = await import('../bench/tasks.mjs');
+      const ref = context.args.model || context.runtime.config.get().defaultModel;
+      const wanted = context.args.tasks ? String(context.args.tasks).split(',').map((item) => item.trim()) : null;
+      const tasks = wanted ? TASKS.filter((task) => wanted.includes(task.id)) : TASKS;
+      if (!tasks.length) throw new Error('No matching tasks; see `maskshift bench list`');
+      const without = context.args.without ? String(context.args.without).split(',').map((item) => item.trim()).filter(Boolean) : [];
+      const report = await runBenchmark({
+        runtime: context.runtime, modelRef: ref, tasks, without, repeat: Number(context.args.repeat || 1), maxSteps: Number(context.args.steps || 24),
+        onTask: (entry) => { if (!context.ui.json) context.ui.line(`  ${entry.passed ? 'pass' : 'FAIL'}  ${entry.id}  ${entry.steps} turns, ${(entry.inputTokens || 0) + (entry.outputTokens || 0)} tokens${entry.status === 'completed' ? '' : `  [${entry.status}]`}`); },
+      });
+      const file = context.args.out ? path.resolve(String(context.args.out)) : path.join(context.runtime.config.get().home, 'bench', `${report.at.replace(/[:.]/g, '-')}-${report.model.replace(/[^a-z0-9._-]+/gi, '_')}.json`);
+      await fsp.mkdir(path.dirname(file), { recursive: true });
+      await fsp.writeFile(file, JSON.stringify(report, null, 2));
+      if (context.ui.emit({ ...report, file })) return;
+      const { summary } = report;
+      context.ui.line();
+      context.ui.heading(report.model, `level ${report.level}${without.length ? `, without ${without.join('+')}` : ''}`);
+      context.ui.key('solved', `${summary.solved}/${summary.tasks} (${Math.round(summary.passRate * 100)}%)`, 18);
+      context.ui.key('avg turns', String(summary.avgSteps), 18);
+      context.ui.key('tokens / solved', String(summary.tokensPerSolved ?? 'n/a'), 18);
+      context.ui.key('harness stepped in', Object.entries(summary.harnessInterventions).filter(([, count]) => count).map(([name, count]) => `${name} ${count}`).join(', ') || 'never', 18);
+      context.ui.key('saved to', file, 18);
+    },
+  },
+  compare: {
+    usage: 'bench compare BEFORE.json AFTER.json',
+    summary: 'Compare two benchmark reports: pass rate, tokens per solved task, regressions and fixes',
+    async run(context) {
+      const { compareReports } = await import('../bench/runner.mjs');
+      const [a, b] = [requirePositional(context, 0, 'BEFORE.json'), requirePositional(context, 1, 'AFTER.json')];
+      const read = async (file) => JSON.parse(await fsp.readFile(path.resolve(file), 'utf8'));
+      const result = compareReports(await read(a), await read(b));
+      if (context.ui.emit(result)) return;
+      context.ui.key('pass rate', `${result.passRate.before} → ${result.passRate.after} (${result.passRate.delta >= 0 ? '+' : ''}${result.passRate.delta})`, 18);
+      context.ui.key('tokens / solved', `${result.tokensPerSolved.before} → ${result.tokensPerSolved.after}`, 18);
+      context.ui.key('avg turns', `${result.avgSteps.before} → ${result.avgSteps.after}`, 18);
+      context.ui.key('regressions', result.regressions.join(', ') || 'none', 18);
+      context.ui.key('fixed', result.fixes.join(', ') || 'none', 18);
+    },
+  },
+};
+
 // ------------------------------------------------------------------------ mcp
 
 const mcpCommands = {
@@ -1011,6 +1119,8 @@ export const GROUPS = {
   session: { title: 'Heists', commands: sessionCommands, defaultCommand: 'list' },
   tools: { title: 'Tools', commands: toolCommands, defaultCommand: 'list' },
   skills: { title: 'Skills', commands: skillCommands, defaultCommand: 'list' },
+  model: { title: 'Model capability', commands: modelCommands, defaultCommand: 'profile' },
+  bench: { title: 'Benchmark', commands: benchCommands, defaultCommand: 'list' },
   mcp: { title: 'MCP network', commands: mcpCommands, defaultCommand: 'list' },
   plugins: { title: 'Plugins', commands: pluginCommands, defaultCommand: 'list' },
   automation: { title: 'Automations', commands: automationCommands, defaultCommand: 'list' },

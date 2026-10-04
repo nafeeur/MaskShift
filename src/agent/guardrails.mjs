@@ -186,9 +186,23 @@ export function fallbackSummary(history, limit = 12) {
     : 'No tool actions recorded yet.';
 }
 
+/**
+ * Creates the workspace's .maskshift directory and makes it ignore itself, so notes the harness
+ * leaves there (progress files, saved command output) never show up as untracked changes in a
+ * repository that has never heard of MaskShift.
+ */
+export async function ensureStateDir(workspacePath, sub = '') {
+  const root = path.join(workspacePath, '.maskshift');
+  const dir = sub ? path.join(root, sub) : root;
+  await fsp.mkdir(dir, { recursive: true });
+  const ignore = path.join(root, '.gitignore');
+  await fsp.writeFile(ignore, '*\n', { flag: 'wx' }).catch(() => {});
+  return dir;
+}
+
 export async function writeProgressFile(workspacePath, content) {
   const file = path.join(workspacePath, PROGRESS_FILE);
-  await fsp.mkdir(path.dirname(file), { recursive: true });
+  await ensureStateDir(workspacePath);
   const temp = `${file}.${process.pid}.tmp`;
   await fsp.writeFile(temp, content);
   await fsp.rename(temp, file);

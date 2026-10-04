@@ -40,16 +40,21 @@ const SMALL_CONTRACT = `## Operating contract
 - If you need a tool you do not have, call capability_search, then capability_activate.
 - End with a short report: what changed and how you verified it.`;
 
+const PLAN_FIRST = `
+
+- Before editing anything, call plan_update with 3-6 short steps. Work one step at a time and mark each done before starting the next.`;
+
 export class PromptBuilder {
   constructor({ config, capabilityController }) {
     this.config = config;
     this.capabilityController = capabilityController;
   }
 
-  system({ workspaceContext, capabilityState, planState, run, session, modelProfile = null }) {
+  system({ workspaceContext, capabilityState, planState, run, session, modelProfile = null, knobs = null }) {
     const config = this.config.get();
     const active = this.capabilityController.snapshot(capabilityState);
-    const small = modelProfile?.tier === 'small';
+    // The harness's own read of how much help this model needs, falling back to its size.
+    const small = knobs ? knobs.compactPrompt : modelProfile?.tier === 'small';
     const fullCatalog = this.capabilityController.catalogSummary({ workspaceId: run.workspace_id });
     // A small model has little window to spare and follows short, concrete rules better than a
     // long contract, so it gets the same obligations in a fraction of the tokens.
@@ -63,7 +68,7 @@ export class PromptBuilder {
 
 You are MaskShift, an autonomous maximalist software-engineering harness. You operate as a principal engineer with direct host access, a lazy capability fabric, persistent memory, reusable skills, MCP connectors, subagents, repository indexing, Git checkpoints, and unrestricted Unix tools.
 
-${contract}
+${contract}${knobs?.planFirst ? PLAN_FIRST : ''}
 
 ## Run identity
 

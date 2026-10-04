@@ -1,6 +1,7 @@
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
+import { applyEdit, EditMatchError } from './edit-match.mjs';
 import { absolutePath, ensureDir, id, runCommand, sha256, shellQuote, truncate } from '../core/utils.mjs';
 
 function resolveTarget(input, context) {
@@ -146,7 +147,7 @@ export function registerFilesystemTools(registry, { workspaceManager, config }) 
   registry.register({
     name: 'fs_patch',
     title: 'Apply exact text edits',
-    description: 'Apply one or more exact oldText/newText replacements to a file atomically. Fails on missing or ambiguous text unless replaceAll is requested.',
+    description: 'Apply one or more oldText/newText replacements to a file atomically. Minor whitespace or indentation differences are tolerated; text that is missing or ambiguous fails with the closest region shown, unless replaceAll is requested.',
     category: 'filesystem', risk: 'write', alwaysAvailable: true,
     keywords: ['patch', 'replace', 'edit file', 'modify'],
     inputSchema: {
@@ -167,17 +168,27 @@ export function registerFilesystemTools(registry, { workspaceManager, config }) 
       let content = await fsp.readFile(target, 'utf8');
       const applied = [];
       for (const [index, edit] of args.edits.entries()) {
-        if (!edit.oldText) throw new Error(`Edit ${index} has empty oldText`);
-        const count = content.split(edit.oldText).length - 1;
-        if (count === 0) throw new Error(`Edit ${index} oldText was not found in ${target}`);
-        if (count > 1 && !edit.replaceAll) throw new Error(`Edit ${index} matched ${count} locations; provide more context or set replaceAll`);
-        content = edit.replaceAll ? content.split(edit.oldText).join(edit.newText) : content.replace(edit.oldText, edit.newText);
-        applied.push({ index, replacements: edit.replaceAll ? count : 1 });
+        let result;
+        try {
+          result = applyEdit(content, edit.oldText, edit.newText ?? '', { replaceAll: Boolean(edit.replaceAll), exactOnly: config.get().guardrails?.features?.fuzzyEdits === false });
+        } catch (error) {
+          if (error instanceof EditMatchError) throw new Error(`Edit ${index}: ${error.message} (${target})`);
+          throw error;
+        }
+        content = result.content;
+        applied.push({
+          index, replacements: result.replacements,
+          ...(result.strategy !== 'exact' ? { matchedBy: result.strategy, lines: [result.startLine, result.endLine] } : {}),
+        });
       }
       const temp = `${target}.${process.pid}.${id('patch')}.tmp`;
       await fsp.writeFile(temp, content, 'utf8');
       await fsp.rename(temp, target);
-      return { path: target, applied, size: Buffer.byteLength(content), sha256: sha256(content) };
+      const loose = applied.filter((entry) => entry.matchedBy);
+      return {
+        path: target, applied, size: Buffer.byteLength(content), sha256: sha256(content),
+        ...(loose.length ? { note: `${loose.length === 1 ? 'An edit was' : `${loose.length} edits were`} applied by a looser match than exact text (${[...new Set(loose.map((entry) => entry.matchedBy))].join(', ')}); check the lines shown if the result looks off.` } : {}),
+      };
     },
   });
 

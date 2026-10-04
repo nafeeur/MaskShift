@@ -33,6 +33,15 @@ Skill self-improvement is evidence-gated. `skill_evaluate` records comparable ba
 outcomes, while `skill_promote_validated` requires a minimum trial count, positive uplift, and zero
 recorded regressions before modifying a skill.
 
+## Adaptive harness
+
+The harness assumes nothing about a model's name or size beyond a prior, and treats every piece of assistance as something a model may or may not need.
+
+- **Three kinds of mechanism.** *Free for everyone* (`call-repair.mjs`, `edit-match.mjs`, `observation.mjs`, `feedback.mjs`): invisible when the model is already right, so they stay on for all models. *Triggered by evidence* (`guardrails.mjs`, the level controller): stagnation nudges, verification retries and hand-offs fire only after something goes wrong. *Chosen by measurement* (`capability-profile.mjs`, `calibration.mjs`): the help level, set from what the model has been shown to do.
+- **One decision point.** `CapabilityRegistry.decide` turns a calibration, a track record or a prior into a level; `knobsFor(level)` turns the level into concrete settings read by the prompt builder, the tool menu, the output budget, the repair budget and the stagnation thresholds. A hard limit (a window too small for the full prompt) is a floor, separate from capability.
+- **Evidence goes in a loop.** The engine reports every stumble to a per-run `ScaffoldController`; the finished run updates the model's running average; the next run starts from it. Calibration and the benchmark exist so none of this is taken on faith.
+- **Everything is attributable.** Run events (`tool-call-repaired`, `edit-check`, `stagnation`, `verification`, `context-reset`, `scaffold`, `scaffold-level`) record what the harness did, and the cost estimate splits tokens by what caused them, so a helper that costs more than it saves shows up.
+
 ## Design objective
 
 MaskShift separates **capability availability** from **model-context cost**. The harness may know about hundreds or thousands of local tools, skills, MCP servers, and plugins, but a run starts with a small always-available kernel. The capability controller searches the entire catalog and activates only what the current task or step requires.

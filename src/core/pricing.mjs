@@ -39,7 +39,7 @@ export function estimateUsageCost(config, providerId, providerType, model, usage
 export function summarizeCosts(entries) {
   const totals = {
     inputTokens: 0, outputTokens: 0, cacheWriteTokens: 0, cacheReadTokens: 0,
-    cost: 0, pricedEntries: 0, unpricedEntries: 0, currency: 'USD',
+    cost: 0, pricedEntries: 0, unpricedEntries: 0, currency: 'USD', bySource: {},
   };
   for (const entry of entries) {
     if (!entry) continue;
@@ -49,6 +49,13 @@ export function summarizeCosts(entries) {
     totals.cacheReadTokens += entry.cacheReadTokens || 0;
     totals.currency = entry.currency || totals.currency;
     if (entry.priced) { totals.cost += entry.cost || 0; totals.pricedEntries += 1; } else totals.unpricedEntries += 1;
+    // Where the tokens went: ordinary turns, or calls the harness itself caused (repairs,
+    // verification retries, nudges, compaction, hand-offs). Untagged entries count as turns.
+    const bucket = totals.bySource[entry.source || 'turn'] ||= { calls: 0, inputTokens: 0, outputTokens: 0, cost: 0 };
+    bucket.calls += 1;
+    bucket.inputTokens += entry.inputTokens || 0;
+    bucket.outputTokens += entry.outputTokens || 0;
+    if (entry.priced) bucket.cost += entry.cost || 0;
   }
   totals.complete = totals.unpricedEntries === 0;
   return totals;

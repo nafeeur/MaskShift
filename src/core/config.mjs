@@ -109,6 +109,9 @@ export function defaultConfig() {
       stagnation: { enabled: true, window: 16, repeatThreshold: 3, stopThreshold: 6 },
       verification: { commands: [], maxAttempts: 3, timeoutMs: 300_000 },
       handoff: { enabled: true, thresholdRatio: 0.75, maxResets: 3 },
+      feedback: { enabled: true, syntax: true, lsp: true, timeoutMs: 8_000, maxIssues: 5 },
+      // Individual switches for the always-on helpers, mainly so `maskshift bench --without` can measure each one.
+      features: { callRepair: true, fuzzyEdits: true, observation: true, editFeedback: true },
     },
     autoLoadCapabilities: true,
     autoConnectMcp: true,
@@ -250,6 +253,12 @@ function mergeConfig(base, override) {
     ...base.routing, ...(override?.routing || {}),
     agents: { ...(base.routing?.agents || {}), ...(override?.routing?.agents || {}) },
     models: override?.routing?.models || base.routing?.models || [],
+  };
+  // Each guardrail group merges on its own, so setting `guardrails.verification.commands` alone
+  // keeps every other default instead of replacing the whole block.
+  merged.guardrails = {
+    ...base.guardrails, ...(override?.guardrails || {}),
+    ...Object.fromEntries(['stagnation', 'verification', 'handoff', 'feedback', 'features'].map((group) => [group, { ...(base.guardrails?.[group] || {}), ...(override?.guardrails?.[group] || {}) }])),
   };
   merged.memory = { ...base.memory, ...(override?.memory || {}) };
   merged.voice = { ...base.voice, ...(override?.voice || {}) };

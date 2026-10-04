@@ -55,6 +55,24 @@ export function streamRunEvents(runtime, ui, sessionId, { onDelta = null } = {})
       case 'run.context-window-learned':
         ui.line(ui.theme.paint(`  ${ui.marks.dot} model window is ${payload.next} tokens, not ${payload.previous}; resized and retrying`, { fg: ui.theme.roles.warning }));
         break;
+      case 'run.tool-call-repaired':
+        ui.line(ui.theme.paint(`  ${ui.marks.dot} fixed ${payload.tool}: ${oneLine((payload.repairs || []).map((entry) => entry.detail.replace(/^[^:]+: /, '')).join('; '), ui.width - 24)}`, { fg: ui.theme.roles.border }));
+        break;
+      case 'run.edit-check':
+        ui.line(ui.theme.paint(`  ${failMark} ${payload.problems} problem${payload.problems === 1 ? '' : 's'} in the edited file — the model has been told`, { fg: ui.theme.roles.warning }));
+        break;
+      case 'run.verification':
+        ui.line(ui.theme.paint(`  ${payload.ok ? okMark : failMark} project checks ${payload.ok ? 'pass' : 'fail'} (attempt ${payload.attempt})`, { fg: payload.ok ? ui.theme.roles.success : ui.theme.roles.warning }));
+        break;
+      case 'run.stagnation':
+        ui.line(ui.theme.paint(`  ${ui.marks.dot} ${payload.level === 'stop' ? 'stopping: the run is repeating itself' : 'nudged: the run is repeating itself'}`, { fg: ui.theme.roles.warning }));
+        break;
+      case 'run.context-reset':
+        ui.line(ui.theme.paint(`  ${ui.marks.dot} context reset #${payload.resets}; continuing from ${payload.file}`, { fg: ui.theme.roles.info }));
+        break;
+      case 'run.scaffold-level':
+        ui.line(ui.theme.paint(`  ${ui.marks.dot} giving this model more help: level ${payload.from} → ${payload.to} (${payload.reason})`, { fg: ui.theme.roles.info }));
+        break;
       case 'run.steered':
         ui.line(ui.theme.paint(`  ${ui.marks.dot} delivered: ${oneLine(payload.message, ui.width - 16)}`, { fg: ui.theme.roles.user }));
         break;

@@ -1,16 +1,18 @@
+import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { nowIso, runCommand, sha256, truncate } from '../core/utils.mjs';
 import { estimateUsageCost, summarizeCosts } from '../core/pricing.mjs';
 import { repairPrompt } from './tool-protocol.mjs';
 import { elideStaleToolResults, estimateHistoryTokens, fitHistory, groupTurns, historyBudget } from './context-budget.mjs';
 import { compactTurns } from './compaction.mjs';
+import { shapeObservation } from './observation.mjs';
+import { EditFeedback, EDIT_TOOLS } from './feedback.mjs';
+import { CapabilityRegistry } from './capability-profile.mjs';
+import { missingArgumentMessage, missingRequired, normalizeArgs, resolveToolName, unknownToolMessage } from './call-repair.mjs';
 import {
   PROGRESS_FILE, StagnationDetector, fallbackSummary, guardrailSettings, handoffMessage, renderProgress,
-  runVerification, stagnationNudge, verificationFeedback, verificationSummary, writeProgressFile,
+  ensureStateDir, runVerification, stagnationNudge, verificationFeedback, verificationSummary, writeProgressFile,
 } from './guardrails.mjs';
-
-// Bounded so a model that cannot produce valid syntax ends the run instead of looping on it.
-const MAX_TOOL_CALL_REPAIRS = 2;
 
 function titleFromPrompt(prompt) {
   return String(prompt || '').replace(/\s+/g, ' ').trim().slice(0, 78) || 'MaskShift run';
@@ -36,12 +38,12 @@ function messageForProvider(message) {
 // reading, editing, searching and running code, plus anything it explicitly activates through
 // capability_search/capability_activate — so the whole catalog stays reachable, just on demand.
 const SMALL_MODEL_CORE_TOOLS = new Set([
-  'fs_list', 'fs_read', 'fs_write', 'fs_patch', 'search_text', 'shell_exec',
+  'fs_list', 'fs_read', 'fs_write', 'fs_patch', 'symbol_read', 'symbol_replace', 'fs_replace_lines', 'search_text', 'shell_exec',
   'git_status', 'git_diff', 'plan_update', 'capability_search', 'capability_activate',
 ]);
 
-function compactToolsFor(profile, tools, capabilityState) {
-  if (profile?.tier !== 'small') return tools;
+function compactToolsFor(knobs, tools, capabilityState) {
+  if (!knobs?.coreTools) return tools;
   const activated = new Set((capabilityState?.activated || []).map((item) => item.name));
   return tools.filter((tool) => SMALL_MODEL_CORE_TOOLS.has(tool.name) || activated.has(tool.name)).map((tool) => {
     const schema = tool.inputSchema || {};
@@ -58,6 +60,14 @@ function renderToolResult(value, maxChars) {
   try { return truncate(JSON.stringify(value, null, 2), maxChars); } catch { return truncate(String(value), maxChars); }
 }
 
+function tagCost(entry, source) {
+  return entry ? { ...entry, source } : entry;
+}
+
+function withNotes(content, notes) {
+  return notes.length ? `${content}\n\n[Harness] ${notes.join(' ')}` : content;
+}
+
 function isAbort(error, signal) {
   return signal?.aborted || error?.name === 'AbortError' || /aborted|cancelled/i.test(error?.message || '');
 }
@@ -65,7 +75,7 @@ function isAbort(error, signal) {
 export class AgentEngine {
   constructor({
     store, config, logger, eventBus, hooks, providerManager, workspaceManager,
-    indexer, toolRegistry, capabilityController, promptBuilder, contextBuilder, mcpManager, intelligenceRouter, personaManager,
+    indexer, toolRegistry, capabilityController, promptBuilder, contextBuilder, mcpManager, intelligenceRouter, personaManager, lspManager = null,
   }) {
     this.store = store;
     this.config = config;
@@ -82,6 +92,8 @@ export class AgentEngine {
     this.mcpManager = mcpManager;
     this.intelligenceRouter = intelligenceRouter;
     this.personaManager = personaManager;
+    this.feedback = new EditFeedback({ config, lspManager, logger });
+    this.capabilities = new CapabilityRegistry({ store });
     this.active = new Map();
     this.recentCompletions = new Map();
   }
@@ -343,6 +355,8 @@ export class AgentEngine {
     deadlineTimer.unref?.();
     let sessionEndOutcome = null;
 
+    let scaffoldRef = null;
+    let scaffoldController = null;
     try {
       await this.hooks?.run('SessionStart', { ...scope, workspacePath, prompt: run.prompt });
       await this.hooks?.run('UserPromptSubmit', { ...scope, workspacePath, prompt: run.prompt });
@@ -360,10 +374,19 @@ export class AgentEngine {
       // Everything below is sized to the model actually running: its window bounds the injected
       // repository context, its tier picks the prompt's verbosity, its output cap bounds replies.
       let modelProfile = await this.providerManager.modelProfile(run.model_id).catch(() => null);
+      // How much help this model gets: measured, else observed, else a prior from its size; and it
+      // can rise during the run if the model keeps stumbling.
+      const scaffold = this.capabilities.begin(modelProfile?.ref || run.model_id, modelProfile, {
+        onChange: (change) => this.#event(run.id, 'scaffold-level', change, scope),
+      });
+      entry.scaffold = scaffold;
+      scaffoldRef = modelProfile?.ref || run.model_id;
+      scaffoldController = scaffold;
+      this.#event(run.id, 'scaffold', { level: scaffold.level, source: scaffold.source }, scope);
       // Share of the window (in ~4-char tokens) spent on injected repository context. A small
       // model keeps more of its window for the conversation itself.
       const contextCharsFor = (profile) => (profile
-        ? Math.min(this.config.get().maxContextChars, Math.floor(profile.contextWindow * 4 * (profile.tier === 'small' ? 0.2 : 0.35)))
+        ? Math.min(this.config.get().maxContextChars, Math.floor(profile.contextWindow * 4 * (scaffold.knobs.compactPrompt ? 0.2 : 0.35)))
         : undefined);
       let workspaceContext = await this.contextBuilder.build({ workspaceId: run.workspace_id, prompt: run.prompt, sessionId: session.id, maxChars: contextCharsFor(modelProfile) });
       const capabilityState = this.capabilityController.createState({ runId: run.id, workspaceId: run.workspace_id });
@@ -414,6 +437,8 @@ export class AgentEngine {
       let lastVerification = null;
       let unverifiedChanges = false;
       let contextResets = 0;
+      // What caused the next model call: an ordinary turn, or one the harness's own correction forced.
+      let turnSource = 'turn';
 
       // Replaces the whole conversation with a compact hand-off, written to disk as well so the
       // state survives a crash and is inspectable. Compaction folds old turns into a summary but
@@ -426,7 +451,7 @@ export class AgentEngine {
         });
         if (compacted.usage) {
           usage.push(compacted.usage);
-          costs.push(estimateUsageCost(this.config.get(), compacted.providerId, compacted.providerType, compacted.model, compacted.usage));
+          costs.push(tagCost(estimateUsageCost(this.config.get(), compacted.providerId, compacted.providerType, compacted.model, compacted.usage), 'handoff'));
         }
         const tree = await runCommand('git status --short', { cwd: workspacePath, timeoutMs: 15_000, maxOutputChars: 6_000 }).catch(() => null);
         contextResets += 1;
@@ -467,8 +492,8 @@ export class AgentEngine {
         this.store.updateRun(run.id, { step_count: step });
         const currentRun = this.store.getRun(run.id);
         const currentSession = this.store.getSession(session.id);
-        const system = this.promptBuilder.system({ workspaceContext, capabilityState, planState: entry.planState, run: currentRun, session: currentSession, modelProfile });
-        const tools = compactToolsFor(modelProfile, await this.capabilityController.descriptors(capabilityState), capabilityState);
+        const system = this.promptBuilder.system({ workspaceContext, capabilityState, planState: entry.planState, run: currentRun, session: currentSession, modelProfile, knobs: scaffold.knobs });
+        const tools = compactToolsFor(scaffold.knobs, await this.capabilityController.descriptors(capabilityState), capabilityState);
         this.#event(run.id, 'model-turn', { step, tools: tools.map((tool) => tool.name), skillCount: capabilityState.skills.size }, scope);
         const maxTokens = entry.options.maxTokens || modelProfile?.maxOutputTokens || 16_384;
         let outboundHistory = history;
@@ -511,7 +536,7 @@ export class AgentEngine {
                   meta: { ...sessionMeta, compaction: { summary: compaction.summary, throughMessageId: compaction.throughMessageId, forced: compaction.forced, updatedAt: nowIso() } },
                 });
                 usage.push(compacted.usage);
-                costs.push(estimateUsageCost(this.config.get(), compacted.providerId, compacted.providerType, compacted.model, compacted.usage));
+                costs.push(tagCost(estimateUsageCost(this.config.get(), compacted.providerId, compacted.providerType, compacted.model, compacted.usage), 'compaction'));
               } else {
                 compaction.lastFailedStep = step;
               }
@@ -569,7 +594,8 @@ export class AgentEngine {
         }
         overflowRetries = 0;
         usage.push(response.usage);
-        costs.push(estimateUsageCost(this.config.get(), response.providerId, response.providerType, response.model, response.usage));
+        costs.push(tagCost(estimateUsageCost(this.config.get(), response.providerId, response.providerType, response.model, response.usage), turnSource));
+        turnSource = 'turn';
         const maxRunTokens = Number(this.config.get().maxRunTokens) || 5_000_000;
         const tokensSoFar = summarizeCosts(costs);
         if (tokensSoFar.inputTokens + tokensSoFar.outputTokens > maxRunTokens) {
@@ -587,8 +613,10 @@ export class AgentEngine {
 
         // A text-protocol model wrote something call-shaped that would not parse. Correct it
         // rather than reading the malformed turn as "finished and no tools needed".
-        if (!response.toolCalls?.length && response.parseErrors?.length && repairAttempts < MAX_TOOL_CALL_REPAIRS) {
+        if (!response.toolCalls?.length && response.parseErrors?.length && repairAttempts < scaffold.knobs.repairBudget) {
           repairAttempts += 1;
+          turnSource = 'repair';
+          scaffold.signal('parse-failure');
           const correction = repairPrompt(response.parseErrors, tools);
           remember({ role: 'user', content: correction }, this.store.addMessage({
             sessionId: session.id, role: 'user', content: correction,
@@ -614,10 +642,12 @@ export class AgentEngine {
           if (outcome.ok) {
             unverifiedChanges = false;
           } else if (verificationAttempts < guardrails.verification.maxAttempts) {
+            scaffold.signal('verification-fail');
             const feedback = verificationFeedback(outcome, { attempt: verificationAttempts, maxAttempts: guardrails.verification.maxAttempts });
             remember({ role: 'user', content: feedback }, this.store.addMessage({
               sessionId: session.id, role: 'user', content: feedback, meta: { runId: run.id, synthetic: true, verification: verificationAttempts },
             }));
+            turnSource = 'verification';
             continue;
           } else {
             const note = `\n\n[Harness] Verification still failing after ${verificationAttempts} attempts: ${verificationSummary(outcome)}.`;
@@ -646,8 +676,13 @@ export class AgentEngine {
           return completed;
         }
 
+        const maxToolChars = this.config.get().maxToolOutputChars;
+        const observation = {
+          budget: Math.max(2_000, Math.floor((modelProfile?.contextWindow ? Math.max(3_000, Math.min(maxToolChars, Math.floor(modelProfile.contextWindow * 4 * 0.1))) : maxToolChars) * scaffold.knobs.observationScale)),
+          spill: (text, where) => this.#spill(text, where),
+        };
         const results = await this.#executeToolCalls(response.toolCalls, {
-          run, session, entry, workspacePath, signal, scope, capabilityState,
+          run, session, entry, workspacePath, signal, scope, capabilityState, observation,
         });
         for (const result of results) {
           const toolMessage = {
@@ -661,10 +696,21 @@ export class AgentEngine {
           this.#event(run.id, result.isError ? 'tool-error' : 'tool-result', {
             toolCallId: result.call.id, tool: result.call.name, content: result.content,
           }, scope);
-          if (this.toolRegistry.descriptor(result.call.name)?.readOnly !== true) unverifiedChanges = true;
+          // The tool that actually ran, which for a repaired call is not the name the model wrote.
+          const ranAs = result.name || result.call.name;
+          if (this.toolRegistry.descriptor(ranAs)?.readOnly !== true) unverifiedChanges = true;
+          const stumbled = [];
+          if (result.isError) stumbled.push(EDIT_TOOLS.has(ranAs) && /oldText|not found|matched \d+ locations/.test(result.content) ? 'edit-miss' : 'tool-error');
+          if (result.repaired) stumbled.push('repaired-call');
+          if (result.value?.applied?.some?.((entry) => entry.matchedBy)) stumbled.push('fuzzy-edit');
+          if (result.checkProblems) stumbled.push('edit-problem');
+          scaffold.result(stumbled);
           if (guardrails.stagnation.enabled) detector.observe(result.call, result);
         }
 
+        // A model that needs more help is also given less rope before the harness steps in.
+        detector.repeatThreshold = Math.min(guardrails.stagnation.repeatThreshold, scaffold.knobs.stagnationRepeat);
+        detector.stopThreshold = Math.max(detector.repeatThreshold + 1, guardrails.stagnation.stopThreshold);
         const finding = guardrails.stagnation.enabled ? detector.check() : null;
         if (finding?.level === 'stop') {
           stagnated = finding;
@@ -675,7 +721,9 @@ export class AgentEngine {
           remember({ role: 'user', content: nudge }, this.store.addMessage({
             sessionId: session.id, role: 'user', content: nudge, meta: { runId: run.id, synthetic: true, stagnation: finding.count },
           }));
+          turnSource = 'nudge';
           this.#event(run.id, 'stagnation', { level: 'warn', ...finding }, scope);
+          scaffold.signal('stagnation');
         }
       }
 
@@ -712,6 +760,8 @@ export class AgentEngine {
       return failed;
     } finally {
       clearTimeout(deadlineTimer);
+      // Remembering how the model did must never change how the run ended.
+      try { if (scaffoldController) this.capabilities.record(scaffoldRef, scaffoldController.summary()); } catch (error) { this.logger.warn('Could not record model track record', { error: error.message }); }
       if (sessionEndOutcome) {
         await this.hooks?.run('SessionEnd', { ...scope, workspacePath, ...sessionEndOutcome }).catch(() => {});
       }
@@ -743,14 +793,80 @@ export class AgentEngine {
       this.#event(run.id, 'tool-intent', { toolCallId: call.id, tool: call.name, argsHash: sha256(JSON.stringify(call.args || {})) }, scope);
     }
     try {
-      let value;
-      if (this.toolRegistry.has(call.name)) value = await this.toolRegistry.execute(call.name, call.args || {}, toolContext);
-      else if (call.name.startsWith('mcp__')) value = await this.mcpManager.callQualified(call.name, call.args || {}, { workspaceId: run.workspace_id, signal });
-      else throw new Error(`Tool '${call.name}' is not active or does not exist. Search and activate the capability first.`);
-      return { call, content: renderToolResult(value, this.config.get().maxToolOutputChars), isError: false };
+      let name = call.name;
+      let args = call.args || {};
+      const notes = [];
+      let repaired = false;
+      const repairOn = this.config.get().guardrails?.features?.callRepair !== false;
+      if (repairOn && (!name.startsWith('mcp__') || !this.toolRegistry.has(name))) {
+        // A near-miss on the name is resolved here rather than sent back as an error: the error
+        // would cost a whole model turn, and the model already knew which tool it meant.
+        if (!this.toolRegistry.has(name) && !name.startsWith('mcp__')) {
+          const resolved = resolveToolName(name, this.toolRegistry.list({ includeSchema: false }).map((tool) => tool.name));
+          if (!resolved.name) throw new Error(unknownToolMessage(name, resolved.suggestions));
+          notes.push(`"${name}" is not a tool; ran \`${resolved.name}\` instead — use that name next time.`);
+          name = resolved.name;
+        }
+      }
+      if (this.toolRegistry.has(name)) {
+        const schema = this.toolRegistry.descriptor(name)?.inputSchema;
+        const normalized = repairOn ? normalizeArgs(args, schema) : { args, repairs: [] };
+        args = normalized.args;
+        repaired = normalized.repairs.length > 0 || notes.length > 0;
+        if (normalized.repairs.length) this.#event(run.id, 'tool-call-repaired', { tool: name, requested: call.name, repairs: normalized.repairs.slice(0, 12) }, scope);
+        const missing = repairOn ? missingRequired(args, schema) : [];
+        if (missing.length) throw new Error(missingArgumentMessage(name, schema, missing, args));
+        const value = await this.toolRegistry.execute(name, args, toolContext);
+        let content = withNotes(await this.#observe(value, context), notes);
+        let checkProblems = 0;
+        const check = await this.feedback.check({ name, args, value, workspaceId: run.workspace_id, workspacePath, signal });
+        if (check) {
+          content += `\n\n${check.text}`;
+          checkProblems = check.problems;
+          this.#event(run.id, 'edit-check', { tool: name, problems: check.problems }, scope);
+        }
+        return { call, content, isError: false, name, args, value, repaired, checkProblems };
+      }
+      if (name.startsWith('mcp__')) {
+        const value = await this.mcpManager.callQualified(name, args, { workspaceId: run.workspace_id, signal });
+        return { call, content: await this.#observe(value, context), isError: false, name, args, value };
+      }
+      throw new Error(unknownToolMessage(name, []));
     } catch (error) {
       return { call, content: renderToolResult({ error: error.message, tool: call.name }, this.config.get().maxToolOutputChars), isError: true };
     }
+  }
+
+  // What the model sees of a tool result: noise removed, rendered compactly, kept within what the
+  // model's window can afford, with the complete text saved to disk when something was left out.
+  async #observe(value, context) {
+    const maxChars = this.config.get().maxToolOutputChars;
+    const { observation, workspacePath, run } = context;
+    try {
+      if (this.config.get().guardrails?.features?.observation === false) return renderToolResult(value, maxChars);
+      const shaped = await shapeObservation(value, {
+        budget: observation?.budget || maxChars,
+        spill: observation?.spill && workspacePath ? (text) => observation.spill(text, { workspacePath, runId: run.id }) : null,
+      });
+      return shaped.text;
+    } catch {
+      return renderToolResult(value, maxChars);
+    }
+  }
+
+  async #spill(text, { workspacePath, runId }) {
+    const dir = await ensureStateDir(workspacePath, 'outputs');
+    this.spillCounter = (this.spillCounter || 0) + 1;
+    const file = path.join(dir, `${runId}-${this.spillCounter}.txt`);
+    await fsp.writeFile(file, text);
+    // Bounded: this is a convenience for re-reading, not an archive.
+    const names = (await fsp.readdir(dir).catch(() => [])).filter((name) => name.endsWith('.txt'));
+    if (names.length > 200) {
+      const stats = await Promise.all(names.map(async (name) => ({ name, mtime: (await fsp.stat(path.join(dir, name)).catch(() => null))?.mtimeMs || 0 })));
+      stats.sort((a, b) => a.mtime - b.mtime);
+      await Promise.all(stats.slice(0, names.length - 150).map((entry) => fsp.rm(path.join(dir, entry.name), { force: true })));
+    }
+    return path.relative(workspacePath, file);
   }
 
   #event(runId, type, payload, scope) {

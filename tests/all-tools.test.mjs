@@ -5,7 +5,7 @@ import test from 'node:test';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { commandExists, shellQuote } from '../src/core/utils.mjs';
-import { createProject, runtimeForTest, jsonServer, respondJson, respondOpenAIResponsesSSE, waitFor } from './helpers.mjs';
+import { createProject, runtimeForTest, jsonServer, isDiscoveryProbe, readJsonBody, respondJson, respondOpenAIChatSSE, respondOpenAIResponsesSSE, waitFor } from './helpers.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const coverage = new Map();
@@ -80,6 +80,12 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
     await call('fs_patch', { path: 'nested/a.txt', edits: [{ oldText: 'beta', newText: 'gamma' }] }, r => assert.equal(r.applied[0].replacements, 1));
     await call('fs_apply_patch', { patch: '--- a/nested/a.txt\n+++ b/nested/a.txt\n@@ -1,2 +1,2 @@\n alpha\n-gamma\n+delta\n' }, r => assert.equal(r.applied, true));
     assert.equal(await fsp.readFile(path.join(project, 'nested/a.txt'), 'utf8'), 'alpha\ndelta\n');
+    await fsp.writeFile(path.join(project, 'nested/sym.js'), 'export function one() {\n  return 1;\n}\n\nexport function two() {\n  return 2;\n}\n');
+    await call('symbol_read', { path: 'nested/sym.js' }, r => assert.deepEqual(r.symbols.map(s => s.name), ['one', 'two']));
+    await call('symbol_read', { path: 'nested/sym.js', symbol: 'two' }, r => { assert.equal(r.startLine, 5); assert.equal(r.endLine, 7); });
+    await call('symbol_replace', { path: 'nested/sym.js', symbol: 'two', newText: 'export function two() {\n  return 22;\n}' }, r => assert.deepEqual(r.replacedLines, [5, 7]));
+    await call('fs_replace_lines', { path: 'nested/sym.js', startLine: 2, endLine: 2, newText: '  return 11;', expect: 'return 1;' }, r => assert.equal(r.replacedLines, 1));
+    assert.equal(await fsp.readFile(path.join(project, 'nested/sym.js'), 'utf8'), 'export function one() {\n  return 11;\n}\n\nexport function two() {\n  return 22;\n}\n');
     await call('fs_move', { from: 'nested/a.txt', to: 'nested/b.txt' });
     assert.equal(await fsp.readFile(path.join(project, 'nested/b.txt'), 'utf8'), 'alpha\ndelta\n');
     await call('fs_delete', { path: 'nested/b.txt' }, r => assert.equal(r.deleted, true));
@@ -318,6 +324,25 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
     await call('agent_run_status', { runId: run.id }, r => assert.equal(r.id, run.id), 'local model fixture');
     await call('agent_cancel', { runId: run.id }, r => assert.equal(r.cancelled, true), 'local model fixture');
     assert.equal((await runtime.engine.waitForRun(run.id)).status, 'cancelled');
+  });
+
+  await suite.test('model profile and calibration against a deterministic local model', async (t) => {
+    const server = await jsonServer(t, async (req, res) => {
+      if (isDiscoveryProbe(req)) return respondJson(res, 404, { error: 'not found' });
+      const body = await readJsonBody(req);
+      const prompt = String(body.messages?.at(-1)?.content || '');
+      const usage = { prompt_tokens: 20, completion_tokens: 5 };
+      if (/record_value tool with key 'alpha'/.test(prompt)) return respondOpenAIChatSSE(res, { toolCalls: [{ id: 'a', name: 'record_value', args: { key: 'alpha', count: 3 } }], finishReason: 'tool_calls', usage });
+      if (/twice in the same reply/.test(prompt)) return respondOpenAIChatSSE(res, { toolCalls: [{ id: 'b', name: 'record_value', args: { key: 'one', count: 1 } }, { id: 'c', name: 'record_value', args: { key: 'two', count: 2 } }], finishReason: 'tool_calls', usage });
+      if (/retries from 3 to 5/.test(prompt)) return respondOpenAIChatSSE(res, { toolCalls: [{ id: 'd', name: 'fs_patch', args: { path: 'src/load.js', edits: [{ oldText: 'const retries = 3;', newText: 'const retries = 5;' }] } }], finishReason: 'tool_calls', usage });
+      if (/numbered list/.test(prompt)) return respondOpenAIChatSSE(res, { content: '1. Search for getUser\n2. Rename it to fetchUser\n3. Run the tests', finishReason: 'stop', usage });
+      const token = prompt.match(/release-token=(ZK-[A-Z0-9]{4})/)?.[1] || 'none';
+      return respondOpenAIChatSSE(res, { content: token, finishReason: 'stop', usage });
+    });
+    const { call } = await setup(t, { defaultModel: 'fixture-cal:cal', providers: [{ id: 'fixture-cal', type: 'openai-compatible', baseUrl: server.url, apiKeyEnv: null, enabled: true, autoDiscover: false, models: [{ id: 'cal', contextWindow: 16000 }], timeoutMs: 5000 }] });
+    await call('model_profile', {}, r => { assert.equal(r.calibration, null); assert.equal(r.source, 'prior'); assert.ok(r.knobs.repairBudget >= 2); }, 'local model fixture');
+    await call('model_calibrate', {}, r => { assert.equal(r.composite, 1); assert.equal(r.decision.level, 0); assert.equal(r.probes.length, 4); }, 'local model fixture');
+    await call('model_profile', {}, r => { assert.equal(r.source, 'calibration'); assert.equal(r.level, 0); assert.equal(r.knobs.compactPrompt, false); }, 'local model fixture');
   });
 
   await suite.test('code intelligence, routing, executable DAGs and validated skills', async (t) => {
