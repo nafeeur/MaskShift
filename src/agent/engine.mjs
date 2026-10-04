@@ -797,7 +797,8 @@ export class AgentEngine {
       let args = call.args || {};
       const notes = [];
       let repaired = false;
-      if (!name.startsWith('mcp__') || !this.toolRegistry.has(name)) {
+      const repairOn = this.config.get().guardrails?.features?.callRepair !== false;
+      if (repairOn && (!name.startsWith('mcp__') || !this.toolRegistry.has(name))) {
         // A near-miss on the name is resolved here rather than sent back as an error: the error
         // would cost a whole model turn, and the model already knew which tool it meant.
         if (!this.toolRegistry.has(name) && !name.startsWith('mcp__')) {
@@ -809,11 +810,11 @@ export class AgentEngine {
       }
       if (this.toolRegistry.has(name)) {
         const schema = this.toolRegistry.descriptor(name)?.inputSchema;
-        const normalized = normalizeArgs(args, schema);
+        const normalized = repairOn ? normalizeArgs(args, schema) : { args, repairs: [] };
         args = normalized.args;
         repaired = normalized.repairs.length > 0 || notes.length > 0;
         if (normalized.repairs.length) this.#event(run.id, 'tool-call-repaired', { tool: name, requested: call.name, repairs: normalized.repairs.slice(0, 12) }, scope);
-        const missing = missingRequired(args, schema);
+        const missing = repairOn ? missingRequired(args, schema) : [];
         if (missing.length) throw new Error(missingArgumentMessage(name, schema, missing, args));
         const value = await this.toolRegistry.execute(name, args, toolContext);
         let content = withNotes(await this.#observe(value, context), notes);
@@ -842,6 +843,7 @@ export class AgentEngine {
     const maxChars = this.config.get().maxToolOutputChars;
     const { observation, workspacePath, run } = context;
     try {
+      if (this.config.get().guardrails?.features?.observation === false) return renderToolResult(value, maxChars);
       const shaped = await shapeObservation(value, {
         budget: observation?.budget || maxChars,
         spill: observation?.spill && workspacePath ? (text) => observation.spill(text, { workspacePath, runId: run.id }) : null,

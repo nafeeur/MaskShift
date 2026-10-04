@@ -170,7 +170,7 @@ export function registerFilesystemTools(registry, { workspaceManager, config }) 
       for (const [index, edit] of args.edits.entries()) {
         let result;
         try {
-          result = applyEdit(content, edit.oldText, edit.newText ?? '', { replaceAll: Boolean(edit.replaceAll) });
+          result = applyEdit(content, edit.oldText, edit.newText ?? '', { replaceAll: Boolean(edit.replaceAll), exactOnly: config.get().guardrails?.features?.fuzzyEdits === false });
         } catch (error) {
           if (error instanceof EditMatchError) throw new Error(`Edit ${index}: ${error.message} (${target})`);
           throw error;

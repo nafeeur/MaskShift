@@ -92,7 +92,7 @@ export class EditFeedback {
   settings() {
     const raw = this.config.get().guardrails?.feedback || {};
     return {
-      enabled: raw.enabled !== false,
+      enabled: raw.enabled !== false && this.config.get().guardrails?.features?.editFeedback !== false,
       syntax: raw.syntax !== false,
       lsp: raw.lsp !== false,
       timeoutMs: Number(raw.timeoutMs) > 0 ? Number(raw.timeoutMs) : 8000,

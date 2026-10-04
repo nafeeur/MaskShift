@@ -141,7 +141,7 @@ const LINE_STRATEGIES = [
  * `strategy` is `exact` or the looser rule that matched. Throws EditMatchError when the text is
  * missing or matches more than one place.
  */
-export function applyEdit(content, oldText, newText, { replaceAll = false } = {}) {
+export function applyEdit(content, oldText, newText, { replaceAll = false, exactOnly = false } = {}) {
   if (!oldText) throw new EditMatchError('oldText is empty', { kind: 'empty' });
   const exact = occurrences(content, oldText);
   if (exact.length > 1 && !replaceAll) throw ambiguous(content, exact.map((at) => lineNumberOf(content, at)));
@@ -149,6 +149,8 @@ export function applyEdit(content, oldText, newText, { replaceAll = false } = {}
     const next = replaceAll ? content.split(oldText).join(newText) : content.slice(0, exact[0]) + newText + content.slice(exact[0] + oldText.length);
     return { content: next, replacements: replaceAll ? exact.length : 1, strategy: 'exact', startLine: lineNumberOf(content, exact[0]), endLine: lineNumberOf(content, exact[0]) + splitLines(oldText).length - 1 };
   }
+
+  if (exactOnly) throw new EditMatchError('oldText was not found', { kind: 'missing' });
 
   // Everything below is a repair of an almost-right edit; it never fans out to replaceAll.
   const eol = eolOf(content);
