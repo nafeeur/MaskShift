@@ -37,7 +37,7 @@ test('directives are parsed leniently and removed from the reply', () => {
 test('the briefing names the member, the team, the objective and the mail', () => {
   const roster = [{ id: '1', name: 'lead', harness: 'alpha', role: 'plans' }, { id: '2', name: 'worker', harness: 'beta', role: '' }];
   const text = buildBriefing({ member: roster[0], roster, objective: 'ship it', inbox: [{ from: 'worker', body: 'done', kind: 'message' }], history: [{ at: '2026-01-01T10:00:00Z', reply: 'earlier' }], message: '' });
-  for (const needle of ['You are "lead"', 'worker (beta)', 'Team objective:\nship it', 'from worker', 'earlier', '[[send to=NAME]]']) assert.ok(text.includes(needle), needle);
+  for (const needle of ['You are "lead"', 'worker (beta)', 'Team objective:\nship it', 'from worker', 'earlier', '[[send to=worker]]']) assert.ok(text.includes(needle), needle);
 });
 
 test('members of different harnesses coexist, and the same harness can hold several seats', async (t) => {
@@ -93,6 +93,8 @@ test('messages are de-duplicated, hop-limited and refused for unknown members', 
   assert.match(duplicate.dropped, /Duplicate/);
   assert.match(fleet.send({ from: 'a', to: 'b', body: 'loop', hops: 4 }).dropped, /hop limit/);
   assert.match(fleet.send({ from: 'a', to: 'nobody', body: 'hi' }).dropped, /No fleet member/);
+  const notice = fleet.get('a').inbox.find((item) => item.kind === 'notice');
+  assert.match(notice.body, /no such member.*b/s, 'the sender is told who it can actually reach');
   const broadcast = fleet.send({ from: 'a', to: '*', body: 'all hands' });
   assert.deepEqual(broadcast.map((item) => item.to), ['b']);
   assert.equal(fleet.get('b').inbox.length, 2);

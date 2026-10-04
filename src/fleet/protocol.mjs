@@ -41,15 +41,25 @@ export function parseDirectives(raw) {
   return { sends, done: dones.length ? dones.join('\n\n') || 'Done.' : null, text: text.replace(/\n{3,}/g, '\n\n').trim() };
 }
 
-export const PROTOCOL = [
-  'You are one member of a team of AI coding agents working together, coordinated by MaskShift.',
-  'To message a teammate, put this in your reply (it is routed to them; they answer by message):',
-  '  [[send to=NAME]] your message [[/send]]      (to=* reaches everyone)',
-  'When the overall task is complete, say so with:',
-  '  [[done]] a short summary of the outcome [[/done]]',
-  'Anything outside those blocks is your own working notes/answer. Be specific in messages: say what you need,',
-  'which files are involved, and what you already tried. Do not message a teammate unless you need something from them.',
-].join('\n');
+/**
+ * How to talk to teammates. Smaller models copy examples verbatim, so the example names a real teammate and the text
+ * around it says outright that the content is theirs to write.
+ */
+export function protocolFor(teammates = []) {
+  const example = teammates[0]?.name || 'reviewer';
+  const lines = [
+    'You are one member of a team of AI agents working together, coordinated by MaskShift.',
+    'To message a teammate, write a block like this in your reply. It is delivered to them, and they answer by message:',
+    `  [[send to=${example}]] Please check the failing test in tests/auth.test.mjs and tell me the cause. [[/send]]`,
+    `(That was only an example of the format. Use a real teammate's name and write your own message; to=* reaches everyone.)`,
+    'When the whole task is finished, close it out with a block containing your real final answer:',
+    '  [[done]] Fixed the race in auth.mjs; reviewed by reviewer; tests pass. [[/done]]',
+    '(Again an example of the format. Write the actual outcome, not those words.)',
+    'Text outside the blocks is your own working notes. Be specific in messages: what you need, which files, what you tried.',
+    'Only message a teammate when you need something from them. If a teammate answered you, use their answer; do not ask again.',
+  ];
+  return lines.join('\n');
+}
 
 const clip = (text, limit) => {
   const value = String(text ?? '');
@@ -63,7 +73,8 @@ const clip = (text, limit) => {
 export function buildBriefing({ member, roster, objective = '', inbox = [], history = [], message = '', limits = {} }) {
   const historyChars = limits.historyChars ?? 6000;
   const messageChars = limits.messageChars ?? 12000;
-  const lines = [PROTOCOL, ''];
+  const teammatesForProtocol = roster.filter((other) => other.id !== member.id);
+  const lines = [protocolFor(teammatesForProtocol), ''];
   lines.push(`You are "${member.name}" (${member.title || member.harness}).`);
   if (member.role) lines.push(`Your role: ${member.role}`);
   const teammates = roster.filter((other) => other.id !== member.id);

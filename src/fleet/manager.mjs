@@ -293,6 +293,15 @@ export class FleetManager {
       record.status = 'dropped';
       record.dropped = error.message;
       this.#log(record);
+      // Tell the sender, so a model that mistyped a name (or copied a placeholder) can correct itself.
+      const sender = this.#find(from);
+      if (sender && kind !== 'notice') {
+        sender.inbox.push({
+          id: newId('msg'), at: nowIso(), from: 'fleet', to: sender.name, kind: 'notice', hops: hops + 1, relayId, status: 'queued',
+          body: `Your message to "${to}" was not delivered: there is no such member. Members you can message: ${[...this.members.values()].filter((member) => member !== sender).map((member) => member.name).join(', ') || '(none)'}.`,
+        });
+      }
+      this.#save();
       return record;
     }
     if (!target) { record.status = 'delivered'; this.#log(record); return record; }
@@ -313,6 +322,10 @@ export class FleetManager {
     this.#save();
     this.#emit('message', { message: record });
     return record;
+  }
+
+  #find(ref) {
+    return [...this.members.values()].find((member) => member.name === ref) || null;
   }
 
   #log(record) {

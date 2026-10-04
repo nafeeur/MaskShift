@@ -109,6 +109,11 @@ it immediately becomes available to the fleet. A bridge may set `modelArgs` (app
 
 ## Limits
 
+- Small models follow the message format less reliably. A message to a name that is not a member is reported back to
+  the sender so it can correct itself, and the round limit bounds the rest. Verified live with Codex, OpenCode and
+  Hermes all running `openai/gpt-oss-20b` through OpenRouter: Codex led, asked the other two questions with `[[send]]`
+  and finished with their answers.
+
 - Members cannot see each other's files except through the shared working directory (or by describing them in messages).
   Two `edit` members in one directory can step on each other; give them `isolated` worktrees for parallel edits.
 - The CLIs are driven non-interactively and one turn at a time. A harness that stops to ask a question is answered by

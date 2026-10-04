@@ -34,7 +34,8 @@ const DEFAULT_BRIDGES = {
   hermes: {
     title: 'Nous Hermes Agent',
     command: 'hermes',
-    args: ['chat', '-q', '{prompt}'],
+    args: ['chat', '-q', '{prompt}', '-Q'],
+    modelArgs: ['-m', '{model}'],
     description: 'Delegate a task to an installed Hermes Agent CLI.',
   },
   aider: {
