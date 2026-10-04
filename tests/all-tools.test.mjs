@@ -308,6 +308,16 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
     assert.match(await fsp.readFile(path.join(project, 'index.js'), 'utf8'), /function speed/);
     await call('lsp_format', pos, r => assert.equal(r.applied.edits, 1), 'stdio protocol fixture');
     assert.match(await fsp.readFile(path.join(project, 'index.js'), 'utf8'), /^\/\/ formatted/);
+    await call('lsp_code_actions', { ...pos }, r => {
+      assert.deepEqual(r.actions.map(action => action.title), ['Organize imports', 'Extract to function', 'Not available here']);
+      assert.equal(r.actions[2].disabled, 'fixture says no');
+    }, 'stdio protocol fixture');
+    await call('lsp_code_actions', { ...pos, kinds: ['refactor'] }, r => assert.deepEqual(r.actions.map(action => action.kind), ['refactor.extract']), 'stdio protocol fixture');
+    await call('lsp_code_actions', { ...pos, apply: true }, r => { assert.equal(r.chosen.title, 'Extract to function', 'the preferred action is applied by default'); assert.equal(r.applied[0].edits, 1); }, 'stdio protocol fixture');
+    assert.match(await fsp.readFile(path.join(project, 'index.js'), 'utf8'), /extracted\(\)/);
+    await call('lsp_code_actions', { ...pos, apply: true, title: 'Organize imports' }, r => assert.equal(r.chosen.kind, 'source.organizeImports'), 'stdio protocol fixture');
+    await assert.rejects(runtime.toolRegistry.execute('lsp_code_actions', { ...pos, apply: true, title: 'Not available here' }, { workspaceId: (await runtime.workspaceManager.open(project)).id }), /not available: fixture says no/);
+    await call('lsp_organize_imports', { file: 'index.js', server: 'fixture' }, r => assert.equal(r.chosen.title, 'Organize imports'), 'stdio protocol fixture');
     await call('lsp_stop', {}, r => assert.equal(r.stopped, true), 'stdio protocol fixture');
     assert.equal(runtime.lspManager.list().length, 0);
   });
@@ -397,6 +407,7 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
     // 'two' answered one's message, so its reply is waiting in one's inbox: the lead's first turn sees mail and the relay ends quietly.
     await call('fleet_relay', { task: 'finish', lead: 'one' }, r => { assert.equal(r.status, 'completed'); assert.equal(r.reason, 'quiet'); assert.equal(r.final, 'got mail'); }, 'local CLI fixture');
     await call('fleet_relay', { task: 'finish again', lead: 'one' }, r => { assert.equal(r.status, 'completed'); assert.equal(r.final, 'FLEET_OK'); assert.match(r.reason, /done by one/); }, 'local CLI fixture');
+    await call('fleet_suggest', { task: 'fix the parser bug' }, r => { assert.ok(r.ranking.some(item => item.name === 'fixture')); assert.equal(typeof r.informed, 'boolean'); }, 'local CLI fixture');
     await call('fleet_stop', { name: 'two', remove: true }, r => assert.equal(r.removed, 'two'), 'local CLI fixture');
     await call('fleet_stop', {}, r => assert.ok(Array.isArray(r)), 'local CLI fixture');
   });
@@ -406,6 +417,21 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
     await call('storage_status', {}, r => { assert.ok(r.usage.database > 0); assert.ok(r.budget.total > 0); assert.ok(['roomy', 'normal', 'tight', 'critical'].includes(r.pressure)); });
     await call('storage_prune', {}, r => { assert.equal(r.dryRun, true); assert.equal(r.freedBytes, 0); });
     await call('storage_prune', { dryRun: false }, r => { assert.equal(r.dryRun, false); assert.deepEqual(r.failures, []); });
+  });
+
+  await suite.test('learning tools report, mine, accept, explain routing and forget', async (t) => {
+    const { call, runtime, project } = await setup(t, { routing: { models: [{ model: 'fixture:local', tags: [], priority: 1 }] } });
+    const workspaceId = (await runtime.workspaceManager.open(project)).id;
+    const memory = runtime.store.saveMemory({ workspaceId, title: 'Lesson · demo', content: 'Run the linter first.', tags: ['lesson'], dedupe: false, meta: { kind: 'lesson', key: 'demo', occurrences: 1, trigger: { tags: ['general-coding'], tokens: [] } } });
+    await call('learn_status', {}, r => { assert.ok(r.lessons.some(item => item.id === memory.id)); assert.equal(r.settings.enabled, true); assert.ok(Array.isArray(r.executors)); });
+    await call('skill_mine', {}, r => assert.deepEqual(r, []));
+    await runtime.store.setSetting(runtime.learningManager.miner.key(workspaceId), [{ id: 'abc', name: 'mined-demo', description: 'd', body: '# demo\n\n1. Run `x`', steps: ['a', 'b', 'c'], support: 3, successRate: 1, status: 'proposed' }]);
+    await call('skill_mine_accept', { name: 'mined-demo', dismiss: true }, r => assert.equal(r.status, 'dismissed'));
+    await call('skill_mine_accept', { name: 'mined-demo' }, r => assert.equal(r.name, 'mined-demo'));
+    await call('router_explain', { task: 'fix the parser bug' }, r => { assert.equal(r.model.selected, 'fixture:local'); assert.ok(r.agent.selected.type); });
+    await call('learn_forget', { id: memory.id }, r => assert.equal(r.kind, 'lesson'));
+    assert.equal(runtime.store.getMemory(memory.id), null);
+    await assert.rejects(runtime.toolRegistry.execute('learn_forget', { id: 'mem_nope' }, { workspaceId }), /not a learned lesson/);
   });
 
   await suite.test('container, SSH, database CLI and service command adapters', async (t) => {

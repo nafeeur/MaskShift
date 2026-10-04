@@ -95,6 +95,7 @@ const SLASH_COMMANDS = [
   { name: 'doctor', hint: 'run diagnostics' },
   { name: 'logs', hint: 'view logs' },
   { name: 'storage', hint: 'disk use, budget and cleanup' },
+  { name: 'learned', hint: 'what MaskShift has learned from your runs' },
   { name: 'settings', hint: 'open settings' },
   { name: 'help', hint: 'reference & shortcuts' },
   { name: 'quit', hint: 'exit MaskShift' },
@@ -1275,6 +1276,9 @@ export class MaskShiftTui {
     if (event.type === 'model.context-window.learned') void this.refreshModelProfile();
     if (event.type.startsWith('plugin.')) this.plugins = this.runtime.pluginManager.list();
     if (event.type.startsWith('fleet.')) fleetView.onEvent(this, event);
+    if (event.type === 'learning.updated' && (event.payload.newLessons || event.payload.preferences)) this.toast(`Learned something new from that run — /learned shows what`, 'info');
+    if (event.type === 'run.escalated') this.toast(`Moved to ${event.payload.to}: ${truncate(event.payload.reason, 80)}`, 'warn');
+    if (event.type === 'run.stuck' && event.payload.level === 'stop') this.toast('Stopped: no progress. See the report in the chat.', 'warn');
     if (event.type === 'storage.warning') this.toast(truncate(event.payload.message, 160), 'warn');
     if (event.type === 'storage.pruned' && event.payload.freedBytes > 50 * 1024 * 1024) this.toast(`Freed ${formatBytes(event.payload.freedBytes)} of old checkpoints and indexes`, 'info');
     if (event.type.startsWith('automation.')) this.automations = this.runtime.automationScheduler.list({ limit: 200 });
@@ -2719,6 +2723,50 @@ export class MaskShiftTui {
       : `Mouse: ${mode} (shift+drag still selects text)`, 'info');
   }
 
+  /** What the learning layer knows, in plain words: what it will tell the model, who it trusts, and what it has noticed. */
+  async openLearned() {
+    try {
+      const status = this.runtime.learningManager.status({ workspaceId: this.workspaceId });
+      const pct = (value) => `${Math.round(value * 100)}%`;
+      const lines = [`Learned from ${status.runs} run${status.runs === 1 ? '' : 's'} on this machine. Everything stays here; \`maskshift learn forget ID\` removes anything.`, ''];
+      if (status.preferences.length) {
+        lines.push('What you have told it');
+        for (const item of status.preferences.slice(0, 8)) lines.push(`  ${item.active ? '●' : '○'} ${item.text}${item.active ? '' : '  (said once; not applied yet)'}`);
+        lines.push('');
+      }
+      if (status.lessons.length) {
+        lines.push('Lessons from earlier runs');
+        for (const item of status.lessons.slice(0, 8)) lines.push(`  • ${item.text}  [seen ${item.occurrences}×, trusted ${pct(item.confidence)}]`);
+        lines.push('');
+      }
+      if (status.executors.length) {
+        lines.push('Track record');
+        for (const item of status.executors.slice(0, 8)) lines.push(`  ${fit(item.executor, 34)} ${fit(`${item.runs} runs`, 9)} ${pct(item.rate)} went well`);
+        lines.push('');
+      }
+      const proposed = status.skills.filter((item) => item.status === 'proposed');
+      if (proposed.length) lines.push(`${proposed.length} repeated workflow${proposed.length === 1 ? '' : 's'} could become a skill: open the palette → "Skills found in your repeated workflows".`, '');
+      if (!status.runs) lines.push('Nothing yet. It builds up as you work.');
+      this.overlay = new TextOverlay({ title: 'What MaskShift has learned', lines: lines.flatMap((line) => wrap(line, 92)), stamp: 'esc closes' });
+    } catch (error) { this.toast(error.message, 'error'); }
+    this.requestRender();
+  }
+
+  /** Workflows found in your own runs, offered as skills. Picking one installs it. */
+  openMinedSkills() {
+    const miner = this.runtime.learningManager.miner;
+    // What the background pass already found; only look afresh when it has found nothing.
+    const known = miner.candidates(this.workspaceId).filter((item) => item.status === 'proposed');
+    const found = known.length ? known : miner.mine({ workspaceId: this.workspaceId }).filter((item) => item.status === 'proposed');
+    if (!found.length) { this.toast('No repeated workflows found yet — they need to show up in at least three runs', 'info'); return; }
+    this.overlay = new PickerOverlay({
+      title: 'Install a skill from your own workflows', placeholder: 'Filter…',
+      items: found.map((item) => ({ id: item.id, label: item.name, detail: `${item.support} runs · ${Math.round(item.successRate * 100)}% went well`, item })),
+      preview: (_app, entry, width) => wrap(entry.item.steps.map((step) => step.replace(/^shell:/, '')).join(' → '), Math.max(20, width - 2)),
+      onSelect: (entry) => void miner.accept(this.workspaceId, entry.id).then(() => this.toast(`Installed skill ${entry.label}`, 'success')).catch((error) => this.toast(error.message, 'error')),
+    });
+  }
+
   /** Disk use, as a read-only report: what is stored, the budget this machine implies, and what to do about it. */
   async openStorage() {
     try {
@@ -2866,6 +2914,8 @@ export class MaskShiftTui {
       action('model.discover', 'model', 'Re-discover providers and models'),
       action('workspace.open', 'workspace', 'Open workspace', 'ctrl+o'),
       action('workspace.index', 'workspace', 'Rebuild the context index'),
+      action('learn.status', 'learning', 'What MaskShift has learned: lessons, preferences, track record'),
+      action('learn.skills', 'learning', 'Skills found in your repeated workflows'),
       action('storage.status', 'storage', 'Disk use: usage and the budget for this machine'),
       action('storage.prune', 'storage', 'Disk use: free up space (old checkpoints, stale indexes)'),
       action('workspace.inspect', 'workspace', 'Inspect the workspace'),
@@ -2932,6 +2982,8 @@ export class MaskShiftTui {
       case 'model.discover': await this.discoverProviders(); this.toast('Providers re-discovered', 'success'); break;
       case 'workspace.open': this.openWorkspaceDialog(); break;
       case 'workspace.index': void this.reindex(); break;
+      case 'learn.status': void this.openLearned(); break;
+      case 'learn.skills': this.openMinedSkills(); break;
       case 'storage.status': void this.openStorage(); break;
       case 'storage.prune': void this.confirmStoragePrune(); break;
       case 'workspace.inspect': void this.showInspection(); break;
@@ -2979,6 +3031,7 @@ export class MaskShiftTui {
       case 'settings': this.openSettings(); break;
       case 'logs': await this.showLogs(); break;
       case 'storage': await this.openStorage(); break;
+      case 'learned': case 'learning': await this.openLearned(); break;
       case 'help': this.openHelp(); break;
       case 'refresh': this.refreshAll(); break;
       case 'quit': this.stop(0); break;

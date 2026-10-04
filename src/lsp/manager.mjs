@@ -122,6 +122,43 @@ export class LspManager {
     return { edits, applied: apply ? await client.applyTextEdits(full, edits || []) : null };
   }
 
+  /**
+   * Refactors and quick fixes the language server offers for a range: organize imports, fix this error, extract a function.
+   * Lists them, and applies one when asked (by index, by title, or the server's preferred one). Where a rename needs the
+   * symbol's name, this needs only the place.
+   */
+  async codeActions(workspaceId, file, { line, character = 1, endLine = null, endCharacter = null, kinds = [], apply = false, index = null, title = null } = {}, serverId) {
+    const { client, file: full } = await this.ensure(workspaceId, file, serverId);
+    if (!client.capabilities?.codeActionProvider) throw new Error(`Language server ${client.serverId} does not offer code actions`);
+    const range = {
+      start: { line: Math.max(0, line - 1), character: Math.max(0, character - 1) },
+      end: { line: Math.max(0, (endLine || line) - 1), character: endCharacter ? Math.max(0, endCharacter - 1) : 10_000 },
+    };
+    const uri = pathToFileURL(full).href;
+    const diagnostics = (client.diagnostics.get(uri) || []).filter((item) => item.range && item.range.start.line <= range.end.line && item.range.end.line >= range.start.line);
+    const raw = (await client.documentRequest('textDocument/codeAction', full, { range, context: { diagnostics, ...(kinds.length ? { only: kinds } : {}) } })) || [];
+    const actions = raw.map((action, position) => ({
+      index: position, title: action.title, kind: action.kind || null, preferred: Boolean(action.isPreferred),
+      disabled: action.disabled?.reason || null, hasEdit: Boolean(action.edit), command: action.command?.command || action.command || null,
+    }));
+    if (!apply) return { actions };
+    const pick = index !== null && index !== undefined ? raw[index] : title ? raw.find((action) => action.title === title) : (raw.find((action) => action.isPreferred) || raw.find((action) => !action.disabled));
+    if (!pick) throw new Error(actions.length ? 'No code action matched; list them first and choose by index or title' : 'The language server offers no code actions here');
+    if (pick.disabled) throw new Error(`That code action is not available: ${pick.disabled.reason}`);
+    let action = pick;
+    if (!action.edit && !action.command?.command && client.capabilities.codeActionProvider?.resolveProvider) action = await client.request('codeAction/resolve', action);
+    const applied = [];
+    if (action.edit) applied.push(...await client.applyWorkspaceEdit(action.edit));
+    // A server that does the work itself (and asks the client to apply the result) is run through its own command.
+    else if (action.command?.command) await client.request('workspace/executeCommand', { command: action.command.command, arguments: action.command.arguments || [] });
+    return { actions, chosen: { title: action.title, kind: action.kind || null }, applied };
+  }
+
+  async organizeImports(workspaceId, file, serverId) {
+    const result = await this.codeActions(workspaceId, file, { line: 1, kinds: ['source.organizeImports'], apply: true }, serverId);
+    return result;
+  }
+
   async close(workspaceId = null, serverId = null) {
     for (const [key, client] of [...this.clients]) {
       if (workspaceId && !key.startsWith(`${workspaceId}:`)) continue;

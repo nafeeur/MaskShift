@@ -52,7 +52,7 @@ export class PromptBuilder {
     this.capabilityController = capabilityController;
   }
 
-  system({ workspaceContext, capabilityState, planState, run, session, modelProfile = null, knobs = null }) {
+  system({ workspaceContext, capabilityState, planState, run, session, modelProfile = null, knobs = null, notes = [] }) {
     const config = this.config.get();
     const active = this.capabilityController.snapshot(capabilityState);
     // The harness's own read of how much help this model needs, falling back to its size.
@@ -103,7 +103,7 @@ ${renderPlan(planState)}
 
 ## Loaded skill instructions
 
-${renderSkills(capabilityState)}
+${renderSkills(capabilityState)}${notes.length ? `\n\n## Harness notes\n\n${notes.map((note) => `- ${note}`).join('\n')}` : ''}
 `.trim();
 
     const maxChars = config.maxContextChars;

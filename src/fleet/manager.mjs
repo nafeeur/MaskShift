@@ -47,7 +47,7 @@ function messageKey(item) {
 }
 
 export class FleetManager {
-  constructor({ config, logger, eventBus, store, bridgeManager, workspaceManager, getEngine }) {
+  constructor({ config, logger, eventBus, store, bridgeManager, workspaceManager, getEngine, getLearning = () => null }) {
     this.config = config;
     this.logger = logger;
     this.eventBus = eventBus;
@@ -55,6 +55,7 @@ export class FleetManager {
     this.bridgeManager = bridgeManager;
     this.workspaceManager = workspaceManager;
     this.getEngine = getEngine;
+    this.getLearning = getLearning;
     this.members = new Map();
     this.messages = [];
     this.relays = [];
@@ -425,6 +426,14 @@ export class FleetManager {
         for (const asker of askers) delivered.push(this.send({ from: member.name, to: asker, body: parsed.text, kind: 'reply', hops: hops + 1, relayId }));
       }
     }
+    // How each harness does on what kind of task is what lets the router (and `fleet_suggest`) pick one later.
+    if (!outcome.cancelled) {
+      try {
+        this.getLearning()?.ledger.recordHarnessTurn({
+          harness: turn.harness, task: message || taken.map((item) => item.body).join('\n'), ok: outcome.ok, durationMs, retries: outcome.retries || 0, workspaceId: member.workspaceId,
+        });
+      } catch (error) { this.logger?.warn?.(`Could not record a harness outcome: ${error.message}`); }
+    }
     this.#save();
     this.#emit('turn.completed', { member: this.#view(member), turn, relayId });
     return {
@@ -621,6 +630,23 @@ export class FleetManager {
   listRelays() {
     this.load();
     return [...this.relays].reverse();
+  }
+
+  /** Which installed harness has done best on tasks like this one, with the evidence. Falls back to the existing members' order. */
+  async suggest(task) {
+    const learning = this.getLearning();
+    const harnesses = (await this.harnesses()).filter((item) => item.available);
+    if (!learning) return { informed: false, ranking: harnesses.map((item) => item.name), reason: 'Learning is unavailable.' };
+    const { classifyTask } = await import('../learning/profile.mjs');
+    const { harnessExecutor } = await import('../learning/ledger.mjs');
+    const profile = classifyTask(task);
+    const plan = learning.router.plan(harnesses.map((item) => ({ name: item.name, title: item.title, executor: harnessExecutor(item.name) })), profile);
+    return {
+      informed: plan.informed, taskProfile: profile, best: plan.primary?.name || null,
+      ranking: plan.ranked.map((item) => ({ name: item.name, expected: item.learned.successRate, evidence: item.learned.evidence })),
+      explanation: learning.router.explain(plan.ranked),
+      reason: plan.informed ? 'Ranked by how each harness has done on similar tasks.' : 'Not enough history yet; ordered by default.',
+    };
   }
 
   // ---------------------------------------------------------------- overview

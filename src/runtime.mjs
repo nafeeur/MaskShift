@@ -14,6 +14,7 @@ import { ProviderManager } from './agent/providers.mjs';
 import { McpManager } from './mcp/manager.mjs';
 import { LspManager } from './lsp/manager.mjs';
 import { BridgeManager } from './bridges/manager.mjs';
+import { LearningManager } from './learning/manager.mjs';
 import { StorageManager } from './storage/manager.mjs';
 import { FleetManager } from './fleet/manager.mjs';
 import { PluginManager } from './plugins/manager.mjs';
@@ -50,6 +51,8 @@ export async function createRuntime({ configPath, configOverrides = {}, workspac
   workspaceManager.checkpointLimits = () => storageManager.syncLimits()?.checkpoints || null;
   const skillManager = new SkillManager({ config, logger, eventBus });
   await skillManager.setWorkspace(workspacePath);
+  const learningManager = new LearningManager({ store, config, logger, eventBus, skillManager, workspaceManager, getCodeGraph: () => codeGraph });
+  contextPlanner.learnedMultiplier = (profile) => learningManager.feedback.multiplier(profile);
   const personaManager = new PersonaManager({ config, logger, eventBus });
   await personaManager.setWorkspace(workspacePath);
   const providerManager = new ProviderManager({ config, logger, eventBus, store });
@@ -58,18 +61,20 @@ export async function createRuntime({ configPath, configOverrides = {}, workspac
   const lspManager = new LspManager({ config, logger, eventBus, workspaceManager });
   const processManager = new ProcessManager({ eventBus, logger, config });
   const bridgeManager = new BridgeManager({ config, logger, eventBus, processManager, workspaceManager });
-  const fleetManager = new FleetManager({ config, logger, eventBus, store, bridgeManager, workspaceManager, getEngine: () => engine });
+  const fleetManager = new FleetManager({ config, logger, eventBus, store, bridgeManager, workspaceManager, getEngine: () => engine, getLearning: () => learningManager });
   const browserManager = new BrowserManager({ config, logger, eventBus, workspaceManager });
   const interaction = new InteractionBroker({ eventBus, logger });
   const secretVault = new SecretVault({ config, logger, store });
   const toolRegistry = new ToolRegistry({ logger, eventBus, hooks, config });
   const capabilityController = new CapabilityController({ toolRegistry, skillManager, mcpManager, config, eventBus });
   const intelligenceRouter = new IntelligenceRouter({ config, store, providerManager, bridgeManager });
+  intelligenceRouter.learning = learningManager;
   const contextBuilder = new ContextBuilder({ workspaceManager, indexer, codeGraph, contextPlanner, store, config, logger });
+  contextBuilder.learning = learningManager;
   let engine;
   const managerDependencies = {
     config, store, logger, eventBus, hooks, workspaceManager, indexer, codeGraph, contextPlanner, contextBuilder, intelligenceRouter, skillManager, personaManager,
-    providerManager, mcpManager, lspManager, processManager, bridgeManager, fleetManager, storageManager, browserManager, interaction, secretVault,
+    providerManager, mcpManager, lspManager, processManager, bridgeManager, fleetManager, storageManager, learningManager, browserManager, interaction, secretVault,
     toolRegistry, capabilityController, getEngine: () => engine,
   };
   const pluginManager = new PluginManager({
@@ -83,7 +88,7 @@ export async function createRuntime({ configPath, configOverrides = {}, workspac
   managerDependencies.automationScheduler = automationScheduler;
   registerAllTools(toolRegistry, {
     config, store, logger, eventBus, hooks, workspaceManager, indexer, codeGraph, contextPlanner, contextBuilder, intelligenceRouter, skillManager, personaManager,
-    providerManager, mcpManager, lspManager, processManager, bridgeManager, fleetManager, storageManager, browserManager, interaction, secretVault,
+    providerManager, mcpManager, lspManager, processManager, bridgeManager, fleetManager, storageManager, learningManager, browserManager, interaction, secretVault,
     pluginManager, automationScheduler, capabilityController,
     getEngine: () => engine,
   });
@@ -92,19 +97,21 @@ export async function createRuntime({ configPath, configOverrides = {}, workspac
   engine = new AgentEngine({
     store, config, logger, eventBus, hooks, providerManager, workspaceManager, intelligenceRouter,
     indexer, toolRegistry, capabilityController, promptBuilder, contextBuilder, mcpManager, personaManager, lspManager,
+    learning: learningManager, interaction,
   });
   automationScheduler.start();
   storageManager.start();
 
   const runtime = {
     config, eventBus, logger, store, hooks, workspaceManager, indexer, codeGraph, contextPlanner, intelligenceRouter, skillManager, personaManager,
-    providerManager, mcpManager, lspManager, bridgeManager, fleetManager, storageManager, browserManager, interaction, secretVault, pluginManager,
+    providerManager, mcpManager, lspManager, bridgeManager, fleetManager, storageManager, learningManager, browserManager, interaction, secretVault, pluginManager,
     automationScheduler, processManager, toolRegistry, capabilityController,
     contextBuilder, promptBuilder, engine,
     async close() {
+      await engine.close();
+      await learningManager.idle();
       await storageManager.close();
       await fleetManager.close();
-      await engine.close();
       await automationScheduler.close();
       await pluginManager.close();
       await browserManager.closeAll();

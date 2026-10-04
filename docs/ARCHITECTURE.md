@@ -59,7 +59,7 @@ In-process runtime ───── event bus ───── audit + telemetry
         │     ├── capability controller
         │     └── plan / tool / subagent loop
         │
-        ├── Native tool registry (193 tools)
+        ├── Native tool registry (201 tools)
         ├── Skill manager (metadata eager, body lazy)
         ├── MCP manager (definition eager, connection/schema lazy)
         ├── Workspace + index + checkpoint managers
@@ -138,6 +138,12 @@ The built-in `node:sqlite` driver stores:
 - application settings.
 
 Large binary artifacts remain on disk and are referenced by path.
+
+Learning lives in `src/learning/` ([docs](LEARNING.md)). `LearningManager` is its only entry point and the engine calls it
+at three moments: before a run (lessons, preferences and the ambiguity note join the context), during a run (the risk guard,
+the progress monitor, the tool-result cache and neighbour hints sit on the tool path; escalation swaps the model mid-run),
+and after a run (outcome, lessons, preferences and context use are recorded). Everything is best-effort and never changes
+how a run ends. The ledger of outcomes is a table in the same SQLite file; lessons and preferences are ordinary memories.
 
 Disk use is bounded by `src/storage/`: `budget.mjs` derives every limit from the host's disk and memory, and `StorageManager` measures usage, plans and performs retention, and compacts the database. See [Disk use](STORAGE.md).
 

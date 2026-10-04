@@ -73,6 +73,29 @@ export function registerLspTools(registry, { lspManager }) {
   });
 
   registry.register({
+    name: 'lsp_code_actions', title: 'Language-server refactors and quick fixes',
+    description: 'List the refactors and quick fixes the language server offers at a position or range (fix this error, extract a function, add a missing import…) and optionally apply one by index, by title, or the preferred one. Prefer this over hand-editing for mechanical refactors.',
+    category: 'code-intelligence', risk: 'write',
+    keywords: ['refactor', 'quick fix', 'extract function', 'add import', 'code action', 'organize imports'],
+    inputSchema: {
+      type: 'object', required: ['file', 'line'], properties: {
+        ...positionSchema, endLine: { type: 'integer', minimum: 1 }, endCharacter: { type: 'integer', minimum: 1 },
+        kinds: { type: 'array', items: { type: 'string' }, description: 'Only these kinds, e.g. ["quickfix"], ["refactor.extract"], ["source.organizeImports"].' },
+        apply: { type: 'boolean', default: false }, index: { type: 'integer', minimum: 0 }, title: { type: 'string' },
+      },
+    },
+    execute: async (args, context) => lspManager.codeActions(requireWorkspace(context), args.file, { line: args.line, character: args.character || 1, endLine: args.endLine, endCharacter: args.endCharacter, kinds: args.kinds || [], apply: Boolean(args.apply), index: args.index, title: args.title }, args.server),
+  });
+
+  registry.register({
+    name: 'lsp_organize_imports', title: 'Organize imports',
+    description: 'Sort and prune a file\'s imports with the language server.',
+    category: 'code-intelligence', risk: 'write',
+    inputSchema: { type: 'object', required: ['file'], properties: { file: { type: 'string' }, server: { type: 'string' } } },
+    execute: async (args, context) => lspManager.organizeImports(requireWorkspace(context), args.file, args.server),
+  });
+
+  registry.register({
     name: 'lsp_format', title: 'Language-aware format',
     description: 'Ask the language server to format a document and optionally apply the edits.',
     category: 'code-intelligence', risk: 'write',

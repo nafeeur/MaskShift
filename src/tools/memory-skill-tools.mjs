@@ -1,6 +1,7 @@
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { sha256 } from '../core/utils.mjs';
+import { applyConsolidation, planConsolidation } from '../learning/consolidate.mjs';
 
 function decayHalfLifeDays(config) {
   return config.get().memory?.decayHalfLifeDays || 30;
@@ -75,6 +76,7 @@ export function registerMemorySkillTools(registry, { store, skillManager, config
       properties: {
         scope: { type: 'string', enum: ['workspace', 'global', 'session'] },
         dryRun: { type: 'boolean', default: true },
+        similar: { type: 'boolean', default: true, description: 'Also merge memories that say the same thing in different words, not just ones with the same title.' },
         staleDays: { type: 'integer', minimum: 1, maximum: 3650, default: 90 },
         minEffectiveImportance: { type: 'number', minimum: 0, maximum: 1, default: 0.15 },
       },
@@ -110,8 +112,12 @@ export function registerMemorySkillTools(registry, { store, skillManager, config
         .filter((memory) => memory.effectiveImportance < minEffectiveImportance)
         .map((memory) => ({ id: memory.id, title: memory.title, ageDays: Math.round((now - Date.parse(memory.updated_at)) / 86_400_000), effectiveImportance: memory.effectiveImportance }));
 
+      const staleIds = new Set(staleCandidates.map((candidate) => candidate.id));
+      const similarPlans = args.similar === false ? [] : planConsolidation(all.filter((memory) => !mergedAway.has(memory.id) && !staleIds.has(memory.id)));
+      const similarGroups = similarPlans.map((plan) => ({ survivorId: plan.survivorId, title: plan.title, mergedIds: plan.mergedIds }));
+
       if (args.dryRun !== false) {
-        return { dryRun: true, considered: all.length, duplicateGroups, staleCandidates };
+        return { dryRun: true, considered: all.length, duplicateGroups, similarGroups, staleCandidates };
       }
 
       let merged = 0;
@@ -129,7 +135,8 @@ export function registerMemorySkillTools(registry, { store, skillManager, config
       }
       for (const candidate of staleCandidates) store.deleteMemory(candidate.id);
 
-      return { dryRun: false, considered: all.length, merged, pruned: staleCandidates.length, duplicateGroups: duplicateGroups.length };
+      const mergedSimilar = applyConsolidation(store, similarPlans.filter((plan) => store.getMemory(plan.survivorId)));
+      return { dryRun: false, considered: all.length, merged: merged + mergedSimilar, pruned: staleCandidates.length, duplicateGroups: duplicateGroups.length, similarGroups: similarGroups.length };
     },
   });
 

@@ -142,6 +142,20 @@ Run several coding-agent CLIs as one team. See [Agent fleet](FLEET.md).
 | `fleet show MEMBER` | A member's role, state and recent turns. |
 | `fleet stop [MEMBER]` / `reset MEMBER` / `remove MEMBER...` | Cancel a turn (or everything), clear history and inbox, or remove members. |
 
+## Learning
+
+See [Learning and judgement](LEARNING.md).
+
+| Command | Description |
+|---|---|
+| `learn` / `learn status` | Runs learned from, lessons, preferences, and how each model and harness has done. |
+| `learn lessons` | Lessons from earlier runs: how often seen, how often shown, how much they are trusted. |
+| `learn preferences` | Preferences noticed from your messages, and which are applied yet. |
+| `learn skills [mine\|accept NAME\|dismiss NAME]` | Workflows repeated across your runs, drafted as skills. Nothing is installed until you accept. |
+| `learn routing TASK...` | How a task would be routed: models and installed agent harnesses ranked by their record on similar tasks. |
+| `learn consolidate [--apply]` | Merge memories that say the same thing in different words (dry run unless `--apply`). |
+| `learn forget ID...` | Remove a learned lesson or preference. |
+
 ## Disk use
 
 See [Disk use](STORAGE.md) for how the limits are derived from the machine.

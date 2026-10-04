@@ -442,6 +442,11 @@ A Claude Desktop-style client config:
 
 Add `"--read-only"` to `args` for a client that should only ever inspect the workspace.
 
+## Learning
+
+The `learning` section switches and tunes what MaskShift learns from its own runs and how it decides when to ask or stop;
+see [Learning and judgement](LEARNING.md#configuration) for every key. `learning.enabled: false` turns it all off.
+
 ## Disk use
 
 The `storage` section pins the limits that are otherwise derived from the machine's disk and memory; see

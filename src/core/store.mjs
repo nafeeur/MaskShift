@@ -194,6 +194,30 @@ export class Store {
         created_at TEXT NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS run_outcomes (
+        id TEXT PRIMARY KEY,
+        run_id TEXT,
+        workspace_id TEXT,
+        executor TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        tags TEXT NOT NULL DEFAULT '[]',
+        tokens TEXT NOT NULL DEFAULT '[]',
+        complexity TEXT,
+        status TEXT NOT NULL,
+        success INTEGER NOT NULL,
+        verified INTEGER,
+        steps INTEGER NOT NULL DEFAULT 0,
+        total_tokens INTEGER NOT NULL DEFAULT 0,
+        cost REAL NOT NULL DEFAULT 0,
+        duration_ms INTEGER NOT NULL DEFAULT 0,
+        corrections INTEGER NOT NULL DEFAULT 0,
+        escalated_from TEXT,
+        created_at TEXT NOT NULL,
+        meta TEXT NOT NULL DEFAULT '{}'
+      );
+      CREATE INDEX IF NOT EXISTS idx_outcomes_executor_created ON run_outcomes(executor, created_at DESC);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_outcomes_run ON run_outcomes(run_id) WHERE run_id IS NOT NULL;
+
       CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL,
@@ -628,6 +652,51 @@ export class Store {
   listCheckpoints(workspaceId, limit = 100) {
     return this.db.prepare('SELECT * FROM checkpoints WHERE workspace_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?')
       .all(workspaceId, limit).map((row) => parseFields(row, ['manifest']));
+  }
+
+  // ------------------------------------------------------------------- learning
+
+  addOutcome(entry) {
+    const row = {
+      id: id('out'), run_id: entry.runId || null, workspace_id: entry.workspaceId || null, executor: entry.executor, kind: entry.kind,
+      tags: entry.tags || [], tokens: entry.tokens || [], complexity: entry.complexity || null, status: entry.status,
+      success: entry.success ? 1 : 0, verified: entry.verified === null || entry.verified === undefined ? null : (entry.verified ? 1 : 0),
+      steps: entry.steps || 0, total_tokens: entry.totalTokens || 0, cost: entry.cost || 0, duration_ms: entry.durationMs || 0,
+      corrections: entry.corrections || 0, escalated_from: entry.escalatedFrom || null, created_at: nowIso(), meta: entry.meta || {},
+    };
+    // One outcome per run: recording the same run again (a retry of the learning pass) replaces it.
+    if (row.run_id) this.db.prepare('DELETE FROM run_outcomes WHERE run_id = ?').run(row.run_id);
+    this.db.prepare(`INSERT INTO run_outcomes(id, run_id, workspace_id, executor, kind, tags, tokens, complexity, status, success, verified, steps,
+        total_tokens, cost, duration_ms, corrections, escalated_from, created_at, meta)
+      VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(row.id, row.run_id, row.workspace_id, row.executor, row.kind, JSON.stringify(row.tags), JSON.stringify(row.tokens), row.complexity,
+        row.status, row.success, row.verified, row.steps, row.total_tokens, row.cost, row.duration_ms, row.corrections, row.escalated_from,
+        row.created_at, JSON.stringify(row.meta));
+    return row;
+  }
+
+  listOutcomes({ executor, kind, since, workspaceId, limit = 500 } = {}) {
+    const clauses = [];
+    const args = [];
+    if (executor) { clauses.push('executor = ?'); args.push(executor); }
+    if (kind) { clauses.push('kind = ?'); args.push(kind); }
+    if (since) { clauses.push('created_at >= ?'); args.push(since); }
+    if (workspaceId) { clauses.push('workspace_id = ?'); args.push(workspaceId); }
+    const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+    return this.db.prepare(`SELECT * FROM run_outcomes ${where} ORDER BY created_at DESC, rowid DESC LIMIT ?`).all(...args, limit)
+      .map((row) => parseFields(row, ['tags', 'tokens', 'meta']));
+  }
+
+  pruneOutcomes(beforeIso) {
+    return Number(this.db.prepare('DELETE FROM run_outcomes WHERE created_at < ?').run(beforeIso).changes);
+  }
+
+  /** Memories of one learned kind (lessons, preferences), parsed, for the learning layer's own bookkeeping. */
+  listMemoriesByKind(kind, { workspaceId = null, limit = 500 } = {}) {
+    const rows = workspaceId
+      ? this.db.prepare("SELECT * FROM memories WHERE json_extract(meta, '$.kind') = ? AND (workspace_id = ? OR scope = 'global') ORDER BY updated_at DESC LIMIT ?").all(kind, workspaceId, limit)
+      : this.db.prepare("SELECT * FROM memories WHERE json_extract(meta, '$.kind') = ? ORDER BY updated_at DESC LIMIT ?").all(kind, limit);
+    return rows.map((row) => parseFields(row, ['tags', 'meta']));
   }
 
   // ------------------------------------------------------------ storage upkeep
