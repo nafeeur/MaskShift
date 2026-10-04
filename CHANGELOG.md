@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Added run guardrails (`guardrails` config). Stagnation detection nudges, then stops (status `stagnated`), a run that repeats the same call with the same result or alternates between two actions. Optional verification runs the project's own test/lint/typecheck commands before a run that changed files may finish, and feeds failures back to the model. Long runs now hand off to a fresh context seeded from `.maskshift/progress.md` once history nears the context budget, instead of relying on compaction alone.
+
 ## 1.4.1
 
 - Fixed `VERSION` (shown by `--version`, the TUI header, and reported to MCP/LSP clients) being a second hardcoded literal that had drifted from `package.json` — 1.4.0 was published still reporting itself as 1.3.0 everywhere. It's now read from `package.json` at startup instead of duplicated.

@@ -55,6 +55,7 @@ const VOCABULARY = {
   error: ['fail', 'ERROR'],
   cancelled: ['off', 'CANCELLED'],
   max_steps: ['warn', 'STEP LIMIT'],
+  stagnated: ['warn', 'STAGNATED'],
 
   // Plan steps.
   pending: ['pending', 'PENDING'],

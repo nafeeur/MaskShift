@@ -1,8 +1,13 @@
+import path from 'node:path';
 import { nowIso, runCommand, sha256, truncate } from '../core/utils.mjs';
 import { estimateUsageCost, summarizeCosts } from '../core/pricing.mjs';
 import { repairPrompt } from './tool-protocol.mjs';
 import { elideStaleToolResults, estimateHistoryTokens, fitHistory, groupTurns, historyBudget } from './context-budget.mjs';
 import { compactTurns } from './compaction.mjs';
+import {
+  PROGRESS_FILE, StagnationDetector, fallbackSummary, guardrailSettings, handoffMessage, renderProgress,
+  runVerification, stagnationNudge, verificationFeedback, verificationSummary, writeProgressFile,
+} from './guardrails.mjs';
 
 // Bounded so a model that cannot produce valid syntax ends the run instead of looping on it.
 const MAX_TOOL_CALL_REPAIRS = 2;
@@ -401,6 +406,54 @@ export class AgentEngine {
       };
       let overflowRetries = 0;
 
+      // Harness guardrails: none of these trust the model's own sense of progress.
+      const guardrails = guardrailSettings(this.config.get());
+      const detector = new StagnationDetector(guardrails.stagnation);
+      let stagnated = null;
+      let verificationAttempts = 0;
+      let lastVerification = null;
+      let unverifiedChanges = false;
+      let contextResets = 0;
+
+      // Replaces the whole conversation with a compact hand-off, written to disk as well so the
+      // state survives a crash and is inspectable. Compaction folds old turns into a summary but
+      // keeps the rest; this is the full reset for runs that outlive even that.
+      const resetContext = async () => {
+        const turns = groupTurns(history);
+        const compacted = await compactTurns(this.providerManager, {
+          modelRef: this.store.getRun(run.id).model_id, newlyDropped: turns, previousSummary: compaction.summary, signal,
+          maxSummaryTokens: 1_500,
+        });
+        if (compacted.usage) {
+          usage.push(compacted.usage);
+          costs.push(estimateUsageCost(this.config.get(), compacted.providerId, compacted.providerType, compacted.model, compacted.usage));
+        }
+        const tree = await runCommand('git status --short', { cwd: workspacePath, timeoutMs: 15_000, maxOutputChars: 6_000 }).catch(() => null);
+        contextResets += 1;
+        const progress = renderProgress({
+          runId: run.id, prompt: run.prompt, planState: entry.planState,
+          summary: compacted.usage ? compacted.summary : fallbackSummary(history),
+          verification: lastVerification ? verificationSummary(lastVerification) : null,
+          workingTree: tree?.code === 0 ? tree.stdout.trim() : '',
+          resets: contextResets,
+        });
+        let file = PROGRESS_FILE;
+        try { file = path.relative(workspacePath, await writeProgressFile(workspacePath, progress)) || PROGRESS_FILE; } catch (error) {
+          this.logger.warn('Could not write progress file', { runId: run.id, error: error.message });
+        }
+        const content = handoffMessage({ prompt: run.prompt, progress, file });
+        history.length = 0;
+        positions.clear();
+        compaction.summary = null;
+        compaction.throughMessageId = null;
+        compaction.forced = false;
+        detector.reset();
+        remember({ role: 'user', content }, this.store.addMessage({
+          sessionId: session.id, role: 'user', content, meta: { runId: run.id, synthetic: true, handoff: contextResets },
+        }));
+        this.#event(run.id, 'context-reset', { resets: contextResets, file, summarized: Boolean(compacted.usage) }, scope);
+      };
+
       while (step < maxSteps) {
         if (signal.aborted) throw signal.reason || new Error('Run cancelled');
         while (entry.steering.length) {
@@ -427,6 +480,12 @@ export class AgentEngine {
             systemTokens: Math.ceil(Buffer.byteLength(system.text, 'utf8') / 4),
             toolTokens: Math.ceil(Buffer.byteLength(JSON.stringify(tools), 'utf8') / 4),
           };
+          // Past this share of the budget a long run is handed off to a fresh context rather than
+          // left to be summarized turn by turn.
+          if (guardrails.handoff.enabled && contextResets < guardrails.handoff.maxResets && step > 1
+            && estimateHistoryTokens(history) > historyBudget(sizes) * guardrails.handoff.thresholdRatio) {
+            await resetContext();
+          }
           // Old tool output is the cheapest thing to give up: shrink it before dropping turns.
           const candidate = estimateHistoryTokens(history) > historyBudget(sizes) * 0.5
             ? elideStaleToolResults(history, { onReplace: (original, replacement) => messageIds.set(replacement, messageIds.get(original)) })
@@ -542,11 +601,38 @@ export class AgentEngine {
         // The model thinks it is done, but the operator said something it has not seen yet.
         if (!response.toolCalls?.length && entry.steering.length) continue;
 
+        // The model says it is done. For runs that changed something, the project's own checks
+        // decide whether that is true.
+        if (!response.toolCalls?.length && unverifiedChanges && guardrails.verification.commands.length && !entry.options.skipVerification) {
+          const outcome = await runVerification(guardrails.verification.commands, { cwd: workspacePath, timeoutMs: guardrails.verification.timeoutMs, signal });
+          if (signal.aborted) throw signal.reason || new Error('Run cancelled');
+          verificationAttempts += 1;
+          lastVerification = outcome;
+          this.#event(run.id, 'verification', {
+            ok: outcome.ok, attempt: verificationAttempts, results: outcome.results.map(({ command, label, ok, code, timedOut }) => ({ command, label, ok, code, timedOut })),
+          }, scope);
+          if (outcome.ok) {
+            unverifiedChanges = false;
+          } else if (verificationAttempts < guardrails.verification.maxAttempts) {
+            const feedback = verificationFeedback(outcome, { attempt: verificationAttempts, maxAttempts: guardrails.verification.maxAttempts });
+            remember({ role: 'user', content: feedback }, this.store.addMessage({
+              sessionId: session.id, role: 'user', content: feedback, meta: { runId: run.id, synthetic: true, verification: verificationAttempts },
+            }));
+            continue;
+          } else {
+            const note = `\n\n[Harness] Verification still failing after ${verificationAttempts} attempts: ${verificationSummary(outcome)}.`;
+            finalContent += note;
+            this.store.addMessage({ sessionId: session.id, role: 'assistant', content: note.trim(), meta: { runId: run.id, synthetic: true } });
+          }
+        }
+
         if (!response.toolCalls?.length) {
           const meta = {
             ...currentRun.meta, checkpointId: checkpoint?.id || null,
             capabilities: this.capabilityController.snapshot(capabilityState), plan: entry.planState,
             usage, costEstimate: summarizeCosts(costs), contextPlan: workspaceContext.contextPlan,
+            ...(lastVerification ? { verification: { ok: lastVerification.ok, attempts: verificationAttempts, summary: verificationSummary(lastVerification) } } : {}),
+            ...(contextResets ? { contextResets } : {}),
           };
           const completed = this.store.updateRun(run.id, { status: 'completed', ended_at: nowIso(), meta });
           this.store.updateSession(session.id, { status: 'idle', model_id: response.modelRef || currentRun.model_id });
@@ -575,23 +661,41 @@ export class AgentEngine {
           this.#event(run.id, result.isError ? 'tool-error' : 'tool-result', {
             toolCallId: result.call.id, tool: result.call.name, content: result.content,
           }, scope);
+          if (this.toolRegistry.descriptor(result.call.name)?.readOnly !== true) unverifiedChanges = true;
+          if (guardrails.stagnation.enabled) detector.observe(result.call, result);
+        }
+
+        const finding = guardrails.stagnation.enabled ? detector.check() : null;
+        if (finding?.level === 'stop') {
+          stagnated = finding;
+          break;
+        }
+        if (finding?.level === 'warn') {
+          const nudge = stagnationNudge(finding);
+          remember({ role: 'user', content: nudge }, this.store.addMessage({
+            sessionId: session.id, role: 'user', content: nudge, meta: { runId: run.id, synthetic: true, stagnation: finding.count },
+          }));
+          this.#event(run.id, 'stagnation', { level: 'warn', ...finding }, scope);
         }
       }
 
-      const message = `Run reached the configured maximum of ${maxSteps} model turns.`;
+      const message = stagnated
+        ? `Run stopped after ${stagnated.count} repeated ${stagnated.reason === 'oscillation' ? 'alternating ' : ''}actions with no change in result${stagnated.tool ? ` (${stagnated.tool})` : ''}.`
+        : `Run reached the configured maximum of ${maxSteps} model turns.`;
       if (!finalContent) {
         finalContent = message;
         this.store.addMessage({ sessionId: session.id, role: 'assistant', content: message, meta: { runId: run.id, synthetic: true } });
       }
       const current = this.store.getRun(run.id);
       const completed = this.store.updateRun(run.id, {
-        status: 'max_steps', ended_at: nowIso(), error: message,
+        status: stagnated ? 'stagnated' : 'max_steps', ended_at: nowIso(), error: message,
         meta: { ...current.meta, capabilities: this.capabilityController.snapshot(capabilityState), plan: entry.planState, usage, costEstimate: summarizeCosts(costs) },
       });
       this.store.updateSession(session.id, { status: 'idle' });
-      this.#event(run.id, 'max-steps', { message, final: finalContent }, scope);
-      await this.hooks?.run('Stop', { ...scope, workspacePath, status: 'max_steps', final: finalContent });
-      sessionEndOutcome = { status: 'max_steps', final: finalContent };
+      this.#event(run.id, stagnated ? 'stagnation' : 'max-steps', { ...(stagnated ? { level: 'stop', ...stagnated } : {}), message, final: finalContent }, scope);
+      const endStatus = stagnated ? 'stagnated' : 'max_steps';
+      await this.hooks?.run('Stop', { ...scope, workspacePath, status: endStatus, final: finalContent });
+      sessionEndOutcome = { status: endStatus, final: finalContent };
       return completed;
     } catch (error) {
       const cancelled = isAbort(error, signal);

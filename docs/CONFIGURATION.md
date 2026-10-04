@@ -23,9 +23,28 @@ The full example is [`maskshift.config.example.json`](../maskshift.config.exampl
 | `mcpTimeoutMs` | `60000` | Default MCP request timeout. |
 | `autoIndex` | `true` | Build/update the repository chunk index on open. |
 | `autoCheckpoint` | `true` | Capture recoverable state before autonomous runs. |
+| `guardrails` | see [Run guardrails](#run-guardrails) | Stagnation detection, project-check verification and context hand-off for long runs. |
 | `autoLoadCapabilities` | `true` | Prime tools and skills from prompt relevance. |
 | `autoConnectMcp` | `true` | Permit relevance-driven MCP connection. |
 | `visionModel` | `null` | `provider:model` reference used by `image_read` to describe images (e.g. `ollama:llava`). `null` auto-detects a vision-capable model already pulled on the Ollama provider; override with `MASKSHIFT_VISION_MODEL`. |
+
+## Run guardrails
+
+Three checks that do not rely on the model's own judgement of its progress. All live under `guardrails` in the config file.
+
+```json
+"guardrails": {
+  "stagnation":   { "enabled": true, "window": 16, "repeatThreshold": 3, "stopThreshold": 6 },
+  "verification": { "commands": [{ "command": "npm test", "label": "tests" }, "npm run lint"], "maxAttempts": 3, "timeoutMs": 300000 },
+  "handoff":      { "enabled": true, "thresholdRatio": 0.75, "maxResets": 3 }
+}
+```
+
+- **Stagnation.** A call's signature is the tool, its arguments and a hash of its result. The same signature `repeatThreshold` times in the last `window` calls (or a strict A,B,A,B alternation) injects a `[Harness notice]` telling the model to change approach. At `stopThreshold` the run ends with status `stagnated`. A changed result (a test going from red to a different red) counts as progress.
+- **Verification.** Off until `commands` is set. When a run that changed something says it is done, the commands run in the workspace; any non-zero exit sends the failing output back as a new turn. After `maxAttempts` failures the run completes anyway with `meta.verification.ok: false` and a note appended to the reply. Runs that only read are never verified, and a run option `skipVerification` opts a single run out.
+- **Hand-off.** When the conversation passes `thresholdRatio` of the model's history budget (and before compaction would start dropping turns), earlier turns are summarized into `.maskshift/progress.md` in the workspace — goal, plan, progress, last verification result, `git status` — and the run continues from a fresh context seeded with that file. At most `maxResets` times per run. `.maskshift/` is already git-ignored.
+
+Run events: `stagnation`, `verification` and `context-reset`.
 
 ## Terminal interface
 
@@ -487,7 +506,7 @@ Hooks are lifecycle actions keyed by event name. A hook may execute shell, HTTP,
 | `PostToolUse` | After a tool call succeeds. |
 | `PostToolUseFailure` | After a tool call throws. |
 | `PreCompact` | Before context compaction summarizes turns dropped to fit a smaller context window — the last point to persist state ahead of a lossy summarization. |
-| `Stop` | When a run finishes, for any reason (completed, hit `max_steps`, failed, or cancelled). |
+| `Stop` | When a run finishes, for any reason (completed, hit `max_steps`, `stagnated`, failed, or cancelled). |
 | `RunCompleted` | When a run finishes successfully (a narrower companion to `Stop`). |
 | `SessionEnd` | After a run's outcome is finalized, once — the counterpart to `SessionStart`; a good place for hooks that persist or clean up session state, since it always fires exactly once per run regardless of outcome. |
 
