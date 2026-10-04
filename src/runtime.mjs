@@ -14,6 +14,7 @@ import { ProviderManager } from './agent/providers.mjs';
 import { McpManager } from './mcp/manager.mjs';
 import { LspManager } from './lsp/manager.mjs';
 import { BridgeManager } from './bridges/manager.mjs';
+import { StorageManager } from './storage/manager.mjs';
 import { FleetManager } from './fleet/manager.mjs';
 import { PluginManager } from './plugins/manager.mjs';
 import { AutomationScheduler } from './automations/scheduler.mjs';
@@ -41,6 +42,12 @@ export async function createRuntime({ configPath, configOverrides = {}, workspac
   const indexer = new RepositoryIndexer({ store, workspaceManager, config, logger, eventBus });
   const codeGraph = new CodeGraph({ store, workspaceManager, indexer, eventBus, logger });
   const contextPlanner = new ContextPlanner({ config, logger });
+  const storageManager = new StorageManager({ config, store, logger, eventBus, workspaceManager });
+  // Limits come from the host, not constants (see storage/budget.mjs). The sync getters read the last computed budget;
+  // prepareLimits() makes sure one exists before the first index or checkpoint.
+  for (const owner of [indexer, workspaceManager]) owner.prepareLimits = () => storageManager.budget();
+  indexer.limits = () => storageManager.syncLimits()?.index || null;
+  workspaceManager.checkpointLimits = () => storageManager.syncLimits()?.checkpoints || null;
   const skillManager = new SkillManager({ config, logger, eventBus });
   await skillManager.setWorkspace(workspacePath);
   const personaManager = new PersonaManager({ config, logger, eventBus });
@@ -62,7 +69,7 @@ export async function createRuntime({ configPath, configOverrides = {}, workspac
   let engine;
   const managerDependencies = {
     config, store, logger, eventBus, hooks, workspaceManager, indexer, codeGraph, contextPlanner, contextBuilder, intelligenceRouter, skillManager, personaManager,
-    providerManager, mcpManager, lspManager, processManager, bridgeManager, fleetManager, browserManager, interaction, secretVault,
+    providerManager, mcpManager, lspManager, processManager, bridgeManager, fleetManager, storageManager, browserManager, interaction, secretVault,
     toolRegistry, capabilityController, getEngine: () => engine,
   };
   const pluginManager = new PluginManager({
@@ -76,7 +83,7 @@ export async function createRuntime({ configPath, configOverrides = {}, workspac
   managerDependencies.automationScheduler = automationScheduler;
   registerAllTools(toolRegistry, {
     config, store, logger, eventBus, hooks, workspaceManager, indexer, codeGraph, contextPlanner, contextBuilder, intelligenceRouter, skillManager, personaManager,
-    providerManager, mcpManager, lspManager, processManager, bridgeManager, fleetManager, browserManager, interaction, secretVault,
+    providerManager, mcpManager, lspManager, processManager, bridgeManager, fleetManager, storageManager, browserManager, interaction, secretVault,
     pluginManager, automationScheduler, capabilityController,
     getEngine: () => engine,
   });
@@ -87,13 +94,15 @@ export async function createRuntime({ configPath, configOverrides = {}, workspac
     indexer, toolRegistry, capabilityController, promptBuilder, contextBuilder, mcpManager, personaManager, lspManager,
   });
   automationScheduler.start();
+  storageManager.start();
 
   const runtime = {
     config, eventBus, logger, store, hooks, workspaceManager, indexer, codeGraph, contextPlanner, intelligenceRouter, skillManager, personaManager,
-    providerManager, mcpManager, lspManager, bridgeManager, fleetManager, browserManager, interaction, secretVault, pluginManager,
+    providerManager, mcpManager, lspManager, bridgeManager, fleetManager, storageManager, browserManager, interaction, secretVault, pluginManager,
     automationScheduler, processManager, toolRegistry, capabilityController,
     contextBuilder, promptBuilder, engine,
     async close() {
+      await storageManager.close();
       await fleetManager.close();
       await engine.close();
       await automationScheduler.close();

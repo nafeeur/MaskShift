@@ -32,6 +32,9 @@ export class Store {
   async init() {
     await ensureDir(path.dirname(this.file));
     this.db = new DatabaseSync(this.file);
+    // auto_vacuum can only be chosen before the first table exists; an existing database keeps what it has until
+    // StorageManager.vacuum() rebuilds it. With it on, deleting rows lets the file shrink instead of keeping free pages.
+    if (this.db.prepare('PRAGMA page_count').get().page_count === 0) this.db.exec('PRAGMA auto_vacuum = INCREMENTAL');
     this.db.exec(`
       PRAGMA journal_mode = WAL;
       PRAGMA synchronous = NORMAL;
@@ -625,6 +628,75 @@ export class Store {
   listCheckpoints(workspaceId, limit = 100) {
     return this.db.prepare('SELECT * FROM checkpoints WHERE workspace_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?')
       .all(workspaceId, limit).map((row) => parseFields(row, ['manifest']));
+  }
+
+  // ------------------------------------------------------------ storage upkeep
+
+  /** File-level facts about the database, for deciding whether it needs compacting. */
+  dbInfo() {
+    const one = (sql) => Object.values(this.db.prepare(sql).get())[0];
+    const pageSize = one('PRAGMA page_size');
+    return {
+      pageSize, pages: one('PRAGMA page_count'), freePages: one('PRAGMA freelist_count'),
+      autoVacuum: one('PRAGMA auto_vacuum'), // 0 none, 1 full, 2 incremental
+    };
+  }
+
+  /** Rough bytes held by each area. SQLite does not expose per-table sizes here, so these are sums of the large columns. */
+  usageByArea() {
+    const sum = (sql) => Number(Object.values(this.db.prepare(sql).get())[0] || 0);
+    return {
+      indexText: sum('SELECT COALESCE(SUM(length(content)), 0) FROM repo_chunks'),
+      indexChunks: sum('SELECT COUNT(*) FROM repo_chunks'),
+      chats: sum('SELECT COALESCE(SUM(length(content)), 0) FROM messages'),
+      runEvents: sum('SELECT COALESCE(SUM(length(payload)), 0) FROM run_events'),
+      memories: sum('SELECT COALESCE(SUM(length(content)), 0) FROM memories'),
+    };
+  }
+
+  /** Per-workspace index size and when the workspace was last opened, oldest-opened first. */
+  indexedWorkspaces() {
+    return this.db.prepare(`SELECT w.id, w.name, w.path, w.last_opened_at, COUNT(c.id) AS chunks,
+        COALESCE(SUM(length(c.content)), 0) AS text_bytes
+      FROM workspaces w JOIN repo_chunks c ON c.workspace_id = w.id
+      GROUP BY w.id ORDER BY w.last_opened_at ASC`).all().map(plain);
+  }
+
+  dropWorkspaceIndex(workspaceId) {
+    return this.transaction(() => {
+      const chunks = this.db.prepare('DELETE FROM repo_chunks WHERE workspace_id = ?').run(workspaceId).changes;
+      this.db.prepare('DELETE FROM repo_fts WHERE workspace_id = ?').run(workspaceId);
+      this.db.prepare('DELETE FROM code_edges WHERE workspace_id = ?').run(workspaceId);
+      this.db.prepare('DELETE FROM code_nodes WHERE workspace_id = ?').run(workspaceId);
+      this.db.prepare("DELETE FROM settings WHERE key = ?").run(`codeGraph:${workspaceId}:builtAt`);
+      return Number(chunks);
+    });
+  }
+
+  pruneRunEvents(beforeIso) {
+    return Number(this.db.prepare('DELETE FROM run_events WHERE created_at < ?').run(beforeIso).changes);
+  }
+
+  allCheckpoints() {
+    return this.db.prepare('SELECT * FROM checkpoints ORDER BY created_at DESC, rowid DESC').all().map((row) => parseFields(row, ['manifest']));
+  }
+
+  deleteCheckpoint(checkpointId) {
+    this.db.prepare('DELETE FROM checkpoints WHERE id = ?').run(checkpointId);
+  }
+
+  /** Move the write-ahead log back into the main file and truncate it, then hand free pages back to the filesystem. */
+  compact({ pages = 20_000 } = {}) {
+    if (this.dbInfo().autoVacuum === 2) this.db.exec(`PRAGMA incremental_vacuum(${Math.max(1, Math.floor(pages))})`);
+    this.db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+  }
+
+  /** Rebuild the file, switching it to incremental auto-vacuum. Needs free disk roughly equal to the database's size. */
+  vacuumFull() {
+    this.db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+    this.db.exec('PRAGMA auto_vacuum = INCREMENTAL');
+    this.db.exec('VACUUM');
+    this.db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
   }
 
   setSetting(key, value) {

@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-10-04T16:14:36.300Z",
+  "generatedAt": "2026-10-04T16:58:30.124Z",
   "version": "1.4.1",
-  "nativeToolCount": 191,
+  "nativeToolCount": 193,
   "bundledSkillCount": 50,
-  "curatedMcpCount": 8,
+  "curatedMcpCount": 43,
   "tools": [
     {
       "name": "agent_bridge_discover",
@@ -1635,6 +1635,24 @@
       "alwaysAvailable": true
     },
     {
+      "name": "storage_prune",
+      "title": "Free MaskShift disk space",
+      "description": "Delete old checkpoints, stale search indexes, old run events and oversized logs according to the host-derived retention. Never deletes chats, memory or workspace files. Defaults to a dry run that only lists what would go.",
+      "category": "storage",
+      "readOnly": false,
+      "risk": "state",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "storage_status",
+      "title": "Show MaskShift disk use",
+      "description": "Report how much disk MaskShift uses (database, checkpoints, browser profiles, logs), the budget derived from this machine's disk and memory, and advice when it is over budget.",
+      "category": "storage",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
       "name": "disk_usage",
       "title": "Inspect disk usage",
       "description": "Report filesystem-level free/used space (df), or a per-directory usage breakdown (du) when a path is given.",
@@ -2392,6 +2410,56 @@
   ],
   "mcpServers": [
     {
+      "name": "chrome-devtools",
+      "title": "Chrome DevTools",
+      "description": "Drive and debug Chrome: performance traces, network, console, DOM and screenshots.",
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@latest",
+        "--headless"
+      ],
+      "keywords": [
+        "chrome",
+        "devtools",
+        "performance",
+        "browser",
+        "debug",
+        "lighthouse"
+      ],
+      "enabled": true,
+      "lazy": true,
+      "source": "curated",
+      "status": "available",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "cloudflare-docs",
+      "title": "Cloudflare Docs",
+      "description": "Search the Cloudflare developer documentation.",
+      "transport": "http",
+      "url": "https://docs.mcp.cloudflare.com/mcp",
+      "keywords": [
+        "cloudflare",
+        "workers",
+        "dns",
+        "cdn",
+        "docs"
+      ],
+      "enabled": true,
+      "lazy": true,
+      "source": "curated",
+      "status": "available",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
       "name": "context7",
       "title": "Context7 Library Documentation",
       "description": "Current library and framework documentation with version-aware examples.",
@@ -2405,6 +2473,73 @@
         "examples",
         "npm",
         "python"
+      ],
+      "enabled": true,
+      "lazy": true,
+      "source": "curated",
+      "status": "available",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "deepwiki",
+      "title": "DeepWiki",
+      "description": "Ask questions about any public GitHub repository and read its generated documentation.",
+      "transport": "http",
+      "url": "https://mcp.deepwiki.com/mcp",
+      "keywords": [
+        "github",
+        "repository",
+        "wiki",
+        "code",
+        "docs",
+        "open source"
+      ],
+      "enabled": true,
+      "lazy": true,
+      "source": "curated",
+      "status": "available",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "duckduckgo",
+      "title": "DuckDuckGo Search",
+      "description": "Keyless web search and page fetching.",
+      "transport": "stdio",
+      "command": "uvx",
+      "args": [
+        "duckduckgo-mcp-server"
+      ],
+      "keywords": [
+        "search",
+        "web",
+        "duckduckgo"
+      ],
+      "enabled": true,
+      "lazy": true,
+      "source": "curated",
+      "status": "available",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "exa",
+      "title": "Exa Search",
+      "description": "Web and code search built for language models.",
+      "transport": "http",
+      "url": "https://mcp.exa.ai/mcp",
+      "keywords": [
+        "search",
+        "web",
+        "research",
+        "code search"
       ],
       "enabled": true,
       "lazy": true,
@@ -2441,6 +2576,76 @@
       "toolCount": 0
     },
     {
+      "name": "gitmcp",
+      "title": "GitMCP",
+      "description": "Read the docs and code of any GitHub project as context (change the URL to gitmcp.io/OWNER/REPO to pin one).",
+      "transport": "http",
+      "url": "https://gitmcp.io/docs",
+      "keywords": [
+        "github",
+        "docs",
+        "repository",
+        "readme"
+      ],
+      "enabled": true,
+      "lazy": true,
+      "source": "curated",
+      "status": "available",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "huggingface",
+      "title": "Hugging Face",
+      "description": "Search models, datasets, Spaces and papers on the Hugging Face Hub.",
+      "transport": "http",
+      "url": "https://huggingface.co/mcp",
+      "keywords": [
+        "models",
+        "datasets",
+        "ml",
+        "ai",
+        "papers",
+        "spaces"
+      ],
+      "enabled": true,
+      "lazy": true,
+      "source": "curated",
+      "status": "available",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "markitdown",
+      "title": "MarkItDown",
+      "description": "Convert PDF, Word, Excel, PowerPoint, HTML and images to Markdown.",
+      "transport": "stdio",
+      "command": "uvx",
+      "args": [
+        "markitdown-mcp"
+      ],
+      "keywords": [
+        "pdf",
+        "docx",
+        "xlsx",
+        "convert",
+        "markdown",
+        "documents"
+      ],
+      "enabled": true,
+      "lazy": true,
+      "source": "curated",
+      "status": "available",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
       "name": "memory-mcp",
       "title": "MCP Knowledge Graph Memory",
       "description": "Standard persistent knowledge graph memory server.",
@@ -2455,6 +2660,29 @@
         "knowledge graph",
         "entities",
         "relations"
+      ],
+      "enabled": true,
+      "lazy": true,
+      "source": "curated",
+      "status": "available",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "microsoft-learn",
+      "title": "Microsoft Learn",
+      "description": "Search and read official Microsoft, Azure and .NET documentation.",
+      "transport": "http",
+      "url": "https://learn.microsoft.com/api/mcp",
+      "keywords": [
+        "microsoft",
+        "azure",
+        "dotnet",
+        "windows",
+        "docs",
+        "powershell"
       ],
       "enabled": true,
       "lazy": true,
@@ -2544,6 +2772,302 @@
       "toolCount": 0
     },
     {
+      "name": "svelte",
+      "title": "Svelte",
+      "description": "Svelte and SvelteKit documentation and code checking.",
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@sveltejs/mcp"
+      ],
+      "keywords": [
+        "svelte",
+        "sveltekit",
+        "frontend",
+        "docs"
+      ],
+      "enabled": true,
+      "lazy": true,
+      "source": "curated",
+      "status": "available",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "time-mcp",
+      "title": "MCP Time",
+      "description": "Current time and timezone conversion.",
+      "transport": "stdio",
+      "command": "uvx",
+      "args": [
+        "mcp-server-time"
+      ],
+      "keywords": [
+        "time",
+        "timezone",
+        "date",
+        "clock"
+      ],
+      "enabled": true,
+      "lazy": true,
+      "source": "curated",
+      "status": "available",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "apify",
+      "title": "Apify",
+      "description": "Run thousands of web scraping and automation Actors. Needs APIFY_TOKEN in your environment.",
+      "transport": "http",
+      "url": "https://mcp.apify.com",
+      "keywords": [
+        "scraping",
+        "apify",
+        "crawl",
+        "automation",
+        "web data"
+      ],
+      "enabled": false,
+      "lazy": true,
+      "source": "curated",
+      "headers": {
+        "Authorization": "Bearer ${APIFY_TOKEN}"
+      },
+      "requires": [
+        "APIFY_TOKEN"
+      ],
+      "status": "disabled",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "asana",
+      "title": "Asana",
+      "description": "Tasks, projects and goals. Signs in through your browser on first connect.",
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://mcp.asana.com/v2/mcp"
+      ],
+      "keywords": [
+        "asana",
+        "tasks",
+        "projects",
+        "planning"
+      ],
+      "enabled": false,
+      "lazy": true,
+      "source": "curated",
+      "oauth": true,
+      "status": "disabled",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "atlassian",
+      "title": "Atlassian (Jira & Confluence)",
+      "description": "Jira issues and Confluence pages. Signs in through your browser on first connect.",
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://mcp.atlassian.com/v1/mcp"
+      ],
+      "keywords": [
+        "jira",
+        "confluence",
+        "atlassian",
+        "tickets",
+        "wiki"
+      ],
+      "enabled": false,
+      "lazy": true,
+      "source": "curated",
+      "oauth": true,
+      "status": "disabled",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "brave-search",
+      "title": "Brave Search",
+      "description": "Web and local search. Needs BRAVE_API_KEY in your environment.",
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-brave-search"
+      ],
+      "keywords": [
+        "search",
+        "web",
+        "brave"
+      ],
+      "enabled": false,
+      "lazy": true,
+      "source": "curated",
+      "env": {
+        "BRAVE_API_KEY": "${BRAVE_API_KEY}"
+      },
+      "requires": [
+        "BRAVE_API_KEY"
+      ],
+      "status": "disabled",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "canva",
+      "title": "Canva",
+      "description": "Create and edit Canva designs. Signs in through your browser on first connect.",
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://mcp.canva.com/mcp"
+      ],
+      "keywords": [
+        "canva",
+        "design",
+        "graphics",
+        "presentations"
+      ],
+      "enabled": false,
+      "lazy": true,
+      "source": "curated",
+      "oauth": true,
+      "status": "disabled",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "docker-mcp",
+      "title": "Docker",
+      "description": "Manage Docker containers, images, volumes and networks.",
+      "transport": "stdio",
+      "command": "uvx",
+      "args": [
+        "mcp-server-docker"
+      ],
+      "keywords": [
+        "docker",
+        "container",
+        "image",
+        "compose"
+      ],
+      "enabled": false,
+      "lazy": true,
+      "source": "curated",
+      "status": "disabled",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "everything-mcp",
+      "title": "MCP Everything (test server)",
+      "description": "Reference server that exercises every MCP feature, for testing clients.",
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-everything"
+      ],
+      "keywords": [
+        "test",
+        "reference",
+        "compatibility"
+      ],
+      "enabled": false,
+      "lazy": true,
+      "source": "curated",
+      "status": "disabled",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "figma",
+      "title": "Figma",
+      "description": "Designs, components and variables. Signs in through your browser on first connect.",
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://mcp.figma.com/mcp"
+      ],
+      "keywords": [
+        "figma",
+        "design",
+        "ui",
+        "components"
+      ],
+      "enabled": false,
+      "lazy": true,
+      "source": "curated",
+      "oauth": true,
+      "status": "disabled",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "figma-api",
+      "title": "Figma (access token)",
+      "description": "Read Figma files, frames and styles to build UI from designs. Needs FIGMA_API_KEY in your environment.",
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "figma-developer-mcp",
+        "--stdio"
+      ],
+      "keywords": [
+        "figma",
+        "design",
+        "ui",
+        "frames"
+      ],
+      "enabled": false,
+      "lazy": true,
+      "source": "curated",
+      "env": {
+        "FIGMA_API_KEY": "${FIGMA_API_KEY}"
+      },
+      "requires": [
+        "FIGMA_API_KEY"
+      ],
+      "status": "disabled",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
       "name": "filesystem-mcp",
       "title": "MCP Filesystem",
       "description": "Standard MCP filesystem server. MaskShift already has native host filesystem tools; use for compatibility tests.",
@@ -2570,6 +3094,37 @@
       "toolCount": 0
     },
     {
+      "name": "firecrawl",
+      "title": "Firecrawl",
+      "description": "Scrape, crawl and extract structured data from websites. Needs FIRECRAWL_API_KEY in your environment.",
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "firecrawl-mcp"
+      ],
+      "keywords": [
+        "scrape",
+        "crawl",
+        "web",
+        "extract"
+      ],
+      "enabled": false,
+      "lazy": true,
+      "source": "curated",
+      "env": {
+        "FIRECRAWL_API_KEY": "${FIRECRAWL_API_KEY}"
+      },
+      "requires": [
+        "FIRECRAWL_API_KEY"
+      ],
+      "status": "disabled",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
       "name": "git-mcp",
       "title": "MCP Git",
       "description": "Git repository inspection and operations through the standard Python MCP server.",
@@ -2588,6 +3143,396 @@
       "enabled": false,
       "lazy": true,
       "source": "curated",
+      "status": "disabled",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "github",
+      "title": "GitHub",
+      "description": "Repositories, issues, pull requests, code search and Actions. Needs GITHUB_TOKEN in your environment.",
+      "transport": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "keywords": [
+        "github",
+        "issues",
+        "pull request",
+        "repo",
+        "actions",
+        "code review"
+      ],
+      "enabled": false,
+      "lazy": true,
+      "source": "curated",
+      "headers": {
+        "Authorization": "Bearer ${GITHUB_TOKEN}"
+      },
+      "requires": [
+        "GITHUB_TOKEN"
+      ],
+      "status": "disabled",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "hubspot",
+      "title": "HubSpot",
+      "description": "CRM contacts, companies and deals. Signs in through your browser on first connect.",
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://mcp.hubspot.com"
+      ],
+      "keywords": [
+        "hubspot",
+        "crm",
+        "sales",
+        "contacts"
+      ],
+      "enabled": false,
+      "lazy": true,
+      "source": "curated",
+      "oauth": true,
+      "status": "disabled",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "linear",
+      "title": "Linear",
+      "description": "Issues, projects and cycles. Needs LINEAR_API_KEY in your environment.",
+      "transport": "http",
+      "url": "https://mcp.linear.app/mcp",
+      "keywords": [
+        "linear",
+        "issues",
+        "tickets",
+        "project management"
+      ],
+      "enabled": false,
+      "lazy": true,
+      "source": "curated",
+      "headers": {
+        "Authorization": "Bearer ${LINEAR_API_KEY}"
+      },
+      "requires": [
+        "LINEAR_API_KEY"
+      ],
+      "status": "disabled",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "mapbox",
+      "title": "Mapbox",
+      "description": "Geocoding, directions, isochrones and static maps. Needs MAPBOX_ACCESS_TOKEN in your environment.",
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@mapbox/mcp-server"
+      ],
+      "keywords": [
+        "maps",
+        "geocoding",
+        "directions",
+        "places"
+      ],
+      "enabled": false,
+      "lazy": true,
+      "source": "curated",
+      "env": {
+        "MAPBOX_ACCESS_TOKEN": "${MAPBOX_ACCESS_TOKEN}"
+      },
+      "requires": [
+        "MAPBOX_ACCESS_TOKEN"
+      ],
+      "status": "disabled",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "neon",
+      "title": "Neon",
+      "description": "Serverless Postgres projects, branches and SQL. Signs in through your browser on first connect.",
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://mcp.neon.tech/mcp"
+      ],
+      "keywords": [
+        "neon",
+        "postgres",
+        "database",
+        "sql"
+      ],
+      "enabled": false,
+      "lazy": true,
+      "source": "curated",
+      "oauth": true,
+      "status": "disabled",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "notion",
+      "title": "Notion",
+      "description": "Search and edit your Notion workspace. Signs in through your browser on first connect.",
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://mcp.notion.com/mcp"
+      ],
+      "keywords": [
+        "notion",
+        "notes",
+        "wiki",
+        "docs"
+      ],
+      "enabled": false,
+      "lazy": true,
+      "source": "curated",
+      "oauth": true,
+      "status": "disabled",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "notion-api",
+      "title": "Notion (integration token)",
+      "description": "Pages, databases and comments through a Notion integration. Needs NOTION_TOKEN in your environment.",
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@notionhq/notion-mcp-server"
+      ],
+      "keywords": [
+        "notion",
+        "notes",
+        "wiki",
+        "database"
+      ],
+      "enabled": false,
+      "lazy": true,
+      "source": "curated",
+      "env": {
+        "NOTION_TOKEN": "${NOTION_TOKEN}"
+      },
+      "requires": [
+        "NOTION_TOKEN"
+      ],
+      "status": "disabled",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "paypal",
+      "title": "PayPal",
+      "description": "Invoices, orders and transactions. Signs in through your browser on first connect.",
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://mcp.paypal.com/mcp"
+      ],
+      "keywords": [
+        "paypal",
+        "payments",
+        "invoices"
+      ],
+      "enabled": false,
+      "lazy": true,
+      "source": "curated",
+      "oauth": true,
+      "status": "disabled",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "sentry",
+      "title": "Sentry",
+      "description": "Errors, issues, releases and traces. Signs in through your browser on first connect.",
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://mcp.sentry.dev/mcp"
+      ],
+      "keywords": [
+        "sentry",
+        "errors",
+        "monitoring",
+        "crash",
+        "traces"
+      ],
+      "enabled": false,
+      "lazy": true,
+      "source": "curated",
+      "oauth": true,
+      "status": "disabled",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "sqlite-mcp",
+      "title": "SQLite",
+      "description": "Query and modify a SQLite database (edit the path in the definition).",
+      "transport": "stdio",
+      "command": "uvx",
+      "args": [
+        "mcp-server-sqlite",
+        "--db-path",
+        "./data.db"
+      ],
+      "keywords": [
+        "sqlite",
+        "sql",
+        "database"
+      ],
+      "enabled": false,
+      "lazy": true,
+      "source": "curated",
+      "status": "disabled",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "stripe",
+      "title": "Stripe",
+      "description": "Customers, payments, subscriptions and docs. Needs STRIPE_API_KEY in your environment. Use a restricted key.",
+      "transport": "http",
+      "url": "https://mcp.stripe.com",
+      "keywords": [
+        "stripe",
+        "payments",
+        "billing",
+        "subscriptions"
+      ],
+      "enabled": false,
+      "lazy": true,
+      "source": "curated",
+      "headers": {
+        "Authorization": "Bearer ${STRIPE_API_KEY}"
+      },
+      "requires": [
+        "STRIPE_API_KEY"
+      ],
+      "status": "disabled",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "supabase",
+      "title": "Supabase",
+      "description": "Projects, tables, SQL, migrations and logs. Needs SUPABASE_ACCESS_TOKEN in your environment.",
+      "transport": "http",
+      "url": "https://mcp.supabase.com/mcp",
+      "keywords": [
+        "supabase",
+        "postgres",
+        "database",
+        "backend"
+      ],
+      "enabled": false,
+      "lazy": true,
+      "source": "curated",
+      "headers": {
+        "Authorization": "Bearer ${SUPABASE_ACCESS_TOKEN}"
+      },
+      "requires": [
+        "SUPABASE_ACCESS_TOKEN"
+      ],
+      "status": "disabled",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "tavily",
+      "title": "Tavily",
+      "description": "Search, extract and crawl the web for research. Needs TAVILY_API_KEY in your environment.",
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "tavily-mcp@latest"
+      ],
+      "keywords": [
+        "search",
+        "research",
+        "crawl",
+        "extract"
+      ],
+      "enabled": false,
+      "lazy": true,
+      "source": "curated",
+      "env": {
+        "TAVILY_API_KEY": "${TAVILY_API_KEY}"
+      },
+      "requires": [
+        "TAVILY_API_KEY"
+      ],
+      "status": "disabled",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "vercel",
+      "title": "Vercel",
+      "description": "Projects, deployments and logs. Signs in through your browser on first connect.",
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://mcp.vercel.com"
+      ],
+      "keywords": [
+        "vercel",
+        "deploy",
+        "hosting",
+        "logs"
+      ],
+      "enabled": false,
+      "lazy": true,
+      "source": "curated",
+      "oauth": true,
       "status": "disabled",
       "protocol": null,
       "era": null,

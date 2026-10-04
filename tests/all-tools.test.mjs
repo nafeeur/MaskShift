@@ -401,6 +401,13 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
     await call('fleet_stop', {}, r => assert.ok(Array.isArray(r)), 'local CLI fixture');
   });
 
+  await suite.test('storage tools report disk use and prune only what retention allows', async (t) => {
+    const { call } = await setup(t);
+    await call('storage_status', {}, r => { assert.ok(r.usage.database > 0); assert.ok(r.budget.total > 0); assert.ok(['roomy', 'normal', 'tight', 'critical'].includes(r.pressure)); });
+    await call('storage_prune', {}, r => { assert.equal(r.dryRun, true); assert.equal(r.freedBytes, 0); });
+    await call('storage_prune', { dryRun: false }, r => { assert.equal(r.dryRun, false); assert.deepEqual(r.failures, []); });
+  });
+
   await suite.test('container, SSH, database CLI and service command adapters', async (t) => {
     const { call, optional, project } = await setup(t);
     const bin = path.join(project, 'fixture-bin'); await fsp.mkdir(bin);

@@ -36,6 +36,15 @@ export function language(file) {
   return LANGUAGE_BY_EXT[path.extname(file).toLowerCase()] || 'text';
 }
 
+/**
+ * Order files so the ones most likely to matter come first: recognised source before everything else, then shallow
+ * before deep, then by name for a stable result. A limit that cuts the list short then cuts the least valuable end.
+ */
+export function prioritise(files) {
+  const rank = (file) => (LANGUAGE_BY_EXT[path.extname(file).toLowerCase()] || /^(dockerfile|makefile)$/i.test(path.basename(file)) ? 0 : 1);
+  return [...files].sort((a, b) => rank(a) - rank(b) || a.split('/').length - b.split('/').length || (a < b ? -1 : a > b ? 1 : 0));
+}
+
 export function shouldIndex(relative, size) {
   if (size > 2 * 1024 * 1024) return false;
   const ext = path.extname(relative).toLowerCase();

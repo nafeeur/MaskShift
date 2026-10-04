@@ -26,6 +26,7 @@ import { Composer, ListView, Spinner, TextField, Toasts, Viewport } from './widg
 import { columns, gutter, key as typeKey, label as sectionLabel } from './type.mjs';
 import { VERSION, runCommand, safeJsonParse, shellQuote } from '../core/utils.mjs';
 import { tokenCounts } from '../core/pricing.mjs';
+import { formatBytes } from '../storage/budget.mjs';
 import { notify } from '../notify/index.mjs';
 import { VoiceInput } from '../voice/index.mjs';
 import * as chatView from './views/chat.mjs';
@@ -93,6 +94,7 @@ const SLASH_COMMANDS = [
   { name: 'fleet', hint: 'run Claude Code, Codex, Hermes, OpenCode… as one team' },
   { name: 'doctor', hint: 'run diagnostics' },
   { name: 'logs', hint: 'view logs' },
+  { name: 'storage', hint: 'disk use, budget and cleanup' },
   { name: 'settings', hint: 'open settings' },
   { name: 'help', hint: 'reference & shortcuts' },
   { name: 'quit', hint: 'exit MaskShift' },
@@ -1273,6 +1275,8 @@ export class MaskShiftTui {
     if (event.type === 'model.context-window.learned') void this.refreshModelProfile();
     if (event.type.startsWith('plugin.')) this.plugins = this.runtime.pluginManager.list();
     if (event.type.startsWith('fleet.')) fleetView.onEvent(this, event);
+    if (event.type === 'storage.warning') this.toast(truncate(event.payload.message, 160), 'warn');
+    if (event.type === 'storage.pruned' && event.payload.freedBytes > 50 * 1024 * 1024) this.toast(`Freed ${formatBytes(event.payload.freedBytes)} of old checkpoints and indexes`, 'info');
     if (event.type.startsWith('automation.')) this.automations = this.runtime.automationScheduler.list({ limit: 200 });
     if (event.type.startsWith('tool.registered') || event.type.startsWith('plugin.activated')) this.refreshCatalogs();
     this.requestRender();
@@ -2715,6 +2719,49 @@ export class MaskShiftTui {
       : `Mouse: ${mode} (shift+drag still selects text)`, 'info');
   }
 
+  /** Disk use, as a read-only report: what is stored, the budget this machine implies, and what to do about it. */
+  async openStorage() {
+    try {
+      const status = await this.runtime.storageManager.status();
+      const { usage, budget } = status;
+      const row = (label, value, extra = '') => `${fit(label, 30)}${fit(value, 12)}${extra}`;
+      const lines = [
+        row('Database (index, chats, runs)', formatBytes(usage.database), `of ${formatBytes(budget.share.index + budget.share.other * 0.5)}`),
+        row('Checkpoints (undo points)', formatBytes(usage.checkpoints), `of ${formatBytes(budget.share.checkpoints)}`),
+        row('Browser profiles, logs, caches', formatBytes(usage.other), `of ${formatBytes(budget.share.other * 0.5)}`),
+        row('Total', formatBytes(usage.total), `of ${formatBytes(budget.total)} budget`),
+        '',
+        `This machine: ${formatBytes(budget.host.diskFree)} free of ${formatBytes(budget.host.diskTotal)} · ${formatBytes(budget.host.memTotal)} memory · disk pressure ${status.pressure}`,
+        `Per workspace index: up to ${formatBytes(budget.index.maxTextBytes)} of text, ${budget.index.maxFiles} files · checkpoints kept: ${budget.checkpoints.keepPerWorkspace} / ${budget.checkpoints.maxAgeDays} days`,
+        '',
+        ...(status.advice.length ? status.advice.map((line) => `▲ ${line}`) : ['Within budget.']),
+        '',
+        'Limits are derived from this machine; override them under "storage" in your config. Use the palette to free space.',
+      ];
+      this.overlay = new TextOverlay({ title: 'Disk use', lines: lines.flatMap((line) => wrap(line, 92)), stamp: 'esc closes' });
+    } catch (error) { this.toast(error.message, 'error'); }
+    this.requestRender();
+  }
+
+  /** Show what a cleanup would remove, then ask. Chats, memory and workspace files are never in the list. */
+  async confirmStoragePrune() {
+    try {
+      const plan = await this.runtime.storageManager.prune({ dryRun: true });
+      if (!plan.actions.length) { this.toast('Nothing to clean up', 'success'); return; }
+      const names = { checkpoint: 'old checkpoints', 'orphan-checkpoint': 'orphaned checkpoint folders', index: 'search indexes', 'run-events': 'old run event batches', 'rotate-log': 'oversized logs' };
+      this.overlay = new ConfirmOverlay({
+        title: 'Free up space', danger: true,
+        message: `Remove about ${formatBytes(plan.wouldFreeBytes)}? Chats, memory and your files are not touched; search indexes rebuild when needed.`,
+        details: Object.entries(plan.summary).map(([type, count]) => `  ${count} × ${names[type] || type}`),
+        onConfirm: async () => {
+          const result = await this.runtime.storageManager.prune({ dryRun: false });
+          this.toast(`Freed ${formatBytes(result.freedBytes)}`, 'success');
+        },
+      });
+    } catch (error) { this.toast(error.message, 'error'); }
+    this.requestRender();
+  }
+
   openSettings() {
     const config = this.runtime.config.get();
     this.overlay = new FormOverlay({
@@ -2819,6 +2866,8 @@ export class MaskShiftTui {
       action('model.discover', 'model', 'Re-discover providers and models'),
       action('workspace.open', 'workspace', 'Open workspace', 'ctrl+o'),
       action('workspace.index', 'workspace', 'Rebuild the context index'),
+      action('storage.status', 'storage', 'Disk use: usage and the budget for this machine'),
+      action('storage.prune', 'storage', 'Disk use: free up space (old checkpoints, stale indexes)'),
       action('workspace.inspect', 'workspace', 'Inspect the workspace'),
       action('workspace.checkpoint', 'workspace', 'Create a checkpoint'),
       action('workspace.restore', 'workspace', 'Restore a checkpoint'),
@@ -2883,6 +2932,8 @@ export class MaskShiftTui {
       case 'model.discover': await this.discoverProviders(); this.toast('Providers re-discovered', 'success'); break;
       case 'workspace.open': this.openWorkspaceDialog(); break;
       case 'workspace.index': void this.reindex(); break;
+      case 'storage.status': void this.openStorage(); break;
+      case 'storage.prune': void this.confirmStoragePrune(); break;
       case 'workspace.inspect': void this.showInspection(); break;
       case 'workspace.checkpoint': void this.createCheckpoint(); break;
       case 'workspace.restore': this.openCheckpointPicker(); break;
@@ -2927,6 +2978,7 @@ export class MaskShiftTui {
       case 'doctor': await this.showDoctor(); break;
       case 'settings': this.openSettings(); break;
       case 'logs': await this.showLogs(); break;
+      case 'storage': await this.openStorage(); break;
       case 'help': this.openHelp(); break;
       case 'refresh': this.refreshAll(); break;
       case 'quit': this.stop(0); break;

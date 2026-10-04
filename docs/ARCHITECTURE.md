@@ -59,7 +59,7 @@ In-process runtime ───── event bus ───── audit + telemetry
         │     ├── capability controller
         │     └── plan / tool / subagent loop
         │
-        ├── Native tool registry (191 tools)
+        ├── Native tool registry (193 tools)
         ├── Skill manager (metadata eager, body lazy)
         ├── MCP manager (definition eager, connection/schema lazy)
         ├── Workspace + index + checkpoint managers
@@ -138,6 +138,8 @@ The built-in `node:sqlite` driver stores:
 - application settings.
 
 Large binary artifacts remain on disk and are referenced by path.
+
+Disk use is bounded by `src/storage/`: `budget.mjs` derives every limit from the host's disk and memory, and `StorageManager` measures usage, plans and performs retention, and compacts the database. See [Disk use](STORAGE.md).
 
 ## Host execution
 

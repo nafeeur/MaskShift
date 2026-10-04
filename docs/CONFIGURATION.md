@@ -442,6 +442,12 @@ A Claude Desktop-style client config:
 
 Add `"--read-only"` to `args` for a client that should only ever inspect the workspace.
 
+## Disk use
+
+The `storage` section pins the limits that are otherwise derived from the machine's disk and memory; see
+[Disk use](STORAGE.md). `maxGb`, `indexMaxMb`, `indexMaxFiles`, `staleIndexDays`, `keepCheckpoints`,
+`checkpointMaxAgeDays` and `runEventDays` default to `null` (derive); `auto: false` stops the background upkeep.
+
 ## Built-in MCP servers
 
 MaskShift ships a catalogue of 40+ public MCP servers. They cost nothing until used: nothing starts or connects until a
