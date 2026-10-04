@@ -495,6 +495,18 @@ mode for an initial interactive login, then reuse the same named profile in head
 }
 ```
 
+## Remembered sign-ins
+
+`browser_login` can remember a password after you sign in. The default keeps it in memory until
+MaskShift exits; `keychain` stores it in the operating-system credential store when one is available.
+
+```json
+{ "secrets": { "backend": "session" } }
+```
+
+`session` (default) or `keychain`. Only the names of remembered sites are indexed in MaskShift's own
+data; values are never written there. See [web tasks](WEB_TASKS.md).
+
 ## Data locations
 
 Default home is `~/.maskshift`, overridable with `MASKSHIFT_HOME`.

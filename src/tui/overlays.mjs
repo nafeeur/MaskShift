@@ -297,7 +297,7 @@ export class FormOverlay extends Overlay {
       ...field,
       editor: field.type === 'textarea'
         ? new Composer({ value: String(field.value ?? '') })
-        : new TextField({ value: String(field.value ?? '') }),
+        : new TextField({ value: String(field.value ?? ''), mask: Boolean(field.mask) }),
       rows: field.type === 'textarea' ? (field.rows || 5) : 1,
       toggled: Boolean(field.value),
       optionIndex: Math.max(0, (field.options || []).findIndex((option) => option.value === field.value)),

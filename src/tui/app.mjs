@@ -10,6 +10,7 @@ import { isImagePath } from './image/render.mjs';
 import { detectImageProtocol } from './image/protocol.mjs';
 import { Keyboard } from './input.mjs';
 import { hstack, overlay as paintOverlay, split, vstack } from './layout.mjs';
+import { createInteractionHandler } from './interaction.mjs';
 import { ApprovalOverlay, ChangesOverlay, ConfirmOverlay, FormOverlay, PaletteOverlay, PickerOverlay, TextOverlay } from './overlays.mjs';
 import { approvalPreview } from './approval.mjs';
 import { commandDirectories, expandCommand, loadCustomCommands } from './commands.mjs';
@@ -315,6 +316,10 @@ export class MaskShiftTui {
     // Tools the user chose "always" for; cleared when the chat changes (see loadSession).
     this.approvedTools = new Set();
     this.runtime.toolRegistry.confirmHandler = (details) => this.requestToolConfirmation(details);
+    // Questions from tools (pick a restaurant, enter a password, solve a CAPTCHA) land here.
+    // { message, finish } while the agent is waiting for the person to act in the Browser view.
+    this.handoff = null;
+    this.detachInteraction = this.runtime.interaction?.attach(createInteractionHandler(this)) || null;
   }
 
   // Returns a Promise<boolean> resolved once the user answers the approval
@@ -872,6 +877,8 @@ export class MaskShiftTui {
       setTimeout(() => { this.quitArmed = false; }, 2500).unref?.();
       return true;
     }
+    if (this.handoff && event.ctrl && event.name === 'e') { this.handoff.finish(true); return true; }
+    if (this.handoff && event.ctrl && event.name === 'x') { this.handoff.finish(false); return true; }
     if (event.ctrl && event.name === 'q') { this.stop(0); return true; }
     if (event.ctrl && event.name === 'k') { this.openPalette(); return true; }
     if (event.ctrl && event.name === 'p') { this.openSessionPicker(); return true; }

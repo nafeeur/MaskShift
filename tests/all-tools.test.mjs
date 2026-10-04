@@ -437,6 +437,48 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
     }
   });
 
+  await suite.test('web task tool contracts', async (t) => {
+    const { call, runtime } = await setup(t);
+    const model = {
+      url: 'https://shop.example/menu', title: 'Menu', modal: null, blockers: [], alerts: [], forms: [], actions: [],
+      lists: [{ name: 'Restaurants', total: 2, options: [
+        { ref: 'e1', title: 'Luigi Pizza', detail: '4.5 stars', price: '$2', rating: '4.5', url: 'https://shop.example/1', facts: [], buttons: [] },
+        { ref: 'e2', title: 'Sushi Go', detail: '', price: '', rating: '', url: 'https://shop.example/2', facts: [], buttons: [] },
+      ] }],
+      text: '', scroll: { y: 0, height: 100, viewport: 100 },
+    };
+    const manager = runtime.browserManager;
+    const originals = { extract: manager.extract, act: manager.act };
+    const acted = [];
+    manager.extract = async () => ({ instanceId: 'fixture', tabId: 'page', model });
+    manager.act = async (request) => { acted.push(request); return { ref: request.ref, action: request.action, url: 'https://shop.example/1' }; };
+    // A fake interactive surface that always takes the last option.
+    const detach = runtime.interaction.attach({
+      choose: async (request) => ({ ids: [request.options.at(-1).id] }),
+      text: async () => ({ value: '12 Main St' }),
+      secret: async () => ({ value: 'unused' }),
+      confirm: async () => true,
+      handoff: async () => ({ done: true }),
+    });
+    try {
+      await call('browser_extract', {}, r => { assert.match(r, /Luigi Pizza/); assert.match(r, /\[e1\]/); }, 'page model stubbed; real extraction covered by web-tasks.test.mjs');
+      await call('browser_act', { ref: 'e1', action: 'click' }, r => { assert.equal(r.ref, 'e1'); assert.equal(acted.at(-1).ref, 'e1'); }, 'manager stubbed');
+      await call('browser_choose', { question: 'Where?' }, r => { assert.equal(r.chosen[0].title, 'Sushi Go'); assert.equal(acted.at(-1).ref, 'e2'); }, 'picker answered by a fake interactive surface');
+      await call('browser_login', {}, r => { assert.equal(r.status, 'logged_in'); assert.equal(r.signedInAlready, true); }, 'no sign-in form on the stubbed page; real login covered by web-tasks.test.mjs');
+      await call('browser_handoff', { message: 'Solve the puzzle' }, r => assert.equal(r.done, true), 'hand-off answered by a fake interactive surface');
+      await call('user_choose', { question: 'Which?', options: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }] }, r => assert.deepEqual(r.ids, ['b']), 'fake interactive surface');
+      await call('user_ask', { question: 'Address?' }, r => assert.equal(r.answer, '12 Main St'), 'fake interactive surface');
+      await call('user_confirm', { message: 'Pay $12?' }, r => assert.equal(r.confirmed, true), 'fake interactive surface');
+      await runtime.secretVault.set('login:shop.example', 'username', 'jane@example.com');
+      await runtime.secretVault.set('login:shop.example', 'password', 'hunter2');
+      await call('credentials_list', {}, r => { assert.deepEqual(r.sites.map(site => site.site), ['shop.example']); assert.doesNotMatch(JSON.stringify(r), /hunter2|jane/); }, 'in-memory vault');
+      await call('credentials_forget', { site: 'https://www.shop.example/login' }, async r => { assert.equal(r.forgotten, 'shop.example'); assert.equal(await runtime.secretVault.get('login:shop.example', 'password'), null); }, 'in-memory vault');
+    } finally {
+      detach();
+      Object.assign(manager, originals);
+    }
+  });
+
   await suite.test('coverage gate: every native tool has assertions or an explicit dependency skip', () => {
     const missing = inventory.filter(tool => !coverage.has(tool.name)).map(tool => tool.name);
     assert.deepEqual(missing, [], `Tools without successful assertions: ${missing.join(', ')}`);
