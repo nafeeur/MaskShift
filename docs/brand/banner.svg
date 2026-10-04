@@ -1,14 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 220" role="img" aria-label="MaskShift — a general-purpose agent harness">
   <rect width="1200" height="220" rx="28" fill="#161A20"/>
-  <svg x="56" y="46" width="128" height="128" viewBox="0 0 512 512">
-    <rect x="72" y="72" width="272" height="272" rx="60" fill="none" stroke="#F4EFE6" stroke-width="26"/>
-    <rect x="168" y="168" width="272" height="272" rx="60" fill="#E42A3C"/>
-    <path d="M262 252L336 304L262 356" fill="none" stroke="#F4EFE6" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>
-  <text x="222" y="126" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="70" font-weight="700" letter-spacing="-2" fill="#F4EFE6">mask<tspan fill="#E42A3C">shift</tspan></text>
-  <text x="224" y="162" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="21" letter-spacing="0.5" fill="#8891A0">A general-purpose agent harness for any model</text>
-  <line x1="856" y1="56" x2="856" y2="164" stroke="#2E3A47" stroke-width="2"/>
-  <text x="900" y="98" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="15" fill="#6B7684">Any model, local or hosted</text>
-  <text x="900" y="122" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="15" fill="#6B7684">Zero runtime dependencies</text>
-  <text x="900" y="146" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="15" fill="#6B7684">Runs in your terminal</text>
+  <text x="600" y="116" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="84" font-weight="700" letter-spacing="-3" fill="#F4EFE6">mask<tspan fill="#E42A3C">shift</tspan></text>
+  <text x="600" y="164" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="23" letter-spacing="0.5" fill="#8891A0">A general-purpose agent harness for any model</text>
 </svg>
