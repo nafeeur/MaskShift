@@ -16,7 +16,7 @@ RestartSec=3
 TimeoutStopSec=30
 KillMode=mixed
 
-# Deliberately no ProtectSystem/PrivateNetwork sandboxing: overdrive tools need the
+# Deliberately no ProtectSystem/PrivateNetwork sandboxing: autonomous-mode tools need the
 # same host authority as the user running this service.
 
 [Install]

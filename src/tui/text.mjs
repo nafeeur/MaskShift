@@ -303,3 +303,14 @@ export function oneLine(text, width = 0) {
 export function expandTabs(text, size = 2) {
   return String(text ?? '').replace(/\t/g, ' '.repeat(size));
 }
+
+const ACRONYMS = new Set(['url', 'uri', 'mcp', 'api', 'id', 'cpu', 'gpu', 'ui', 'http', 'https', 'json', 'sql', 'ssh', 'lsp', 'tui', 'cli', 'npm', 'pdf', 'os']);
+
+/** First letter up, the rest as written: "model" → "Model". A leading acronym is capitalised whole: "url" → "URL". */
+export function sentence(text) {
+  const value = String(text ?? '');
+  if (!value) return value;
+  const first = value.split(/[\s/]/, 1)[0];
+  if (ACRONYMS.has(first.toLowerCase()) && first === first.toLowerCase()) return first.toUpperCase() + value.slice(first.length);
+  return value[0].toUpperCase() + value.slice(1);
+}

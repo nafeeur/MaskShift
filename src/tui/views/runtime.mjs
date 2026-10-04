@@ -1,7 +1,7 @@
 // 04 RUNTIME — the host shell (the default, full-account-permission terminal
 // terminal.mjs used to be on its own), plus automations, background
 // processes and browser instances behind a secondary tab strip. Those three
-// used to be tabs of modshop.mjs, alongside plugins and bridges — which
+// used to be tabs of the old plugins view, alongside plugins and bridges — which
 // moved to 03 CAPABILITIES instead, since they're catalogue browsing rather
 // than runtime state.
 
@@ -14,10 +14,10 @@ import { detailBlock, handleCatalog, listRow, renderCatalog, tabRow } from './ca
 import { fuzzy } from '../widgets.mjs';
 
 const TABS = [
-  { id: 'shell', label: 'SHELL' },
-  { id: 'automations', label: 'AUTOMATIONS' },
-  { id: 'processes', label: 'PROCESSES' },
-  { id: 'browsers', label: 'BROWSER INSTANCES' },
+  { id: 'shell', label: 'Shell' },
+  { id: 'automations', label: 'Automations' },
+  { id: 'processes', label: 'Processes' },
+  { id: 'browsers', label: 'Browser instances' },
 ];
 
 const NAME_WIDTH = 30;
@@ -146,10 +146,10 @@ function renderCatalogTab(app, region) {
     placeholder: 'Filter automations, processes and browser instances',
     list: app.runtimeList,
     row: (item, selected, width) => row(app, item, selected, width),
-    stamp: `${list.length} ENTRIES`,
+    stamp: `${list.length} ${list.length === 1 ? 'entry' : 'entries'}`,
     empty,
     detail: detail(app, Math.max(30, Math.floor(region.width * 0.4) - 4)),
-    detailTitle: app.runtimeList.current?.name ? truncate(app.runtimeList.current.name, 30) : 'DOSSIER',
+    detailTitle: app.runtimeList.current?.name ? truncate(app.runtimeList.current.name, 30) : 'Details',
     onTab: (target, id) => {
       target.runtimeTab = id;
       target.focus = id === 'shell' ? 'terminal' : 'runtime';
@@ -189,7 +189,7 @@ function renderShell(app, region) {
   // The tab strip carries this view's own name and its other sections; the
   // rail carries where the shell actually is.
   const framed = panel({
-    theme, width, height, titleRaw: tabs, note: app.terminalBusy ? 'RUNNING' : (app.terminalCwd || ''),
+    theme, width, height, titleRaw: tabs, note: app.terminalBusy ? 'Running' : (app.terminalCwd || ''),
     busy: app.terminalBusy,
     focused: app.focus === 'terminal', body: lines,
   });
@@ -258,7 +258,7 @@ export const hints = (app) => {
   return [...base, ['del', 'stop']];
 };
 
-export const meta = { id: 'runtime', index: '04', title: 'RUNTIME', shortcut: '4' };
+export const meta = { id: 'runtime', index: '4', title: 'Runtime', shortcut: '4' };
 
 // -------------------------------------------------------------------- rail
 //
@@ -272,7 +272,7 @@ export function rail(app, width) {
   const lines = [];
   for (const entry of app.terminalHistory.slice(-40).reverse()) {
     const ok = entry.code === 0;
-    const codeLabel = entry.code === null ? 'ERR' : String(entry.code);
+    const codeLabel = entry.code === null ? 'err' : String(entry.code);
     const tone = ok ? theme.roles.success : theme.roles.danger;
     const durationLabel = entry.durationMs !== undefined ? `${entry.durationMs}ms` : '';
     lines.push(spread(

@@ -1,14 +1,14 @@
 ---
-name: terminal-phantom-ui
-description: Build MaskShift terminal interfaces in the Phantom Protocol design language — tokens over hex values, one marker gutter per pane, one filled chip per screen, and the ANSI width discipline that keeps a TUI aligned.
+name: terminal-ui
+description: Build MaskShift terminal interfaces in the MaskShift design system — tokens over hex values, one marker gutter per pane, one filled chip per screen, and the ANSI width discipline that keeps a TUI aligned.
 ---
 
-# MaskShift Phantom Protocol (terminal)
+# MaskShift terminal design system
 
-Maximalism in a terminal is a discipline, not a licence. Two constraints hold
-the language together, and everything below serves them:
+A dense terminal interface stays usable only with discipline. Two constraints
+hold the system together, and everything below serves them:
 
-1. **Loud is not illegible.** Colour carries meaning, never decoration, and the
+1. **Dense is not illegible.** Colour carries meaning, never decoration, and the
    whole palette has a defined fallback at 256 colours, 16 colours and none.
 2. **Every row is exactly the terminal width.** A single miscounted column
    shears the entire frame. Alignment is correctness, not polish.
@@ -22,11 +22,11 @@ the language together, and everything below serves them:
   the pane holding the keyboard. It is never a data value and never a severity.
   Failure has its own red (`roles.danger`) precisely so a red pane cannot read
   as a focused one.
-- **Gold is the operator** — their turn, their keys, their pending input.
+- **Gold is the user** — their turn, their keys, their pending input.
 - Capability classes keep fixed accents so the same colour always means the same
   category, everywhere: cyanide for tools, violet for skills, azure for MCP. If
   you add a category, give it a token; if you add a token, wire it to a category.
-- Everything else is the neutral ramp. Hierarchy is carried by weight and case,
+- Everything else is the neutral ramp. Hierarchy is carried by weight and colour,
   not by inventing a hue. If you reach for a new colour, you probably want
   `heading` / `text` / `label` / `dim` / `muted` instead.
 - Define colours once as hex and let the theme degrade them. `Theme.fg`/`bg`
@@ -63,9 +63,9 @@ the language together, and everything below serves them:
   with. Section switchers inside a pane are marked by weight and an underline.
 - Focus is the frame, and the frame alone: a light hairline when idle, a heavy
   frame in a *dark* red when focused. Mixing a border with full crimson traces a
-  bright rectangle around whatever the operator is already looking at.
-- **Chrome is upper case; content keeps the case its author wrote.** Never
-  upper-case a model's headings or a user's prose.
+  bright rectangle around whatever the user is already looking at.
+- **Everything is written in ordinary sentence case.** Never upper-case labels,
+  a model's headings or a user's prose; weight and colour carry the hierarchy.
 
 ## Status and motion
 
@@ -148,5 +148,5 @@ This is where TUIs actually break.
   code that causes them.
 - Look at the output. `npm run capture` renders real frames to SVG through the
   same renderer; a palette that reads fine as a list of hex values can still put
-  the loudest thing on screen around the thing the operator is already looking
+  the loudest thing on screen around the thing the user is already looking
   at.

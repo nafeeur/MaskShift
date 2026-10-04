@@ -40,7 +40,7 @@ test('the status rail shows how full the model window is, and keeps it when narr
   const { app } = await tui(t);
   app.modelProfile = { contextWindow: 200_000, tier: 'large', source: 'provider', maxOutputTokens: 16_384 };
   app.contextUsed = 41_200;
-  assert.match(screenText(app), /CTX .*41\.2k\/200k/);
+  assert.match(screenText(app), /Context .*41\.2k\/200k/);
   assert.equal(app.contextState.tone, 'success');
   app.contextUsed = 180_000;
   assert.equal(app.contextState.tone, 'danger');
@@ -49,7 +49,7 @@ test('the status rail shows how full the model window is, and keeps it when narr
   narrow.app.modelProfile = app.modelProfile;
   narrow.app.contextUsed = 41_200;
   const text = screenText(narrow.app);
-  assert.match(text, /CTX .*41\.2k\/200k/);
+  assert.match(text, /Context .*41\.2k\/200k/);
   assert.doesNotMatch(text.split('\n').at(-2), /TIME/, 'lower-priority stats give way first');
 });
 
@@ -63,19 +63,19 @@ test('the transcript marks where the saved summary ends, and s opens it', async 
   app.compaction = { summary: '## Goal\n- SUMMARY-MARKER', throughMessageId: 'b' };
   app.view = 'chat';
   const text = screenText(app);
-  assert.match(text, /2 EARLIER MESSAGES SUMMARIZED/);
-  assert.ok(text.indexOf('second') < text.indexOf('SUMMARIZED') && text.indexOf('SUMMARIZED') < text.indexOf('third'));
+  assert.match(text, /2 earlier messages summarized/);
+  assert.ok(text.indexOf('second') < text.indexOf('summarized') && text.indexOf('summarized') < text.indexOf('third'));
   app.openSessionSummary();
-  assert.equal(app.overlay.title, 'SESSION SUMMARY');
+  assert.equal(app.overlay.title, 'Chat summary');
   assert.match(screenText(app), /SUMMARY-MARKER/);
 });
 
-test('the approval dialog shows what the call does, and "always" approves the tool for the heist', async (t) => {
+test('the approval dialog shows what the call does, and "always" approves the tool for the chat', async (t) => {
   const { app } = await tui(t);
   const tool = { title: 'Execute shell command', risk: 'host-exec' };
   const first = app.requestToolConfirmation({ name: 'shell_exec', tool, args: { command: 'rm -rf build && npm ci' } });
   await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(app.overlay.title, 'APPROVE TOOL CALL');
+  assert.equal(app.overlay.title, 'Approve tool call');
   assert.equal(app.overlay.choice, 1, 'a host-exec call defaults to NO');
   assert.match(screenText(app), /\$ rm -rf build && npm ci/);
   app.overlay.handle(app, { name: 'a' });
@@ -130,7 +130,7 @@ test('the changes pane lists what the last run touched and loads each diff', asy
   await fsp.writeFile(path.join(project, 'index.js'), 'changed\n');
   app.lastUndoableRun = () => ({ run: { id: 'r1', prompt: 'Change index' }, checkpoint });
   await app.openRunChanges();
-  assert.equal(app.overlay.title, 'RUN CHANGES');
+  assert.equal(app.overlay.title, 'Run changes');
   assert.deepEqual(app.overlay.files, [{ path: 'index.js', kind: 'modified' }]);
   screenText(app);
   await waitFor(() => typeof app.overlay.diffs.get('index.js') === 'string', { timeoutMs: 5000, message: 'diff load' });
@@ -175,9 +175,9 @@ test('the session picker previews goal, open issues and the last request', async
   app.sessionId = session.id;
   app.openSessionPicker();
   const text = screenText(app);
-  assert.match(text, /GOAL\s+GOAL-TEXT/);
-  assert.match(text, /OPEN\s+ISSUE-TEXT/);
-  assert.match(text, /LAST\s+“LAST-ASK”/);
+  assert.match(text, /Goal\s+GOAL-TEXT/);
+  assert.match(text, /Open\s+ISSUE-TEXT/);
+  assert.match(text, /Last\s+“LAST-ASK”/);
 });
 
 test('custom commands load from .maskshift/commands and expand $ARGUMENTS', async (t) => {
@@ -248,7 +248,7 @@ test('the cost report lists each run and the total', async (t) => {
   ];
   app.openCostReport();
   const text = screenText(app);
-  assert.match(text, /TOTAL\s+\$0\.1000/);
+  assert.match(text, /Total\s+\$0\.1000/);
   assert.match(text, /unpriced/);
   assert.match(text, /1 run has usage with no price/);
 });
@@ -261,7 +261,7 @@ test('with colour off, chips and the active tab stay visible as brackets', async
   const app = new MaskShiftTui(runtime, { workspacePath: project, output: new FakeTerminal(), headless: true, theme: plain });
   await app.bootstrap();
   app.screen.invalidate();
-  assert.match(app.snapshot()[1], /\[01 HEIST\]/);
+  assert.match(app.snapshot()[1], /\[1 Chat\]/);
 });
 
 test('NO_COLOR wins over a saved colour depth preference', async (t) => {

@@ -1,4 +1,4 @@
-// 01 HEIST — the transcript and the composer.
+// Chat — the transcript and the composer.
 //
 // The transcript is the densest surface in the product, and it was the one
 // that read worst: a user turn's text began two columns right of the model's,
@@ -13,7 +13,7 @@
 
 import path from 'node:path';
 import { frameColour, glyphs, panel, rule } from '../box.mjs';
-import { MASK_WIDTH, heroBlock, maskArt } from '../brand.mjs';
+import { heroBlock } from '../brand.mjs';
 import { diffLines, looksLikeDiff } from '../diff.mjs';
 import { buildImagePreview, isImagePath } from '../image/render.mjs';
 import { renderMarkdown } from '../markdown.mjs';
@@ -24,9 +24,9 @@ import { CONTENT_OFFSET, SPACE } from '../tokens.mjs';
 import { columns, gutter, key as typeKey, spread } from '../type.mjs';
 
 const STARTERS = [
-  ['CASE THE REPO', 'Map this repository, identify architectural risks, and propose the highest-impact improvements.'],
-  ['HUNT & ELIMINATE', 'Find the most important broken or incomplete feature, implement it fully, and verify the result.'],
-  ['REVIEW THE TAKE', 'Review the current Git changes, repair defects, add missing tests, and run the relevant verification suite.'],
+  ['Explore', 'Look through this workspace and summarize what is in it, what it is for, and what could be improved.'],
+  ['Review changes', 'Review the current changes, fix any defects, add missing tests or checks, and run the relevant verification.'],
+  ['Plan a task', 'Ask me what I want to get done, propose a short plan, and start on it once I agree.'],
 ];
 
 const TOOL_NAME_WIDTH = 18;
@@ -37,8 +37,8 @@ const TOOL_NAME_WIDTH = 18;
  * `lead` is the row that names the speaker and takes the colour at full
  * strength; every other row of the turn gets the same rail softened toward the
  * panel, which groups the turn without fencing it in. The assistant's rail is
- * softened much further than the operator's: the model's output is the page,
- * the operator's input is the thing quoted onto it.
+ * softened much further than the user's: the model's output is the page,
+ * the user's input is the thing quoted onto it.
  */
 function rail(theme, colour, { lead = false, weight = 0.35 } = {}) {
   const mark = glyphs(theme);
@@ -55,7 +55,7 @@ function speakerRow(theme, name, colour, width, { qualifier = '', stamp = '' } =
       ? theme.paint(` ${mark.dot} ${truncate(qualifier, Math.max(0, width - name.length - 12))}`, { fg: theme.roles.muted })
       : '');
   const tail = stamp ? theme.paint(stamp, { fg: theme.roles.faint }) : '';
-  // The left edge keeps a gutter's worth of margin before OPERATOR/MASKSHIFT;
+  // The left edge keeps a gutter's worth of margin before the speaker name;
   // the timestamp got none on the right, sitting one column off the frame
   // where every other line kept its full margin. Reserve the same column here.
   return fit(spread(head, tail, Math.max(0, width - 1)), width);
@@ -233,7 +233,7 @@ function buildMessageLines(app, theme, text) {
       openBlock('user');
       const colour = theme.roles.user;
       lines.push(rail(theme, colour, { lead: true })
-        + speakerRow(theme, 'OPERATOR', colour, text, {
+        + speakerRow(theme, 'You', colour, text, {
           qualifier: message.meta?.source === 'steer' ? 'steered mid-run' : '',
           stamp: app.stamp(message.created_at),
         }));
@@ -249,7 +249,7 @@ function buildMessageLines(app, theme, text) {
       openBlock('assistant');
       const colour = theme.roles.primary;
       lines.push(rail(theme, colour, { lead: true })
-        + speakerRow(theme, 'MASKSHIFT', colour, text, {
+        + speakerRow(theme, 'MaskShift', colour, text, {
           qualifier: message.meta?.modelRef || '',
           stamp: app.stamp(message.created_at),
         }));
@@ -292,7 +292,7 @@ function buildMessageLines(app, theme, text) {
 
 function summaryMarker(theme, width, count) {
   const mark = glyphs(theme);
-  const label = ` ${count ? `${count} EARLIER MESSAGE${count === 1 ? '' : 'S'}` : 'EARLIER MESSAGES'} SUMMARIZED ${mark.dot} s TO READ `;
+  const label = ` ${count ? `${count} earlier message${count === 1 ? '' : 's'}` : 'Earlier messages'} summarized ${mark.dot} s to read `;
   const side = Math.max(2, Math.floor((width - visibleWidth(label)) / 2));
   const line = theme.unicode ? '─' : '-';
   const rule = (n) => theme.paint(line.repeat(Math.max(0, n)), { fg: theme.mixed(theme.roles.border, theme.roles.info, 0.6) });
@@ -343,7 +343,7 @@ export function transcriptLines(app, width) {
     const colour = theme.roles.primary;
     const mark = glyphs(theme);
     lines.push(rail(theme, colour, { lead: true })
-      + speakerRow(theme, 'MASKSHIFT', colour, text, { qualifier: app.modelRef || '' }));
+      + speakerRow(theme, 'MaskShift', colour, text, { qualifier: app.modelRef || '' }));
     const body = renderMarkdown(theme, app.streamingText, text);
     const cursor = theme.paint(mark.spineRight, { fg: colour });
     body.forEach((piece, index) => {
@@ -374,19 +374,14 @@ function emptyState(app, width, height) {
   const { theme } = app;
   const mark = glyphs(theme);
   const lines = [];
-  const hero = heroBlock(theme, width);
-  const art = width >= MASK_WIDTH ? maskArt(theme, { busy: app.busy }) : [];
-  const artBlock = art.map((line) => center(line, width));
+  const block = heroBlock(theme, width);
   const chrome = STARTERS.length + 3;
-  const showArt = art.length > 0 && height > hero.length + art.length + chrome + 4;
-  app.maskBreathing = showArt;
-  const block = showArt ? [...artBlock, '', ...hero] : hero;
   const pad = Math.max(0, Math.floor((height - block.length - chrome) / 2));
   for (let index = 0; index < pad; index += 1) lines.push('');
   lines.push(...block);
   lines.push('');
   lines.push(center(theme.paint(
-    `${app.counts.tools} TOOLS  ${mark.dot}  ${app.counts.skills} SKILLS  ${mark.dot}  ${app.counts.mcp} MCP SERVERS  ${mark.dot}  SUMMONED ONLY WHEN NEEDED`,
+    `${app.counts.tools} tools  ${mark.dot}  ${app.counts.skills} skills  ${mark.dot}  ${app.counts.mcp} MCP servers  ${mark.dot}  loaded only when needed`,
     { fg: theme.roles.muted },
   ), width));
   lines.push('');
@@ -476,7 +471,7 @@ export function render(app, region) {
   const scrolled = !app.transcript.stick && body.length > transcriptHeight;
   const note = scrolled
     ? `${mark.arrowUp} ${Math.round((app.transcript.offset / Math.max(1, body.length - transcriptHeight)) * 100)}%`
-    : `${app.messages.length} MESSAGES`;
+    : `${app.messages.length} message${app.messages.length === 1 ? '' : 's'}`;
 
   // The seam labels the composer and carries its keys, so the pane that owns
   // the keyboard is named on the rule that bounds it.
@@ -522,13 +517,13 @@ export function render(app, region) {
   const stampParts = [];
   if (draftRows > draftVisibleRows) stampParts.push(`${draftRows} lines`);
   if (drafted > 1000) stampParts.push(`${Math.round((drafted / 4000) * 100)}% of budget`);
-  if (!app.autoLoad) stampParts.push('MANUAL LOAD');
+  if (!app.autoLoad) stampParts.push('Manual loading');
 
-  // The tab strip already says which view this is; repeating "01 HEIST" on the
+  // The tab strip already says which view this is; repeating "Chat" on the
   // rail directly beneath it stacked two identical chips one row apart. The
-  // rail now carries the one thing the tab cannot: what this session is about.
+  // rail now carries the one thing the tab cannot: what this chat is about.
   const lines = panel({
-    theme, width, height, title: app.sessionTitle || 'NEW SESSION', note,
+    theme, width, height, title: app.sessionTitle || 'New chat', note,
     busy: app.busy && paneFocused,
     stamp: stampParts.join(` ${mark.dot} `),
     body: [...transcriptRows, seam, ...composerBody],
@@ -671,7 +666,7 @@ export function handle(app, event) {
   if (event.name === 'tab' && !event.ctrl) {
     // Complete to the top suggestion instead of leaving the composer, so the
     // command the suggestion panel is already showing is one keystroke away
-    // rather than something the operator has to keep typing out by hand.
+    // rather than something the user has to keep typing out by hand.
     const matches = app.matchingSlashCommands();
     if (matches?.length) { app.composer.set(`/${matches[0].name} `); return true; }
     app.focus = 'transcript';
@@ -708,4 +703,4 @@ export const hints = (app) => (app.focus === 'composer'
     ['?', 'help', (target) => target.openHelp()],
   ]);
 
-export const meta = { id: 'chat', index: '01', title: 'HEIST', shortcut: '1' };
+export const meta = { id: 'chat', index: '1', title: 'Chat', shortcut: '1' };

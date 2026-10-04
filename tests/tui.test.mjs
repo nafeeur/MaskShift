@@ -53,7 +53,7 @@ test('text measurement ignores ANSI and respects wide characters', () => {
 
 test('panels render at an exact width in both focus states', () => {
   for (const focused of [true, false]) {
-    const lines = panel({ theme, width: 40, height: 6, title: 'ARSENAL', stamp: '12', body: ['a', 'b'], focused });
+    const lines = panel({ theme, width: 40, height: 6, title: 'Tools', stamp: '12', body: ['a', 'b'], focused });
     assert.equal(lines.length, 6);
     for (const line of lines) assert.equal(visibleWidth(line), 40);
   }
@@ -120,11 +120,11 @@ test('every transcript row shares one left edge', async (t) => {
   }
   // And the three kinds of row really do put their first character there.
   const starts = new Set(rows
-    .filter((line) => /OPERATOR|MASKSHIFT|fs_read|Diff the frame/.test(line))
+    .filter((line) => /You|MaskShift|fs_read|Diff the frame/.test(line))
     .map((line) => line.slice(SPACE.gutter).length - line.slice(SPACE.gutter).trimStart().length));
   assert.deepEqual([...starts], [0], `speaker, prose and tool rows drifted apart: ${[...starts].join(', ')}`);
-  assert.ok(rows.some((line) => line.includes('OPERATOR')));
-  assert.ok(rows.some((line) => line.includes('MASKSHIFT')));
+  assert.ok(rows.some((line) => line.includes('You')));
+  assert.ok(rows.some((line) => line.includes('MaskShift')));
   assert.ok(rows.some((line) => line.includes('fs_read')));
 });
 
@@ -176,9 +176,9 @@ test('one status vocabulary answers for every subsystem', () => {
   }
   assert.equal(statusOf('connected').kind, 'done');
   assert.equal(statusOf('in_progress').kind, 'active');
-  assert.equal(statusOf('max steps').label, 'STEP LIMIT');
+  assert.equal(statusOf('max steps').label, 'Step limit');
   // Anything a subsystem invents still renders legibly rather than silently.
-  assert.equal(statusOf('reticulating').label, 'RETICULATING');
+  assert.equal(statusOf('reticulating').label, 'Reticulating');
   assert.equal(visibleWidth(stripAnsi(statusGlyph(theme, 'running', { animate: false }))), 1);
 });
 
@@ -519,7 +519,7 @@ test('prompts submitted during a run are queued and drained sequentially', async
   await app.submitPrompt();
   assert.deepEqual(started, []);
   assert.equal(app.promptQueue.length, 1);
-  assert.ok(app.liveTrail.some((entry) => stripAnsi(entry.render(theme, 80)[0]).includes('QUEUED')));
+  assert.ok(app.liveTrail.some((entry) => stripAnsi(entry.render(theme, 80)[0]).includes('Queued')));
   app.activeRun = null;
   app.runId = null;
   await app.drainPromptQueue();
@@ -562,7 +562,7 @@ test('opening the model or session picker starts on the currently active choice,
   // unambiguously later updated_at so it — not the active session — sorts first, regardless
   // of how coarse the clock is between the two creations.
   const current = app.sessionId;
-  const later = runtime.store.createSession({ workspaceId: app.workspaceId, title: 'second heist' });
+  const later = runtime.store.createSession({ workspaceId: app.workspaceId, title: 'second chat' });
   runtime.store.db.prepare('UPDATE sessions SET updated_at = ? WHERE id = ?')
     .run(new Date(Date.now() + 60_000).toISOString(), later.id);
   app.openSessionPicker();
@@ -583,8 +583,8 @@ test('a form field can hide itself based on another field, and navigation skips 
   });
 
   const rendered = () => form.render({ theme }, { columns: 100, rows: 30 }).lines.map(stripAnsi).join('\n');
-  assert.ok(rendered().includes('ONLY FOR A'));
-  assert.ok(!rendered().includes('ONLY FOR B'));
+  assert.ok(rendered().includes('Only for a'));
+  assert.ok(!rendered().includes('Only for b'));
   assert.equal(form.visibleFields().length, 2, 'the hidden field should not count toward the visible total');
 
   // Tab from the mode field should skip the hidden "only for b" field entirely and land
@@ -596,11 +596,11 @@ test('a form field can hide itself based on another field, and navigation skips 
 
   // Switch mode to "b": the visibility should flip live.
   form.fields[0].optionIndex = 1;
-  assert.ok(rendered().includes('ONLY FOR B'));
-  assert.ok(!rendered().includes('ONLY FOR A'));
+  assert.ok(rendered().includes('Only for b'));
+  assert.ok(!rendered().includes('Only for a'));
 });
 
-test('the Add MCP Server dialog shows COMMAND for stdio and URL for streamable HTTP, never both', async (t) => {
+test('the Add MCP Server dialog shows Command for stdio and URL for streamable HTTP, never both', async (t) => {
   const project = await createProject(t);
   const runtime = await runtimeForTest(t, project);
   const app = new MaskShiftTui(runtime, { workspacePath: project, output: new FakeTerminal(), headless: true, theme });
@@ -608,7 +608,7 @@ test('the Add MCP Server dialog shows COMMAND for stdio and URL for streamable H
 
   app.openMcpDialog();
   let frame = app.snapshot().map(stripAnsi).join('\n');
-  assert.ok(frame.includes('COMMAND'), 'stdio (the default transport) should show COMMAND');
+  assert.ok(frame.includes('Command'), 'stdio (the default transport) should show Command');
   assert.ok(!frame.includes('URL'), 'stdio should not show URL');
 
   const transportField = app.overlay.fields.find((field) => field.name === 'transport');
@@ -616,7 +616,7 @@ test('the Add MCP Server dialog shows COMMAND for stdio and URL for streamable H
   app.screen.invalidate();
   frame = app.snapshot().map(stripAnsi).join('\n');
   assert.ok(frame.includes('URL'), 'streamable http should show URL');
-  assert.ok(!frame.includes('COMMAND'), 'streamable http should not show COMMAND');
+  assert.ok(!frame.includes('Command'), 'streamable http should not show Command');
 });
 
 test('stale file previews and duplicate operations cannot replace current state', async (t) => {
@@ -743,7 +743,7 @@ test('typing a slash in the composer shows matching command suggestions, and onl
 
   app.composer.set('/');
   let frame = app.snapshot().map(stripAnsi);
-  assert.ok(frame.some((line) => line.includes('COMMANDS')), 'expected a suggestion panel for a bare slash');
+  assert.ok(frame.some((line) => line.includes('Commands')), 'expected a suggestion panel for a bare slash');
   assert.ok(frame.some((line) => line.includes('/model')), 'expected /model among the suggestions');
 
   app.composer.set('/h');
@@ -789,7 +789,7 @@ test('the slash-command suggestion panel stays inside the chat panel and never b
   app.composer.set('/');
   const frame = app.snapshot().map(stripAnsi);
   const railStart = app.lastRegion.width;
-  const suggestionRow = frame.find((line) => line.includes('┏━ COMMANDS'));
+  const suggestionRow = frame.find((line) => line.includes('┏━ Commands'));
   assert.ok(suggestionRow, 'expected the suggestion panel to be visible');
   // The panel's own right border must land at or before the chat panel's
   // right edge, not spill into the columns the rail owns.
@@ -1072,14 +1072,14 @@ test('the interface routes clicks, wheels and drags to what it painted', async (
     app.onMouse(decode(`${ESC}[<${mask};${column + 1};${row + 1}${final}`).events[0]);
   };
 
-  // The tab strip: " 01 HEIST " opens at column 1, so 02 FILES starts at 12.
+  // The tab strip: " 1 Chat " opens at column 1, so 2 Files follows it.
   app.view = 'chat';
   at(1, 14);
   assert.equal(app.view, 'files');
   at(1, 3);
   assert.equal(app.view, 'chat');
 
-  // The two panes of the heist view take focus from a click.
+  // The two panes of the chat view take focus from a click.
   app.focus = 'composer';
   at(4, 20);
   assert.equal(app.focus, 'transcript');
@@ -1131,7 +1131,7 @@ test('the interface routes clicks, wheels and drags to what it painted', async (
   app.screen.setMouse('click');
 });
 
-test('the heist view keeps the composer inside one unclipped frame', async (t) => {
+test('the chat view keeps the composer inside one unclipped frame', async (t) => {
   const project = await createProject(t);
   const runtime = await runtimeForTest(t, project);
   const app = new MaskShiftTui(runtime, {
@@ -1257,7 +1257,7 @@ test('a streaming reply grows word by word in the transcript, then settles into 
   }, { timeoutMs: 3000, message: 'partial streamed text to appear before the reply finishes' });
 
   const midFrame = app.snapshot().map(stripAnsi);
-  assert.ok(midFrame.some((line) => line.includes('MASKSHIFT')), 'expected the speaker row to appear as soon as text starts streaming');
+  assert.ok(midFrame.some((line) => line.includes('MaskShift')), 'expected the speaker row to appear as soon as text starts streaming');
   assert.ok(app.streamingText && text.startsWith(app.streamingText), 'app.streamingText should be a prefix of the final text while streaming');
   // A spinner "thinking" row would be redundant once real text is already visible.
   assert.ok(!midFrame.some((line) => /Thinking…|THINKING/i.test(line)), 'the thinking spinner should stand down once text is streaming');

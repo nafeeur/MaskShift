@@ -1,4 +1,4 @@
-// MaskShift terminal theme: "Phantom Protocol".
+// MaskShift terminal theme.
 //
 // The palette itself lives in tokens.mjs; this file is the renderer that puts
 // it on the wire, degrading truecolor to 256 and 16 colours so the identity
@@ -97,7 +97,7 @@ export class Theme {
     this.unicode = unicode;
     // Always the original MaskShift brand palette, regardless of the selected theme — a handful
     // of call sites (and one test) reach for a plain, known-good hex value off it rather than a
-    // themed role, and have no reason to change colour when the operator switches themes.
+    // themed role, and have no reason to change colour when the user switches themes.
     this.palette = PALETTE;
     this.themeId = resolveThemeId(themeId);
     this.roles = resolveTheme(this.themeId).roles;

@@ -217,7 +217,7 @@ const workspaceCommands = {
 const sessionCommands = {
   list: {
     usage: 'session list [--limit N]',
-    summary: 'List heists (sessions)',
+    summary: 'List chats',
     run(context) {
       const sessions = context.runtime.store.listSessions({ limit: Number(context.args.limit || 40) });
       if (context.ui.emit(sessions)) return;
@@ -240,9 +240,9 @@ const sessionCommands = {
       const messages = context.runtime.store.listMessages(sessionId, Number(context.args.limit || 500));
       if (context.ui.emit({ session, messages })) return;
       const { ui } = context;
-      ui.heading(session.title || 'heist');
+      ui.heading(session.title || 'chat');
       for (const message of messages) {
-        if (message.role === 'user') { ui.section('operator'); ui.markdown(message.content); }
+        if (message.role === 'user') { ui.section('user'); ui.markdown(message.content); }
         else if (message.role === 'assistant' && message.content) { ui.section('maskshift'); ui.markdown(message.content); }
         else if (message.role === 'tool') {
           ui.line(ui.theme.paint(`  ${message.meta?.isError ? ui.marks.cross : ui.marks.check} ${message.meta?.toolName || 'tool'}`, {
@@ -254,21 +254,21 @@ const sessionCommands = {
   },
   new: {
     usage: 'session new [TITLE] [--model REF]',
-    summary: 'Create an empty heist',
+    summary: 'Create an empty chat',
     async run(context) {
       const workspace = await resolveWorkspace(context);
       const session = context.runtime.engine.createSession({
         workspaceId: workspace.id,
-        title: context.positional.join(' ') || 'New run',
+        title: context.positional.join(' ') || 'New chat',
         modelRef: context.args.model || null,
       });
       if (context.ui.emit(session)) return;
-      context.ui.ok(`Heist ${session.id} opened`);
+      context.ui.ok(`Chat ${session.id} opened`);
     },
   },
   rename: {
     usage: 'session rename SESSION_ID TITLE...',
-    summary: 'Rename a heist',
+    summary: 'Rename a chat',
     run(context) {
       const sessionId = requirePositional(context, 0, 'SESSION_ID');
       const title = context.positional.slice(1).join(' ');
@@ -280,7 +280,7 @@ const sessionCommands = {
   },
   delete: {
     usage: 'session delete SESSION_ID',
-    summary: 'Delete a heist and its messages',
+    summary: 'Delete a chat and its messages',
     run(context) {
       const sessionId = requirePositional(context, 0, 'SESSION_ID');
       context.runtime.store.deleteSession(sessionId);
@@ -290,7 +290,7 @@ const sessionCommands = {
   },
   export: {
     usage: 'session export SESSION_ID [--out FILE]',
-    summary: 'Export a heist as JSON',
+    summary: 'Export a chat as JSON',
     async run(context) {
       const sessionId = requirePositional(context, 0, 'SESSION_ID');
       const session = context.runtime.store.getSession(sessionId);
@@ -310,7 +310,7 @@ const sessionCommands = {
   },
   runs: {
     usage: 'session runs SESSION_ID',
-    summary: 'List the runs inside a heist',
+    summary: 'List the runs inside a chat',
     run(context) {
       const sessionId = requirePositional(context, 0, 'SESSION_ID');
       const runs = context.runtime.store.listRuns({ sessionId, limit: Number(context.args.limit || 50) });
@@ -364,7 +364,7 @@ const toolCommands = {
         ['category', descriptor.category],
         ['access', descriptor.readOnly ? 'read only' : 'writes / executes'],
         ['risk', descriptor.risk || 'normal'],
-        ['always on', descriptor.alwaysAvailable ? 'yes' : 'summoned on demand'],
+        ['always on', descriptor.alwaysAvailable ? 'yes' : 'loaded on demand'],
       ]);
       const properties = descriptor.inputSchema?.properties || {};
       const required = new Set(descriptor.inputSchema?.required || []);
@@ -488,7 +488,7 @@ const benchCommands = {
       const { verifyTasks } = await import('../bench/runner.mjs');
       const results = await verifyTasks({ runtime: context.runtime });
       if (context.ui.emit(results)) return;
-      for (const entry of results) context.ui.key(entry.id, entry.ok ? 'ok' : `BROKEN (${entry.error || entry.detail || 'check did not flip'})`, 24);
+      for (const entry of results) context.ui.key(entry.id, entry.ok ? 'ok' : `broken (${entry.error || entry.detail || 'check did not flip'})`, 24);
       if (results.some((entry) => !entry.ok)) throw new Error('One or more benchmark tasks are not sound');
     },
   },
@@ -505,7 +505,7 @@ const benchCommands = {
       const without = context.args.without ? String(context.args.without).split(',').map((item) => item.trim()).filter(Boolean) : [];
       const report = await runBenchmark({
         runtime: context.runtime, modelRef: ref, tasks, without, repeat: Number(context.args.repeat || 1), maxSteps: Number(context.args.steps || 24),
-        onTask: (entry) => { if (!context.ui.json) context.ui.line(`  ${entry.passed ? 'pass' : 'FAIL'}  ${entry.id}  ${entry.steps} turns, ${(entry.inputTokens || 0) + (entry.outputTokens || 0)} tokens${entry.status === 'completed' ? '' : `  [${entry.status}]`}`); },
+        onTask: (entry) => { if (!context.ui.json) context.ui.line(`  ${entry.passed ? 'pass' : 'fail'}  ${entry.id}  ${entry.steps} turns, ${(entry.inputTokens || 0) + (entry.outputTokens || 0)} tokens${entry.status === 'completed' ? '' : `  [${entry.status}]`}`); },
       });
       const file = context.args.out ? path.resolve(String(context.args.out)) : path.join(context.runtime.config.get().home, 'bench', `${report.at.replace(/[:.]/g, '-')}-${report.model.replace(/[^a-z0-9._-]+/gi, '_')}.json`);
       await fsp.mkdir(path.dirname(file), { recursive: true });
@@ -1116,7 +1116,7 @@ const configCommands = {
 
 export const GROUPS = {
   workspace: { title: 'Workspace', commands: workspaceCommands, defaultCommand: 'info' },
-  session: { title: 'Heists', commands: sessionCommands, defaultCommand: 'list' },
+  session: { title: 'Chats', commands: sessionCommands, defaultCommand: 'list' },
   tools: { title: 'Tools', commands: toolCommands, defaultCommand: 'list' },
   skills: { title: 'Skills', commands: skillCommands, defaultCommand: 'list' },
   model: { title: 'Model capability', commands: modelCommands, defaultCommand: 'profile' },

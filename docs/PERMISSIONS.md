@@ -1,17 +1,17 @@
-# Permissive Execution Model
+# Permissions
 
-MaskShift is deliberately configured for low-friction autonomous coding. Its default configuration is:
+MaskShift is deliberately configured for low-friction autonomous work. Its default configuration is:
 
 ```json
 {
-  "permissionMode": "overdrive",
+  "permissionMode": "autonomous",
   "filesystemScope": "host",
   "networkAccess": "unrestricted",
   "autoCheckpoint": true
 }
 ```
 
-## What overdrive means
+## Autonomous mode
 
 The model can call the enabled native tool set without an approval dialog for each action. That includes arbitrary shell commands, writes and deletes, Git operations, remote commands, package managers, database clients, container engines, browser automation, plugin activation, and MCP tools.
 
@@ -19,16 +19,16 @@ MaskShift does not attempt to translate every Unix action into a restrictive pol
 
 ## `balanced` and `review` modes
 
-`permissionMode` also accepts `balanced` and `review`. Both are enforced — a gated tool call is blocked (and audited as `tool.blocked`) unless it is explicitly confirmed:
+`permissionMode` also accepts `balanced` and `review`. (`overdrive`, the name earlier releases used for autonomous mode, is still read as `autonomous`.) Both are enforced — a gated tool call is blocked (and audited as `tool.blocked`) unless it is explicitly confirmed:
 
 - **`balanced`** requires interactive confirmation only for the tiers that can reach outside the workspace or beyond an automatic checkpoint's undo: shell/host execution, remote (SSH) execution, secrets access, package installs, database writes, persistent background processes, dynamically loaded plugin code, and other "external action" tools. Plain file edits, git operations, reads, and everything else `readOnly` still run without a prompt.
 - **`review`** requires interactive confirmation before every tool call that isn't `readOnly` — the strictest mode.
 
-Confirmation currently has one working surface: the TUI, which pauses the run and shows a confirm dialog naming the tool and its risk tier. A headless context with no one to ask — `maskshift run` (the scripted CLI), an armed automation, a plugin-driven call, or an MCP server request — has no confirmation handler wired up, so a gated call in `balanced`/`review` mode fails there with a clear "no confirmation handler is available" error rather than running unattended or silently allowing it. Use `overdrive` for those unattended contexts; `balanced`/`review` are for a human sitting at the TUI.
+Confirmation currently has one working surface: the TUI, which pauses the run and shows a confirm dialog naming the tool and its risk tier. A headless context with no one to ask — `maskshift run` (the scripted CLI), an armed automation, a plugin-driven call, or an MCP server request — has no confirmation handler wired up, so a gated call in `balanced`/`review` mode fails there with a clear "no confirmation handler is available" error rather than running unattended or silently allowing it. Use `autonomous` for those unattended contexts; `balanced`/`review` are for a human sitting at the TUI.
 
 ## What remains observable
 
-Permissive is not invisible. MaskShift records and exposes:
+Autonomous is not invisible. MaskShift records and exposes:
 
 - tool start/completion/failure events;
 - run and message history;
@@ -51,7 +51,7 @@ MaskShift home directory and any shared terminal multiplexer session as
 credentials. If you run `maskshift daemon` for automations, remember that its
 armed automations execute unattended with the same authority.
 
-Run MaskShift as the user whose files and developer credentials it should access. Running as root gives the agent root authority and is rarely necessary.
+Run MaskShift as the user whose files and credentials it should access. Running as root gives the agent root authority and is rarely necessary.
 
 ## Credentials
 
@@ -67,7 +67,7 @@ The supplied container deployment mounts only `/workspace` and `/data` by defaul
 
 ## Recovery limits
 
-Automatic checkpoints help restore repository files. They cannot automatically undo:
+Automatic checkpoints help restore files in the workspace. They cannot automatically undo:
 
 - external API calls;
 - cloud or database mutations;
@@ -76,4 +76,12 @@ Automatic checkpoints help restore repository files. They cannot automatically u
 - package installations outside the workspace;
 - remote SSH operations.
 
-Use a dedicated development account or disposable machine when giving an untrusted model access to sensitive infrastructure.
+Use a dedicated account or disposable machine when giving an untrusted model access to sensitive infrastructure.
+
+## Untrusted content
+
+Files, web pages, documents and tool results can contain text written to look like instructions. The
+system prompt tells the model to treat all of it as data and to follow directions only from the user.
+That is a mitigation, not a guarantee: in autonomous mode a model that is misled can still act with
+your account's authority, which is the main reason to use `balanced` or `review` when a task involves
+content you do not control, or to run in a container with only the files it needs.

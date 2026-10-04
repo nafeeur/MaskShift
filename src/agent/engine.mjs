@@ -98,7 +98,7 @@ export class AgentEngine {
     this.recentCompletions = new Map();
   }
 
-  createSession({ workspaceId = null, title = 'New run', modelRef = null, meta = {} } = {}) {
+  createSession({ workspaceId = null, title = 'New chat', modelRef = null, meta = {} } = {}) {
     return this.store.createSession({ workspaceId, title, modelId: modelRef || this.config.get().defaultModel, meta });
   }
 
@@ -110,7 +110,7 @@ export class AgentEngine {
     if (workspaceId) this.workspaceManager.get(workspaceId);
     if (!session) session = this.createSession({ workspaceId, title: titleFromPrompt(prompt), modelRef });
     else if (!session.workspace_id && workspaceId) session = this.store.updateSession(session.id, { workspace_id: workspaceId });
-    if (/^new run$/i.test(session.title || '')) session = this.store.updateSession(session.id, { title: titleFromPrompt(prompt) });
+    if (/^new (chat|run)$/i.test(session.title || '')) session = this.store.updateSession(session.id, { title: titleFromPrompt(prompt) });
 
     // A session processes one run at a time; a fresh session (the common subagent case, which
     // always creates its own) never collides here.
@@ -249,7 +249,7 @@ export class AgentEngine {
     const session = this.store.getSession(sessionId);
     if (!session) throw new Error(`Unknown session: ${sessionId}`);
     if ([...this.active.values()].some((entry) => entry.sessionId === sessionId && !['completed', 'failed', 'cancelled'].includes(entry.status))) {
-      throw new Error('Wait for the running heist to finish before compacting it');
+      throw new Error('Wait for the running task to finish before compacting it');
     }
     const saved = session.meta?.compaction || {};
     const rows = this.store.listMessages(sessionId, HISTORY_LOAD_LIMIT);
@@ -273,7 +273,7 @@ export class AgentEngine {
   }
 
   /**
-   * Adds an operator message to a run that is still working. It reaches the model at the next
+   * Adds a user message to a run that is still working. It reaches the model at the next
    * step boundary — after any tool call already in flight — instead of waiting for the run to
    * finish the way a queued prompt does.
    */
@@ -404,7 +404,7 @@ export class AgentEngine {
       };
       const savedCompaction = this.store.getSession(session.id)?.meta?.compaction || {};
       const rows = this.store.listMessages(session.id, HISTORY_LOAD_LIMIT);
-      // A summary the operator asked for (/compact) replaces the turns it covers outright, even
+      // A summary the user asked for (/compact) replaces the turns it covers outright, even
       // when they would still fit; an automatic one only stands in for turns that do not.
       const forcedCut = savedCompaction.forced && savedCompaction.throughMessageId
         ? rows.findIndex((row) => row.id === savedCompaction.throughMessageId)
@@ -626,7 +626,7 @@ export class AgentEngine {
           continue;
         }
 
-        // The model thinks it is done, but the operator said something it has not seen yet.
+        // The model thinks it is done, but the user said something it has not seen yet.
         if (!response.toolCalls?.length && entry.steering.length) continue;
 
         // The model says it is done. For runs that changed something, the project's own checks
@@ -754,7 +754,7 @@ export class AgentEngine {
         meta: { ...current?.meta, capabilities: entry.capabilityState ? this.capabilityController.snapshot(entry.capabilityState) : null, plan: entry.planState },
       });
       this.store.updateSession(session.id, { status: 'idle' });
-      this.#event(run.id, status, { error: error.message, stack: this.config.get().permissionMode === 'overdrive' ? error.stack : undefined }, scope);
+      this.#event(run.id, status, { error: error.message, stack: this.config.get().permissionMode === 'autonomous' ? error.stack : undefined }, scope);
       await this.hooks?.run('Stop', { ...scope, workspacePath, status, error: error.message }).catch(() => {});
       sessionEndOutcome = { status, error: error.message };
       return failed;

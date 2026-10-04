@@ -153,7 +153,7 @@ test('a small model gets a compact system prompt; a large one the full contract'
   const args = { workspaceContext, capabilityState, planState: { steps: [] }, run: { id: 'r', workspace_id: workspace.id }, session };
   const large = runtime.promptBuilder.system({ ...args, modelProfile: { tier: 'large' } });
   const small = runtime.promptBuilder.system({ ...args, modelProfile: { tier: 'small' } });
-  assert.match(large.text, /Parallelize independent read-only discovery/);
+  assert.match(large.text, /Run independent read-only calls in parallel/);
   assert.doesNotMatch(small.text, /Parallelize independent read-only discovery/);
   assert.match(small.text, /Finish the task end to end/);
   assert.ok(small.text.length < large.text.length);

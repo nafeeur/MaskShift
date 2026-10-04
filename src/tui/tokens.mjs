@@ -11,7 +11,7 @@
 //
 //   crimson   Identity and focus. The active view, the pane holding the
 //             keyboard, the wordmark. Never a data value, never a severity.
-//   gold      The operator: their turn, their keys, their pending input.
+//   gold      The user: their turn, their keys, their pending input.
 //   danger    Failure and destruction only — a distinct red so a failed run
 //             never reads as "this pane is focused".
 //   tool /    Capability classes. Constant across every view so a cyan token
@@ -23,7 +23,7 @@
 // Exactly one solid-filled chip is allowed per screen region: the active tab.
 // Every other label is drawn as text on the surface it belongs to.
 //
-// Hue budget: eight hues total. Warm half carries identity, operator and
+// Hue budget: eight hues total. Warm half carries identity, user and
 // severity; cool half carries capability classes. info and mcp share the blue
 // family on purpose and are separated by weight, not hue — info is the lighter
 // of the two.
@@ -50,7 +50,7 @@ export const NEUTRAL = {
   chalk: '#FFFFFF', // headings only
 };
 
-/** Brand hues. Crimson is the identity; gold is the operator. */
+/** Brand hues. Crimson is the identity; gold is the user. */
 export const BRAND = {
   crimson: '#E32C40', // the badge red, straight from the mark
   blood: '#A01A2A', // filled tracks, pressed states
@@ -63,7 +63,7 @@ export const BRAND = {
 /** Semantic hues. Distinct from the brand hues above. */
 export const SIGNAL = {
   success: '#35CF8B',
-  warning: '#F7C948', // yellower than gold, so a warning is not the operator
+  warning: '#F7C948', // yellower than gold, so a warning is not the user
   danger: '#FF6B4A', // orange-red, never mistaken for crimson
   info: '#7FB8FF',
   tool: '#2BD9C0',

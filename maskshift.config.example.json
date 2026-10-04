@@ -1,7 +1,7 @@
 {
   "version": 1,
   "home": "~/.maskshift",
-  "permissionMode": "overdrive",
+  "permissionMode": "autonomous",
   "filesystemScope": "host",
   "networkAccess": "unrestricted",
   "maxAgentSteps": 96,

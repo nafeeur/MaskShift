@@ -8,7 +8,7 @@ The full example is [`maskshift.config.example.json`](../maskshift.config.exampl
 
 | Field | Default | Meaning |
 |---|---:|---|
-| `permissionMode` | `overdrive` | `overdrive` never prompts. `balanced` requires interactive confirmation (in the TUI) before a high-risk tool call — one whose `risk` tier is `destructive`, `host-exec`, `remote-exec`, `secrets`, `install`, `database-write`, `persistent-exec`, `dynamic-load`, or `external-action`. `review` requires confirmation before any non-`readOnly` tool call. See [`docs/PERMISSIVE_MODE.md`](PERMISSIVE_MODE.md#balanced-and-review-modes). |
+| `permissionMode` | `autonomous` | `autonomous` never prompts (the older name `overdrive` is still accepted). `balanced` requires interactive confirmation (in the TUI) before a high-risk tool call — one whose `risk` tier is `destructive`, `host-exec`, `remote-exec`, `secrets`, `install`, `database-write`, `persistent-exec`, `dynamic-load`, or `external-action`. `review` requires confirmation before any non-`readOnly` tool call. See [`docs/PERMISSIONS.md`](PERMISSIONS.md#balanced-and-review-modes). |
 | `filesystemScope` | `host` | Native file tools may resolve host paths. |
 | `networkAccess` | `unrestricted` | Declares network intent for prompts and telemetry. |
 | `maxAgentSteps` | `96` | Maximum model/tool turns in a run. |
@@ -82,8 +82,8 @@ The starting level comes from, in order of trust: a **calibration** (`maskshift 
 | Field | Default | Meaning |
 |---|---:|---|
 | `ui.density` | `maximal` | Reserved for future layout density presets. |
-| `ui.rail` | `plan` | Rail section shown first: `plan`, `telemetry`, `events` or `git`. |
-| `ui.railVisible` | `true` | Whether the right rail starts visible. It hides itself below 108 columns regardless. |
+| `ui.rail` | `plan` | Sidebar tab shown first: `plan`, `telemetry` (the tools in use), `events` or `git`. |
+| `ui.railVisible` | `true` | Whether the sidebar starts visible. It hides itself below 108 columns regardless. |
 | `ui.unicode` | `null` | Force Unicode box drawing on or off. `null` auto-detects from the locale. |
 | `ui.colorDepth` | `null` | Force `0`, `4`, `8` or `24`-bit colour. `null` auto-detects. |
 | `ui.expandToolOutput` | `false` | Start the transcript with tool output expanded. |
@@ -448,7 +448,7 @@ Add `"--read-only"` to `args` for a client that should only ever inspect the wor
 {
   "agentBridges": {
     "my-agent": {
-      "title": "Internal coding agent",
+      "title": "Internal agent",
       "command": "my-agent",
       "args": ["--prompt", "${prompt}"],
       "enabled": true,
@@ -478,7 +478,7 @@ the interface event feed.
 }
 ```
 
-Create and manage them from the Mod Shop (`5`), the `maskshift automation` subcommands, or the
+Create and manage them from the Runtime view (`4`), the `maskshift automation` subcommands, or the
 `automation_*` tools.
 
 ## Browser profiles

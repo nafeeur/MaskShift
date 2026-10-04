@@ -1,7 +1,7 @@
 {
   "name": "maskshift",
   "version": "1.4.1",
-  "description": "A maximalist, model-agnostic coding harness for the terminal, with lazy skills, tools, MCP and multi-agent orchestration.",
+  "description": "A general-purpose, model-agnostic agent harness for the terminal, with tools loaded on demand, skills, MCP and multi-agent orchestration.",
   "type": "module",
   "bin": {
     "maskshift": "bin/maskshift.mjs"
@@ -37,13 +37,15 @@
     "test:tools": "node --no-warnings --test ./tests/all-tools.test.mjs ./tests/tool-edge-cases.test.mjs"
   },
   "keywords": [
-    "coding-agent",
+    "ai-agent",
+    "agent-harness",
+    "llm",
+    "automation",
     "tui",
     "cli",
     "mcp",
     "agent-skills",
     "ai",
-    "developer-tools",
     "ollama",
     "openai",
     "anthropic"

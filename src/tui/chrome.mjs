@@ -4,10 +4,9 @@
 // Four rows frame every view, so they have to be readable at a glance and
 // completely silent otherwise. Two rules do most of the work:
 //
-//   Every piece of telemetry is written the same way — a muted upper-case
-//   label followed by its value. The band used to mix `TARGET MaskShift` with
-//   bare `T 148` and a lone `OVERDRIVE`, which read as three unrelated
-//   interfaces sharing a row.
+//   Every piece of telemetry is written the same way — a muted label
+//   followed by its value. Mixing `Workspace MaskShift` with a bare `T 148`
+//   and a lone `Autonomous` read as three unrelated interfaces sharing a row.
 //
 //   The active view tab is the only filled chip on screen. Everything else in
 //   the chrome is text on the background.
@@ -15,13 +14,14 @@
 import { glyphs, meter } from './box.mjs';
 import { LAYER } from './regions.mjs';
 import { statusOf, statusGlyph } from './status.mjs';
-import { fit, padStart, repeat, truncate, visibleWidth } from './text.mjs';
+import { fit, padStart, repeat, sentence, truncate, visibleWidth } from './text.mjs';
 import { BREAKPOINT } from './tokens.mjs';
 import { chip, key as typeKey } from './type.mjs';
+import { RAIL_TITLES } from './rail.mjs';
 
 // Only the permissive mode is tinted. Colouring every mode made the header
 // carry three saturated values that all meant "this is normal".
-const MODE_TONES = { overdrive: 'warning' };
+const MODE_TONES = { autonomous: 'warning' };
 
 /** The one way a value is labelled anywhere in the chrome. */
 function stat(theme, name, value, tone) {
@@ -49,8 +49,8 @@ function divider(theme) {
  * selected one.
  */
 export function wordmarkInline(theme) {
-  return theme.paint('MASK', { fg: theme.roles.primary, bold: true })
-    + theme.paint('SHIFT', { fg: theme.roles.text, bold: true });
+  return theme.paint('Mask', { fg: theme.roles.primary, bold: true })
+    + theme.paint('Shift', { fg: theme.roles.text, bold: true });
 }
 
 export function headerBand(app, width, offset = 0) {
@@ -58,24 +58,24 @@ export function headerBand(app, width, offset = 0) {
   const config = app.runtime.config.get();
   const workspace = app.workspace;
   const brand = ` ${wordmarkInline(theme)}`;
-  const mode = String(config.permissionMode || 'overdrive');
+  const mode = String(config.permissionMode || 'autonomous');
   const online = app.providers.filter((provider) => provider.status === 'online').length;
 
   // Right-hand telemetry, dropped from the left of the group as space runs out.
   const link = theme.paint(`${glyphs(theme).lamp} `, { fg: online ? theme.roles.success : theme.roles.muted })
-    + theme.paint(online ? 'LINK' : 'DARK', { fg: online ? theme.roles.text : theme.roles.muted, bold: true });
+    + theme.paint(online ? 'Online' : 'Offline', { fg: online ? theme.roles.text : theme.roles.muted, bold: true });
   // Rendered left to right; dropped in reverse priority. What survives longest
-  // is what an operator would actually miss — whether there is a provider at
+  // is what a user would actually miss — whether there is a provider at
   // all, and how much this session is allowed to do — not a capability count.
   const rightChips = [
-    { priority: 1, text: stat(theme, 'MODE', mode.toUpperCase(), theme.role(MODE_TONES[mode] || 'text')) },
-    { priority: 3, text: stat(theme, 'TOOLS', String(app.counts.tools), theme.roles.tool) },
-    { priority: 4, text: stat(theme, 'SKILLS', String(app.counts.skills), theme.roles.skill) },
+    { priority: 1, text: stat(theme, 'Mode', sentence(mode), theme.role(MODE_TONES[mode] || 'text')) },
+    { priority: 3, text: stat(theme, 'Tools', String(app.counts.tools), theme.roles.tool) },
+    { priority: 4, text: stat(theme, 'Skills', String(app.counts.skills), theme.roles.skill) },
     { priority: 2, text: stat(theme, 'MCP', String(app.counts.mcp), theme.roles.mcp) },
     { priority: 0, text: link },
   ];
 
-  const target = workspace ? `${workspace.name}${app.gitBranch ? ` ${glyphs(theme).dot} ${app.gitBranch}` : ''}` : 'NO TARGET';
+  const target = workspace ? `${workspace.name}${app.gitBranch ? ` ${glyphs(theme).dot} ${app.gitBranch}` : ''}` : 'No workspace';
   const model = app.modelRef || config.defaultModel || '';
 
   // Budget the row explicitly instead of guessing at it. The left group's
@@ -83,11 +83,11 @@ export function headerBand(app, width, offset = 0) {
   // workspace/branch and model actually need (not a guessed constant: a
   // short branch name shouldn't reserve the same room as a long one) is what
   // the right group has to fit around; chips fall off the left of that group
-  // until it does, in priority order, before the target or persona loses a
-  // single character — they identify *this* session, a tool/skill/MCP count
+  // until it does, in priority order, before the workspace or model loses a
+  // single character — they identify *this* chat, a tool/skill/MCP count
   // is available one keystroke away in the palette.
   const gapWidth = visibleWidth(divider(theme));
-  const labelCost = visibleWidth('TARGET ') + visibleWidth('PERSONA ');
+  const labelCost = visibleWidth('Workspace ') + visibleWidth('Model ');
   const leftFixed = visibleWidth(brand) + gapWidth * 2 + labelCost;
   const valueFloor = Math.min(Math.floor(width * 0.55), Math.max(24, visibleWidth(target) + visibleWidth(model)));
 
@@ -109,9 +109,9 @@ export function headerBand(app, width, offset = 0) {
   // a branch name while blank columns sat beside it.
   const modelWidth = Math.max(6, Math.min(visibleWidth(model), Math.floor(available * 0.45)));
   const targetWidth = Math.max(6, available - modelWidth);
-  const targetChip = stat(theme, 'TARGET', truncate(target, targetWidth), theme.roles.text);
-  const personaChip = stat(theme, 'PERSONA', truncate(model, modelWidth), theme.roles.text);
-  const left = [targetChip, personaChip].join(divider(theme));
+  const targetChip = stat(theme, 'Workspace', truncate(target, targetWidth), theme.roles.text);
+  const modelChip = stat(theme, 'Model', truncate(model, modelWidth), theme.roles.text);
+  const left = [targetChip, modelChip].join(divider(theme));
 
   const body = `${brand}${divider(theme)}${left}`;
   const gap = Math.max(1, width - visibleWidth(body) - visibleWidth(tail) - 1);
@@ -123,15 +123,15 @@ export function headerBand(app, width, offset = 0) {
     const targetColumn = offset + visibleWidth(brand) + visibleWidth(divider(theme));
     regions.add({
       row: 0, column: targetColumn, width: visibleWidth(targetChip), height: 1,
-      id: 'chrome:target', layer: LAYER.chrome,
+      id: 'chrome:workspace', layer: LAYER.chrome,
       onPress: (instance) => instance.openWorkspaceDialog(),
     });
     regions.add({
       row: 0,
       column: targetColumn + visibleWidth(targetChip) + visibleWidth(divider(theme)),
-      width: visibleWidth(personaChip),
+      width: visibleWidth(modelChip),
       height: 1,
-      id: 'chrome:persona', layer: LAYER.chrome,
+      id: 'chrome:model', layer: LAYER.chrome,
       onPress: (instance) => instance.openModelPicker(),
     });
     if (right.length === rightChips.length) {
@@ -193,10 +193,10 @@ export function tabStrip(app, width, offset = 0) {
 
   const railHovered = regions?.hoverId === 'chrome:rail-toggle';
   const railHint = app.railVisible
-    ? theme.paint('RAIL ', { fg: theme.roles.muted }) + theme.paint(app.railTab.toUpperCase(), { fg: railHovered ? theme.roles.text : theme.roles.label, bold: true })
-    : theme.paint('RAIL ', { fg: theme.roles.faint }) + theme.paint('OFF', { fg: theme.roles.faint });
+    ? theme.paint('Sidebar ', { fg: theme.roles.muted }) + theme.paint(RAIL_TITLES[app.railTab] || app.railTab, { fg: railHovered ? theme.roles.text : theme.roles.label, bold: true })
+    : theme.paint('Sidebar ', { fg: theme.roles.faint }) + theme.paint('Off', { fg: theme.roles.faint });
 
-  // At 80 columns the tabs fill the row on their own. A hint clipped to "RA…"
+  // At 80 columns the tabs fill the row on their own. A hint clipped to "Sid…"
   // is worse than no hint: drop it whole, the way every other piece of chrome
   // drops rather than shrinks.
   const room = width - visibleWidth(out) - 2;
@@ -239,10 +239,10 @@ export function statusRail(app, width, offset = 0) {
   // survives longest: it is the one number that predicts trouble rather than reporting history.
   const candidates = [
     context && { priority: 0, text: contextMeter(theme, context) },
-    { priority: 3, text: stat(theme, 'TURN', String(app.metrics.step).padStart(2, '0')) },
-    { priority: 4, text: stat(theme, 'TIME', app.metrics.elapsed) },
-    { priority: 2, text: stat(theme, 'TOKENS', app.metrics.tokens) },
-    { priority: 1, text: stat(theme, 'COST', app.metrics.cost, costTone) },
+    { priority: 3, text: stat(theme, 'Turn', String(app.metrics.step).padStart(2, '0')) },
+    { priority: 4, text: stat(theme, 'Time', app.metrics.elapsed) },
+    { priority: 2, text: stat(theme, 'Tokens', app.metrics.tokens) },
+    { priority: 1, text: stat(theme, 'Cost', app.metrics.cost, costTone) },
   ].filter(Boolean);
   const lead = theme.paint(`${statusGlyph(theme, status)} `, { fg: tone })
     + theme.paint(state.label, { fg: tone, bold: true })
@@ -258,7 +258,7 @@ export function statusRail(app, width, offset = 0) {
   }
   const metrics = candidates.filter((item) => kept.has(item)).map((item) => item.text).join(divider(theme));
   const room = Math.max(8, width - visibleWidth(lead) - visibleWidth(metrics) - 4);
-  const title = truncate(app.sessionTitle || (run ? 'RUN IN PROGRESS' : 'STANDBY FOR ORDERS'), room);
+  const title = truncate(app.sessionTitle || (run ? 'Run in progress' : 'New chat'), room);
 
   const left = `${lead}${theme.paint(title, { fg: theme.roles.label })}`;
   const gap = Math.max(1, width - visibleWidth(left) - visibleWidth(metrics) - 2);
@@ -279,7 +279,7 @@ export function statusRail(app, width, offset = 0) {
  */
 function contextMeter(theme, context) {
   const tone = theme.role(context.tone);
-  return theme.paint('CTX ', { fg: theme.roles.muted })
+  return theme.paint('Context ', { fg: theme.roles.muted })
     + meter(theme, context.used, context.window, 8, { colour: tone })
     + theme.paint(` ${context.label}`, { fg: context.ratio >= 0.6 ? tone : theme.roles.text, bold: true });
 }

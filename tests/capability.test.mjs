@@ -170,7 +170,7 @@ test('a small-window model still starts with the compact prompt, as it did befor
     config: { model: { contextWindow: 8192 } },
     handler: (body, response) => respondOpenAIChatSSE(response, { content: 'ok', finishReason: 'stop', usage }),
   });
-  assert.match(systemOf(requests[0]), /Finish the task end to end: inspect, edit, run, and verify/);
+  assert.match(systemOf(requests[0]), /Finish the task end to end: inspect, act, and verify/);
   const started = runtime.store.listRunEvents(run.id, 100).find((event) => event.type === 'scaffold');
   assert.deepEqual([started.payload.level, started.payload.source], [2, 'prior']);
 });
@@ -196,7 +196,7 @@ test('a window too small for the full prompt forces the compact one however well
     handler: (body, response) => respondOpenAIChatSSE(response, { content: 'ok', finishReason: 'stop', usage }),
   });
   assert.equal(finished.status, 'completed', finished.error);
-  assert.match(systemOf(requests[0]), /Finish the task end to end: inspect, edit, run, and verify/);
+  assert.match(systemOf(requests[0]), /Finish the task end to end: inspect, act, and verify/);
 });
 
 test('a calibrated strong model gets neither the compact prompt nor a plan requirement', async (t) => {
@@ -206,7 +206,7 @@ test('a calibrated strong model gets neither the compact prompt nor a plan requi
     handler: (body, response) => respondOpenAIChatSSE(response, { content: 'ok', finishReason: 'stop', usage }),
   });
   const system = systemOf(requests[0]);
-  assert.ok(!/Finish the task end to end: inspect, edit, run, and verify/.test(system), 'measurement beats the size heuristic');
+  assert.ok(!/Finish the task end to end: inspect, act, and verify/.test(system), 'measurement beats the size heuristic');
   assert.ok(!/Before editing anything/.test(system));
 });
 
@@ -224,8 +224,8 @@ test('a model that keeps missing its edits is moved up mid-run, and the run is r
   const change = events.find((event) => event.type === 'scaffold-level');
   assert.ok(change, 'the level rose during the run');
   assert.deepEqual([change.payload.from, change.payload.to, change.payload.reason], [1, 2, 'edit-miss']);
-  assert.ok(!/Finish the task end to end: inspect, edit, run, and verify/.test(systemOf(requests[0])), 'started at the medium level');
-  assert.match(systemOf(requests.at(-1)), /Finish the task end to end: inspect, edit, run, and verify/, 'ended with the compact prompt');
+  assert.ok(!/Finish the task end to end: inspect, act, and verify/.test(systemOf(requests[0])), 'started at the medium level');
+  assert.match(systemOf(requests.at(-1)), /Finish the task end to end: inspect, act, and verify/, 'ended with the compact prompt');
   const observed = runtime.engine.capabilities.observed('fixture-cap:cap-model');
   assert.equal(observed.runs, 1);
   assert.ok(observed.lastRate > 0.5);

@@ -23,7 +23,7 @@ export const ANSI = {
   bracketedPasteOff: `${CSI}?2004l`,
   // DEC 1004 focus reporting: the terminal sends CSI I / CSI O (see
   // input.mjs) when it gains or loses focus. Used to gate the desktop
-  // notification on a finished run to "the operator actually isn't looking
+  // notification on a finished run to "the user actually isn't looking
   // right now" rather than firing every time regardless. A terminal that
   // doesn't support it just never sends those bytes — MaskShift then treats
   // focus as unknown and simply never suppresses the notification on that

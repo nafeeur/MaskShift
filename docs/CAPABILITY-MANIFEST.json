@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-04T03:00:35.175Z",
+  "generatedAt": "2026-10-04T03:34:08.720Z",
   "version": "1.4.1",
   "nativeToolCount": 173,
   "bundledSkillCount": 50,
@@ -575,7 +575,7 @@
     {
       "name": "fs_delete",
       "title": "Delete path",
-      "description": "Delete a file or directory recursively. Overdrive mode executes immediately without an approval prompt.",
+      "description": "Delete a file or directory recursively. Autonomous mode executes immediately without an approval prompt.",
       "category": "filesystem",
       "readOnly": false,
       "risk": "destructive",
@@ -584,7 +584,7 @@
     {
       "name": "fs_list",
       "title": "List files and directories",
-      "description": "List a directory tree with file sizes and types. Paths may be workspace-relative or absolute in overdrive mode.",
+      "description": "List a directory tree with file sizes and types. Paths may be workspace-relative or absolute in autonomous mode.",
       "category": "filesystem",
       "readOnly": true,
       "risk": "normal",
@@ -1484,7 +1484,7 @@
     {
       "name": "environment_list",
       "title": "Read environment",
-      "description": "List process environment variable names and optionally values. MaskShift overdrive mode permits direct secret-bearing environment access.",
+      "description": "List process environment variable names and optionally values. MaskShift autonomous mode permits direct secret-bearing environment access.",
       "category": "system",
       "readOnly": true,
       "risk": "secrets",
@@ -2077,8 +2077,8 @@
         "name": "security-audit",
         "description": "Audit code and dependencies for concrete exploitable weaknesses while preserving MaskShift’s intentionally permissive local execution philosophy."
       },
-      "bodyChars": 683,
-      "updatedAt": "2026-10-04T02:11:20.223Z"
+      "bodyChars": 684,
+      "updatedAt": "2026-10-04T03:19:58.481Z"
     },
     {
       "name": "self-improving-skills",
@@ -2121,17 +2121,17 @@
       "updatedAt": "2026-10-04T02:11:20.225Z"
     },
     {
-      "name": "terminal-phantom-ui",
-      "description": "Build MaskShift terminal interfaces in the Phantom Protocol design language — tokens over hex values, one marker gutter per pane, one filled chip per screen, and the ANSI width discipline that keeps a TUI aligned.",
-      "path": "skills/terminal-phantom-ui",
-      "file": "skills/terminal-phantom-ui/SKILL.md",
+      "name": "terminal-ui",
+      "description": "Build MaskShift terminal interfaces in the MaskShift design system — tokens over hex values, one marker gutter per pane, one filled chip per screen, and the ANSI width discipline that keeps a TUI aligned.",
+      "path": "skills/terminal-ui",
+      "file": "skills/terminal-ui/SKILL.md",
       "source": "bundled",
       "meta": {
-        "name": "terminal-phantom-ui",
-        "description": "Build MaskShift terminal interfaces in the Phantom Protocol design language — tokens over hex values, one marker gutter per pane, one filled chip per screen, and the ANSI width discipline that keeps a TUI aligned."
+        "name": "terminal-ui",
+        "description": "Build MaskShift terminal interfaces in the MaskShift design system — tokens over hex values, one marker gutter per pane, one filled chip per screen, and the ANSI width discipline that keeps a TUI aligned."
       },
-      "bodyChars": 8377,
-      "updatedAt": "2026-10-04T02:11:20.225Z"
+      "bodyChars": 8399,
+      "updatedAt": "2026-10-04T03:28:01.650Z"
     },
     {
       "name": "test-engineering",

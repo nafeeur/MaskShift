@@ -1,4 +1,4 @@
-// The right rail: the plan of attack, live loadout telemetry, the event bus
+// The right sidebar: the plan, the tools in use, the event feed
 // and a git pulse. Toggle with ctrl+b, cycle with ctrl+r.
 //
 // The rail is a column, not a card. Boxing it put a second vertical rule hard
@@ -19,7 +19,7 @@ import { columns, gutter, label as typeLabel, spread } from './type.mjs';
 
 export const RAIL_TABS = ['plan', 'telemetry', 'events'];
 
-const RAIL_TITLES = { plan: 'PLAN', telemetry: 'LOADOUT', events: 'EVENTS' };
+export const RAIL_TITLES = { plan: 'Plan', telemetry: 'Active', events: 'Events' };
 
 /** A rail section heading. Quieter than a pane title, louder than a value. */
 function heading(theme, text, width, stamp = '') {
@@ -59,7 +59,7 @@ function planLines(app, width) {
   return lines;
 }
 
-// Where the window size came from, in the words an operator would use.
+// Where the window size came from, in the words a user would use.
 const CONTEXT_SOURCES = {
   config: 'set in config', provider: 'reported by the provider', family: 'from the model family',
   learned: 'learned from an overflow', default: 'assumed (model unknown)',
@@ -78,7 +78,7 @@ function telemetryLines(app, width) {
   const context = app.contextState;
   if (context) {
     const tone = theme.role(context.tone);
-    lines.push(heading(theme, 'Context', width, String(context.tier || '').toUpperCase()));
+    lines.push(heading(theme, 'Context', width, String(context.tier || '')));
     lines.push(gutter(theme) + spread(
       theme.paint(`${Math.round(context.ratio * 100)}%`, { fg: tone, bold: true }),
       theme.paint(context.label, { fg: theme.roles.text }),
@@ -92,10 +92,10 @@ function telemetryLines(app, width) {
     lines.push('');
   }
   const gauges = [
-    ['TOOLS', snapshot?.tools?.length ?? 0, app.counts.tools, theme.roles.tool],
-    ['SKILLS', snapshot?.skills?.length ?? 0, app.counts.skills, theme.roles.skill],
+    ['Tools', snapshot?.tools?.length ?? 0, app.counts.tools, theme.roles.tool],
+    ['Skills', snapshot?.skills?.length ?? 0, app.counts.skills, theme.roles.skill],
     ['MCP', snapshot?.mcpServers?.length ?? 0, Math.max(1, app.counts.mcp), theme.roles.mcp],
-    ['SUBAGENTS', app.subagents, Math.max(1, app.runtime.config.get().maxParallelSubagents), theme.roles.accent],
+    ['Subagents', app.subagents, Math.max(1, app.runtime.config.get().maxParallelSubagents), theme.roles.accent],
   ];
   for (const [name, value, total, colour] of gauges) {
     lines.push(gutter(theme) + spread(
@@ -116,8 +116,8 @@ function telemetryLines(app, width) {
     ...(snapshot?.skills || []).map((name) => [name, theme.roles.skill]),
     ...(snapshot?.mcpServers || []).map((name) => [`mcp:${name}`, theme.roles.mcp]),
   ];
-  lines.push(heading(theme, 'Active loadout', width, active.length ? String(active.length) : ''));
-  if (!active.length) lines.push(gutter(theme) + theme.paint('Nothing summoned yet.', { fg: theme.roles.muted, italic: true }));
+  lines.push(heading(theme, 'Active tools', width, active.length ? String(active.length) : ''));
+  if (!active.length) lines.push(gutter(theme) + theme.paint('Nothing loaded yet.', { fg: theme.roles.muted, italic: true }));
   for (const [name, colour] of active.slice(0, 200)) {
     lines.push(gutter(theme, glyphs(theme).dot, { tone: theme.roles.faint })
       + theme.paint(truncate(name, text), { fg: colour }));
@@ -143,7 +143,7 @@ function eventLines(app, width) {
     // long event never breaks the timeline running down the left.
     lines.push(gutter(theme) + columns(theme, [
       { text: app.stamp(event.timestamp), width: 5, tone: theme.roles.faint },
-      { text: event.type.replace(/^run\./, '').toUpperCase(), tone, bold: true },
+      { text: event.type.replace(/^run\./, ''), tone, bold: true },
     ], text));
     const summary = app.summarizeEvent(event);
     if (summary) {
@@ -164,8 +164,8 @@ export function render(app, region) {
   app.railView.set(body);
 
   const stamps = {
-    plan: app.plan?.steps?.length ? `${app.plan.steps.length} STEPS` : '',
-    telemetry: `${app.subagents} SUB`,
+    plan: app.plan?.steps?.length ? `${app.plan.steps.length} steps` : '',
+    telemetry: `${app.subagents} subagents`,
     events: String(app.events.length),
   };
 
@@ -250,7 +250,7 @@ export function handle(app, event) {
  * A single-section rail pane for a non-chat view (see files.mjs, git.mjs,
  * browser.mjs, runtime.mjs and capabilities.mjs's own `rail()` exports) —
  * the same one-row heading, click region and scroll wiring `render()` above
- * gives the plan/loadout/events tabs, without every view reimplementing it.
+ * gives the plan/active/events tabs, without every view reimplementing it.
  * Each caller passes its own Viewport so scroll position doesn't leak
  * between views that happen to share the rail slot at different times.
  */

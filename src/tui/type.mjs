@@ -3,29 +3,28 @@
 // A terminal has one typeface, so hierarchy has to come from case, weight,
 // colour and position instead. Four levels, and only four:
 //
-//   title     what this pane is            bold, chalk, upper
-//   label     what this group is           upper, silver, regular
-//   field     what this value is           upper, muted, fixed width
+//   title     what this pane is            bold, chalk
+//   label     what this group is           silver, regular
+//   field     what this value is           muted, fixed width
 //   body      the thing itself             bone
 //   meta      provenance, counts, times    smoke
 //
-// Chrome is upper case; content keeps whatever case its author wrote. That one
-// rule is why the transcript no longer shouts a model's prose back in capitals
-// while the panel around it stays quiet.
+// Chrome and content are both written in ordinary sentence case; weight and
+// colour, not capitals, carry the hierarchy.
 
 import { fit, padEnd, padStart, truncate, visibleWidth } from './text.mjs';
 import { FIELD_LABEL_WIDTH, SPACE } from './tokens.mjs';
 
 export function title(theme, text, { tone = null } = {}) {
-  return theme.paint(String(text).toUpperCase(), { fg: tone || theme.roles.heading, bold: true });
+  return theme.paint(String(text), { fg: tone || theme.roles.heading, bold: true });
 }
 
 export function label(theme, text, { tone = null } = {}) {
-  return theme.paint(String(text).toUpperCase(), { fg: tone || theme.roles.label });
+  return theme.paint(String(text), { fg: tone || theme.roles.label });
 }
 
 export function field(theme, text, width = FIELD_LABEL_WIDTH) {
-  return theme.paint(fit(String(text).toUpperCase(), width), { fg: theme.roles.muted });
+  return theme.paint(fit(String(text), width), { fg: theme.roles.muted });
 }
 
 export function body(theme, text, { tone = null, bold = false } = {}) {
@@ -40,7 +39,7 @@ export function hint(theme, text) {
   return theme.paint(text, { fg: theme.roles.muted, italic: true });
 }
 
-/** A key the operator can press. Gold, everywhere, always. */
+/** A key the user can press. Gold, everywhere, always. */
 export function key(theme, text) {
   return theme.paint(text, { fg: theme.roles.accent, bold: true });
 }
@@ -131,7 +130,7 @@ export function columns(theme, cells, total, { gap = SPACE.columnGap } = {}) {
  * When the two cannot both fit, the tail is dropped rather than pushing the
  * head off the end: the tail is always the secondary half of the pair — a
  * count, a timestamp, a stamp — and a truncated section switcher reading
- * "PLAN · LOADOUT · EVE…" is worse than one with no count beside it.
+ * "Plan · Active · Eve…" is worse than one with no count beside it.
  */
 export function spread(head, tail, width) {
   const headWidth = visibleWidth(head);

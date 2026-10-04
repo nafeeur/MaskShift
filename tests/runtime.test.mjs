@@ -12,7 +12,7 @@ test('runtime exposes maximal lazy capabilities and executes host tools', async 
 
   assert.ok(runtime.toolRegistry.list().length >= 140);
   assert.ok(runtime.skillManager.list().length >= 36);
-  assert.equal(runtime.config.get().permissionMode, 'overdrive');
+  assert.equal(runtime.config.get().permissionMode, 'autonomous');
 
   const context = {
     workspaceId: workspace.id,

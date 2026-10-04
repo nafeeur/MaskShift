@@ -6,7 +6,7 @@ a raw-mode key decoder, and an SGR mouse decoder with per-frame hit testing.
 Nothing is fetched, nothing is served, and there is no browser anywhere in the
 stack.
 
-## The Phantom Protocol design system
+## The design system
 
 `src/tui/tokens.mjs` holds every colour, every measurement and every rule about
 when to use them. Views import meaning — "this is destructive", "this is a
@@ -19,7 +19,7 @@ wire.
 | Token | Means | Never |
 |---|---|---|
 | **crimson** `#E32C40` | Identity and focus: the wordmark, the active view tab, the pane holding the keyboard | A data value, or a severity |
-| **gold** `#E9A227` | The operator: their turn, their keys, their pending input | A status |
+| **gold** `#E9A227` | The user: their turn, their keys, their pending input | A status |
 | **danger** `#FF6B4A` | Failure and destruction, and nothing else | Confused with crimson |
 | **tool / skill / mcp** | Capability classes, constant across every view | Reused for state |
 | **neutrals** | Everything else | — |
@@ -32,8 +32,9 @@ made earlier revisions read as noise:
   panels drew chips too, the top-left corner stacked the wordmark, the active
   tab and the panel title in three consecutive rows and none of them read as
   "you are here". A modal's primary action is the single exception.
-- **Chrome is upper case; content keeps the case its author wrote.** Model
-  headings are no longer shouted back at the operator from inside a quiet panel.
+- **Everything is written in ordinary sentence case.** Weight and colour, not
+  capitals, carry the hierarchy, so model headings are never shouted back at the
+  user from inside a quiet panel.
 
 ### The grid
 
@@ -73,54 +74,58 @@ monochrome; `MASKSHIFT_ASCII=1` swaps every box-drawing glyph for ASCII.
 ## Layout
 
 ```
- MASKSHIFT · TARGET repo · branch · PERSONA model   MODE OVERDRIVE · TOOLS 149 · SKILLS 44 · ● LINK
-  01 HEIST │ 02 FILES │ 03 CAPABILITIES │ 04 RUNTIME │ 05 BROWSER │ 06 GIT      RAIL PLAN
-┏━ SESSION TITLE ───────────────────────────────────── 42 MESSAGES ━┓ PLAN · LOADOUT · EVENTS
-┃ ▌ OPERATOR                                                  14:22 ┃   Diff frames instead of
-┃ ▌ Refactor the frame renderer so repaints only rewrite changed …  ┃   repainting the screen.
-┃                                                                   ┃
-┃ ▌ MASKSHIFT · ollama:qwen3-coder                            14:22 ┃   ━━━━━━━━━━──────────  2/4
-┃ │ The screen currently repaints every row…                        ┃
-┃                                                                   ┃ ✓ Read the screen module
-┃ ✓ fs_read           src/tui/screen.mjs — 94 lines                 ┃ ⠙ Add a regression test
-┣━ COMPOSER ───────────────────────── ↵ execute · ^J newline ━━━━━━━┫ ○ Run the suite
-┃ ❯ Describe what success looks like…                               ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
- ○ IDLE  │  session title                TURN 07 · TIME 01:32 · TOKENS 12.4k/3.1k · COST $0.02
- ↵ execute · ^J newline · tab transcript · ^K palette · esc menu                          v1.0.0
+ MaskShift · Workspace Documents · main · Model ollama:auto   Mode Autonomous · Tools 173 · Skills 59 · ● Online
+  1 Chat │ 2 Files │ 3 Capabilities │ 4 Runtime │ 5 Browser │ 6 Git                                  Sidebar Plan
+┏━ Q3 invoice summary ──────────────────────────────── 6 messages ━┓ Plan · Active · Events
+┃ ▌ You                                                      14:22 ┃   Total Q3 invoices by vendor.
+┃ │ Go through the PDFs in ~/Documents/Invoices and total …        ┃
+┃                                                                  ┃   ━━━━━━━━━━──────────  2/4
+┃ ▌ MaskShift · anthropic:claude-sonnet-5                    14:22 ┃
+┃ │ There are 23 PDFs. I will extract the vendor and amount …      ┃ ✓ Read every invoice
+┃                                                                  ┃ ✓ Group the amounts by vendor
+┃ ✓ fs_list           ~/Documents/Invoices — 23 files              ┃ ⠙ Write the spreadsheet
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ↵ execute · ^J newline ━━━━━━━━━━━━━┫ ○ Check the totals
+┃ ❯ Ask anything, or describe a task…                              ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+ ○ Idle  │  Q3 invoice summary           Turn 07 · Time 01:32 · Tokens 12.4k/3.1k · Cost $0.02
+ ↵ execute · ^J newline · tab transcript · ^K palette · esc menu                          v1.4.1
 ```
 
 The view's name appears once, in the tab strip. A panel's top rail carries what
-the tab cannot — the session's title, the shell's directory, a catalogue's
+the tab cannot — the chat's title, the shell's directory, a catalogue's
 section switcher — and the frame beneath it carries focus. Panes that sit next
-to each other share a single rule rather than each drawing their own: the heist
-view is one frame split by an internal seam, and the rail and detail panes have
-no frame at all.
+to each other share a single rule rather than each drawing their own: the chat
+view is one frame split by an internal divider, and the sidebar and detail panes
+have no frame at all.
 
-The rail hides itself below 108 columns and the header sheds telemetry from the
-left of its right-hand group as the terminal narrows, so the interface stays
+The sidebar hides itself below 108 columns and the header sheds telemetry from
+the left of its right-hand group as the terminal narrows, so the interface stays
 usable at 80×24.
 
 ## Views
 
 | View | What it holds |
 |---|---|
-| **01 HEIST** | The transcript and composer. Markdown, syntax-tinted code fences, coloured diffs, collapsed tool calls, and a live indicator for in-flight tools. |
-| **02 FILES** | Workspace tree with fold state and a syntax-highlighted preview. `a` attaches the selected file to the composer. |
-| **03 CAPABILITIES** | Every native tool and skill, MCP servers (installed and the official registry), plugins and agent bridges — one catalogue behind five tabs, fuzzy-searchable, with a dossier pane per kind. `x` runs a tool directly. |
-| **04 RUNTIME** | The host shell, running with your full account permissions, plus automations, background processes and browser instances behind a secondary tab strip. |
-| **05 BROWSER** | A live, clickable, typeable view of a running browser tab — the same CDP connection the browser tools drive — with its own instance strip to pick which tab it watches. |
-| **06 GIT** | Working tree changes, commit log, branches, stash, MaskShift checkpoints and worktrees, each with their own actions — plus push/pull/fetch from any tab. |
+| **Chat** | The conversation and composer. Markdown, syntax-tinted code fences, coloured diffs, collapsed tool calls, and a live indicator for in-flight tools. |
+| **Files** | Workspace tree with fold state and a syntax-highlighted preview. `a` attaches the selected file to the composer. |
+| **Capabilities** | Every native tool and skill, MCP servers (installed and the official registry), plugins and agent bridges — one catalogue behind five tabs, fuzzy-searchable, with a details pane per kind. `x` runs a tool directly. |
+| **Runtime** | The host shell, running with your full account permissions, plus automations, background processes and browser instances behind a secondary tab strip. |
+| **Browser** | A live, clickable, typeable view of a running browser tab — the same CDP connection the browser tools drive — with its own instance strip to pick which tab it watches. |
+| **Git** | Working tree changes, commit log, branches, stash, MaskShift checkpoints and worktrees, each with their own actions — plus push/pull/fetch from any tab. |
 
-![01 HEIST](screenshots/heist.svg)
+![Chat](screenshots/chat.svg)
 
-![02 FILES](screenshots/files.svg)
+A new chat opens on a short welcome with three starter prompts (`f1`–`f3`):
 
-![03 CAPABILITIES](screenshots/capabilities.svg)
+![New chat](screenshots/welcome.svg)
 
-![04 RUNTIME](screenshots/runtime.svg)
+![Files](screenshots/files.svg)
 
-![06 GIT](screenshots/git.svg)
+![Capabilities](screenshots/capabilities.svg)
+
+![Runtime](screenshots/runtime.svg)
+
+![Git](screenshots/git.svg)
 
 `ctrl+k` opens a fuzzy command palette over every action MaskShift can perform, so nothing is
 buried behind a key you have to memorise:
@@ -137,29 +142,28 @@ taken before it, and `u` undoes it:
 
 ![Run changes](screenshots/changes.svg)
 
-`ctrl+p` switches heists, previewing each one's goal, open issues and last
+`ctrl+p` switches chats, previewing each one's goal, open issues and last
 request from its saved summary:
 
-![Heist archive](screenshots/sessions.svg)
+![Chats](screenshots/chats.svg)
 
 `f2` tunes the core engine — default model, permission mode, agent turn and subagent limits,
 indexing and checkpoint behaviour — without editing `config.json` by hand:
 
 ![Settings](screenshots/settings.svg)
 
-On **01 HEIST**, the right rail carries three sections, spelled out across a
-single header row so its first line of content sits on the same screen row as
-the first line of the pane it is reporting on: **plan** (live multi-stage plan
-with progress), **loadout** (which tools, skills and MCP servers the current
-run has actually summoned, plus token flow) and **events** (the raw runtime
-bus). Every other view gets the same slot for its own context instead — the
-selected file's outline, imports and likely tests on **02 FILES**, a
-capability's usage on **03 CAPABILITIES**, exit-code history on **04 RUNTIME**,
-a console/network tail on **05 BROWSER**, and recent commit history on
-**06 GIT** — rather than repeating the plan/loadout/events tabs on screens they
-have nothing to do with.
+In Chat, the right sidebar carries three tabs, spelled out across a single
+header row so its first line of content sits on the same screen row as the first
+line of the pane it is reporting on: **Plan** (the live multi-stage plan with
+progress), **Active** (which tools, skills and MCP servers the current run has
+actually loaded, plus token flow) and **Events** (the raw runtime feed). Every
+other view gets the same slot for its own context instead — the selected file's
+outline and relationships on **Files**, a capability's usage on
+**Capabilities**, exit-code history on **Runtime**, a console and network tail
+on **Browser**, and recent commit history on **Git** — rather than repeating the
+chat tabs on screens they have nothing to do with.
 
-![Live loadout telemetry](screenshots/loadout.svg)
+![Tools in use](screenshots/active-tools.svg)
 
 Every screenshot on this page is rendered by `npm run capture` through the same code path the
 terminal uses, so none of them can drift from the product.
@@ -173,10 +177,10 @@ it paints and the click is resolved against the frame you were looking at.
 | Gesture | What it does |
 |---|---|
 | Click a view tab | Switch views |
-| Click a rail section | Switch rail sections, and focus the rail |
-| Click `TARGET` or `PERSONA` | Open the workspace or model picker |
-| Click `MODE` | Cycle overdrive → balanced → review |
-| Click the session title | Switch heist |
+| Click a sidebar tab | Switch sidebar tabs, and focus the sidebar |
+| Click `Workspace` or `Model` | Open the workspace or model picker |
+| Click `Mode` | Cycle autonomous → balanced → review |
+| Click the chat title | Switch chat |
 | Click a key in the bottom hint rail | Run it |
 | Click the transcript or composer | Focus that pane |
 | Click a starter prompt | Load it into the composer |
@@ -209,39 +213,39 @@ default.
 | Key | Action |
 |---|---|
 | `ctrl+k` | Command palette — fuzzy search over every action |
-| `ctrl+p` | Switch heist |
-| `ctrl+n` | New heist |
-| `ctrl+g` | Change persona (model) |
+| `ctrl+p` | Switch chat |
+| `ctrl+n` | New chat |
+| `ctrl+g` | Change model |
 | `ctrl+o` | Open a different workspace |
-| `ctrl+b` | Show or hide the rail |
-| `ctrl+r` | Cycle rail: plan → loadout → events |
-| `ctrl+y` | Focus the rail |
+| `ctrl+b` | Show or hide the sidebar |
+| `ctrl+r` | Cycle the sidebar: plan → active → events |
+| `ctrl+y` | Focus the sidebar |
 | `1`…`6`, `alt+1`…`alt+6` | Jump to a view |
 | `f1` or `?` | Key reference |
 | `f2` | Settings, including the mouse mode |
 | `f5` | Refresh everything |
 | `ctrl+d` | Review what the last run changed (file list and diffs) |
 | `ctrl+z` | Undo the last run's file changes (asks first, listing every file) |
-| `ctrl+c` | Cancel a running heist; press again to quit |
+| `ctrl+c` | Cancel a running task; press again to quit |
 | `ctrl+q` | Quit immediately |
 
-### 01 HEIST
+### Chat
 
 | Key | Action |
 |---|---|
-| `enter` | Execute the prompt (queue it, while a heist is running) |
-| `ctrl+t` | While a heist is running: send the composer's text to it now, delivered at its next step |
+| `enter` | Send the request (queue it, while a task is running) |
+| `ctrl+t` | While a task is running: send the composer's text to it now, delivered at its next step |
 | `ctrl+j` / `alt+enter` | Newline inside the composer |
 | `tab` | Move between transcript and composer |
 | `t` | Expand or collapse tool output |
-| `s` | Read the session summary (transcript focus, once older turns have been summarized) |
-| `esc` | Retreat from the running heist |
+| `s` | Read the chat summary (transcript focus, once older turns have been summarized) |
+| `esc` | Stop the running task |
 | `f1`–`f3` | Fill the composer from a starter prompt (empty transcript only) |
 
-Prompts submitted while a heist is running enter a visible FIFO queue and run
-one at a time in the same session. `ctrl+t` steers instead: the message joins the
+Requests submitted while a task is running enter a visible FIFO queue and run
+one at a time in the same chat. `ctrl+t` sends a message instead: the message joins the
 run in progress at its next step (after any tool call already in flight), and is
-marked *steered mid-run* in the transcript.
+marked as sent mid-run in the transcript.
 
 When older turns are summarized to fit the model's window, a rule in the
 transcript marks exactly where the summary ends. After a run changes files, a
@@ -252,9 +256,9 @@ there, untracked, before the run are left alone.
 
 ### Context meter
 
-The status rail's `CTX` meter shows how much of the model's context window the
+The status bar's `Context` meter shows how much of the model's context window the
 last request used, turning amber at 60% and red at 85% — the range in which
-older turns start being summarized. The rail's LOADOUT section repeats it with
+older turns start being summarized. The sidebar's Active tab repeats it with
 the model's tier, where the window size came from (config, the provider, the
 model family, a learned overflow, or an assumed default) and the reply cap. See
 [Model adaptation](CONFIGURATION.md#model-adaptation).
@@ -264,45 +268,45 @@ model family, a learned overflow, or an assumed default) and the reply cap. See
 In `balanced` and `review` permission modes a gated call opens an approval
 dialog showing what it will actually do: the command and its directory, a file's
 new contents, or an edit as a coloured diff. Answer `y`, `n`, or `a` to approve
-the tool for the rest of the heist. Enter defaults to NO for anything that can
+the tool for the rest of the chat. Enter defaults to No for anything that can
 reach outside the workspace (host or remote execution, installs, secrets,
-destructive calls) and to YES for plain edits. Switching heists or workspaces while a run,
+destructive calls) and to Yes for plain edits. Switching chats or workspaces while a run,
 queue or draft exists requires an explicit confirmation so work cannot silently
-cross session or workspace boundaries.
+cross chat or workspace boundaries.
 
 ### Catalogue views
 
 | Key | Action |
 |---|---|
 | `/` | Filter |
-| `tab` / `shift+tab` | Cycle the section (tools/skills/mcp/plugins/bridges on CAPABILITIES; shell/automations/processes/browsers on RUNTIME) |
+| `tab` / `shift+tab` | Cycle the section (tools/skills/mcp/plugins/bridges in Capabilities; shell/automations/processes/browsers in Runtime) |
 | `g` | Toggle installed/registry (CAPABILITIES, MCP tab) |
-| `→` | Focus the dossier pane |
+| `→` | Focus the details pane |
 | `enter` | The primary action: open, connect, load, run now, toggle |
-| `n` | New automation or browser instance (RUNTIME); install a plugin (CAPABILITIES) |
+| `n` | New automation or browser instance (Runtime); install a plugin (Capabilities) |
 | `space` | Arm or pause an automation |
 | `delete` | Remove the selected entry |
 | `r` | Refresh |
 
-### 06 GIT
+### Git
 
-Built on the same catalogue chrome as CAPABILITIES/RUNTIME above — `/`,
+Built on the same catalogue chrome as Capabilities and Runtime above — `/`,
 `tab`/`shift+tab`, `→` and `r` all work the same way — plus its own actions,
 some of which only apply on the tab named:
 
 | Key | Action |
 |---|---|
 | `P` / `L` / `F` | Push / pull / fetch — from any tab |
-| `space` / `enter` | Stage or unstage a change (CHANGES) · switch branch (BRANCHES) · apply a stash (STASH) · restore a checkpoint (CHECKPOINTS) |
-| `a` / `u` | Stage all / unstage all (CHANGES) |
-| `c` | Commit, with amend and `--no-verify` toggles (CHANGES) |
-| `d` | Discard a change (CHANGES) |
+| `space` / `enter` | Stage or unstage a change (Changes) · switch branch (Branches) · apply a stash (Stash) · restore a checkpoint (Checkpoints) |
+| `a` / `u` | Stage all / unstage all (Changes) |
+| `c` | Commit, with amend and `--no-verify` toggles (Changes) |
+| `d` | Discard a change (Changes) |
 | `n` | New branch / stash / checkpoint / worktree, depending on the active tab |
-| `e` | Rename a branch (BRANCHES) |
-| `p` | Pop a stash (STASH) |
+| `e` | Rename a branch (Branches) |
+| `p` | Pop a stash (Stash) |
 | `delete` | Delete a branch · drop a stash · remove a worktree |
 
-Diffs and `git show` output load asynchronously into the dossier pane the
+Diffs and `git show` output load asynchronously into the details pane the
 moment a row is selected. Every mutating action shells out to the system
 `git` binary directly, the same way the header's branch readout always has —
 it does not go through the agent-facing tool registry.
@@ -312,22 +316,22 @@ it does not go through the agent-facing tool registry.
 Typed into the composer:
 
 `/new` `/clear` `/model [REF]` `/sessions` `/search TEXT` `/workspace`
-`/tools [QUERY]` `/skills [QUERY]` `/mcp [QUERY]` `/mods` `/themes` `/files`
+`/tools [QUERY]` `/skills [QUERY]` `/mcp [QUERY]` `/runtime` `/themes` `/files`
 `/terminal` `/browser` `/git` `/doctor` `/logs` `/settings` `/help` `/quit`
 
-`/tools`, `/skills` and `/mcp` all open **03 CAPABILITIES** on the matching tab;
-`/mods` and `/terminal` both open **04 RUNTIME** (`/terminal` lands on its shell
+`/tools`, `/skills` and `/mcp` all open **Capabilities** on the matching tab;
+`/runtime` and `/terminal` both open **Runtime** (`/terminal` lands on its shell
 tab).
 
 | Command | What it does |
 |---|---|
 | `/context [PROMPT]` | What went into the last request and why — model window and tier, which files were retrieved and their relevance, memories used or left out as stale. With a prompt, shows what that prompt would send. |
 | `/compact` | Summarize older turns now, keeping the last two verbatim; later requests send the summary in their place |
-| `/summary` | Read the session summary |
-| `/cost` | Spend per run in this heist, with a total and a note on any unpriced model |
+| `/summary` | Read the chat summary |
+| `/cost` | Spend per run in this chat, with a total and a note on any unpriced model |
 | `/changes` | Review what the last run changed (same as `ctrl+d`) |
 | `/undo` | Undo the last run's file changes (same as `ctrl+z`) |
-| `/steer TEXT` | Send text to the running heist now (same as `ctrl+t`) |
+| `/steer TEXT` | Send text to the running task now (same as `ctrl+t`) |
 
 ### Custom commands
 
@@ -352,8 +356,8 @@ A TTY, 80×24 or larger, and UTF-8 for the full glyph set. MaskShift detects
 colour depth from `COLORTERM`, `TERM` and `TERM_PROGRAM`; override it with
 `MASKSHIFT_COLOR=off|basic|full`. [`NO_COLOR`](https://no-color.org) turns colour
 off and wins over a colour depth saved in the settings; without colour, the
-active tab and the selected button are drawn in brackets (`[01 HEIST]`,
-`[YES]`) so they stay visible. `MASKSHIFT_ASCII=1` swaps every glyph for ASCII. Bracketed paste is enabled, so pasting a long
+active tab and the selected button are drawn in brackets (`[1 Chat]`,
+`[Yes]`) so they stay visible. `MASKSHIFT_ASCII=1` swaps every glyph for ASCII. Bracketed paste is enabled, so pasting a long
 prompt arrives as one event rather than a thousand keystrokes.
 
 Mouse support uses SGR reporting (`?1006`), which every terminal released this
@@ -370,7 +374,7 @@ next request is read from a normal prompt. Nothing is redrawn and no escape
 codes are sent when colour is off, which suits screen readers, logging through
 `script`/`tee`, and slow links. Plain mode uses ASCII marks and words (`call`,
 `ok`, `error`) instead of symbols. Typing while a run is working steers it;
-`/new` starts a fresh session and `/quit` leaves. In `balanced`/`review` modes,
+`/new` starts a fresh chat and `/quit` leaves. In `balanced`/`review` modes,
 approvals are asked inline with the same preview the interface shows, answered
 with `y`, `n` or `a`.
 

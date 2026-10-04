@@ -90,7 +90,7 @@ export function defaultConfig() {
   return {
     version: 1,
     home,
-    permissionMode: 'overdrive',
+    permissionMode: 'autonomous',
     filesystemScope: 'host',
     networkAccess: 'unrestricted',
     maxAgentSteps: 96,
@@ -200,7 +200,7 @@ export function defaultConfig() {
     // Desktop notification when a run finishes while the terminal is out of
     // focus (see tui/input.mjs's DEC 1004 focus tracking). Off by default
     // for the same reason voice is: it's an external command running on the
-    // operator's machine, not something to fire without being asked.
+    // user's machine, not something to fire without being asked.
     notifications: {
       enabled: false,
       command: process.env.MASKSHIFT_NOTIFY_COMMAND || null,
@@ -232,6 +232,15 @@ function mergeById(defaultItems = [], overrideItems = []) {
     map.set(item.id, { ...(map.get(item.id) || {}), ...item });
   }
   return [...map.values()];
+}
+
+export const PERMISSION_MODES = ['autonomous', 'balanced', 'review'];
+// Names a config file may still carry from earlier releases.
+const LEGACY_PERMISSION_MODES = { overdrive: 'autonomous' };
+
+export function normalizePermissionMode(value) {
+  const mode = String(value || '').trim().toLowerCase();
+  return LEGACY_PERMISSION_MODES[mode] || (PERMISSION_MODES.includes(mode) ? mode : 'autonomous');
 }
 
 function mergeConfig(base, override) {
@@ -267,6 +276,7 @@ function mergeConfig(base, override) {
     models: { ...(base.pricing?.models || {}), ...(override?.pricing?.models || {}) },
   };
   merged.providers = mergeById(base.providers, override?.providers);
+  merged.permissionMode = normalizePermissionMode(merged.permissionMode);
 
   const baseHome = absolutePath(base.home);
   merged.home = absolutePath(override?.home || base.home);

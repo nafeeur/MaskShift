@@ -1,4 +1,4 @@
-// Shared chrome for the catalogue views (arsenal, network, mod shop):
+// Shared chrome for the catalogue views (tools, skills, MCP servers, plugins):
 // a section switcher, a filter, a scrolling list and a detail pane.
 //
 // Three views render through this file, so it is where list rows earn their
@@ -7,7 +7,6 @@
 // other row in the product. Before that each view hand-rolled `fit` calls with
 // its own magic numbers, and no two lists shared a column edge.
 
-import { MASK_HEIGHT, MASK_WIDTH, maskArt } from '../brand.mjs';
 import { frameColour, glyphs, panel, rule } from '../box.mjs';
 import { hstack, split } from '../layout.mjs';
 import { LAYER, listZone, viewportZone } from '../regions.mjs';
@@ -16,19 +15,13 @@ import { FIELD_LABEL_WIDTH, SPACE } from '../tokens.mjs';
 import { columns, field, gutter, label as typeLabel } from '../type.mjs';
 
 /**
- * Centred filler for a catalogue with nothing in it. A blank rectangle under
- * a two-row header reads as broken; the mask glyph the idle heist screen
- * already uses reads as a considered state, so an empty Network or Mod Shop
- * pane feels like the same product instead of an unfinished corner of it.
- * The art only appears when the pane can actually fit it — a raster mark cut
- * off at the edges reads worse than the plain text alone.
+ * Centred filler for a catalogue with nothing in it. A blank rectangle under a
+ * two-row header reads as broken; a short title and a hint read as a considered
+ * empty state.
  */
 function emptyState(app, width, height, { title, hint = '' } = {}) {
   const { theme } = app;
-  const showArt = width >= MASK_WIDTH && height >= MASK_HEIGHT + 4;
-  if (showArt) app.maskBreathing = true;
-  const art = showArt ? maskArt(theme, { busy: app.busy }) : [];
-  const block = [...art, '', theme.paint(title, { fg: theme.roles.muted, bold: true })];
+  const block = [theme.paint(title, { fg: theme.roles.muted, bold: true })];
   if (hint) block.push('', theme.paint(hint, { fg: theme.roles.faint, italic: true }));
   const lines = block.map((line) => fit(center(line, width), width));
   const top = Math.max(0, Math.floor((height - lines.length) / 2));
@@ -54,8 +47,8 @@ export function tabRow(app, tabs, active, width, { origin = null, onPick = null 
   const { theme } = app;
   const mark = glyphs(theme);
 
-  // Counts are the first thing to go when the strip will not fit. The mod shop
-  // carries five sections, and truncating the switcher mid-word — "BROWSER 0
+  // Counts are the first thing to go when the strip will not fit. The capabilities
+  // view carries five sections, and truncating the switcher mid-word — "Browser 0
   // ·…" — hides a section rather than a number.
   const cost = (withCounts) => tabs.reduce((sum, tab) => sum
     + visibleWidth(tab.label)
@@ -130,7 +123,7 @@ export function listRow(app, { selected, marker = '', markerTone = null, cells, 
  *
  * Sections are `{ heading }`, `{ field, value }`, `{ raw }` or a bare string.
  * Every one of them starts its text on the same column, which is why the
- * dossier no longer has its headings, its labels and its prose on three
+ * details pane no longer has its headings, its labels and its prose on three
  * different left edges.
  */
 export function detailBlock(app, width, sections) {
@@ -224,7 +217,7 @@ export function renderCatalog(app, region, spec) {
     : spec.list.render(theme, listInner, listHeight, spec.row);
 
   // No title on the rail: the view tab at the top of the screen already names
-  // this pane, and printing "03 ARSENAL" one row under an "03 ARSENAL" chip
+  // this pane, and printing "Capabilities" one row under a "Capabilities" chip
   // was the single most repetitive thing on screen.
   const listPanel = panel({
     theme, width: listWidth, height, titleRaw: sections, note: spec.note || '',
@@ -262,7 +255,7 @@ export function renderCatalog(app, region, spec) {
   const detailBody = app.detail.render(height - 1, detailWidth - 2);
   const detail = sidePane(app, {
     width: detailWidth, height,
-    title: spec.detailTitle || 'DOSSIER',
+    title: spec.detailTitle || 'Details',
     stamp: spec.detailStamp || '',
     focused: app.focus === 'detail',
     body: detailBody,

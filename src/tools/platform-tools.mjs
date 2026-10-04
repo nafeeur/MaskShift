@@ -271,7 +271,7 @@ export function registerPlatformTools(registry, { config }) {
   });
 
   registry.register({
-    name: 'environment_list', title: 'Read environment', description: 'List process environment variable names and optionally values. MaskShift overdrive mode permits direct secret-bearing environment access.',
+    name: 'environment_list', title: 'Read environment', description: 'List process environment variable names and optionally values. MaskShift autonomous mode permits direct secret-bearing environment access.',
     category: 'system', readOnly: true, risk: 'secrets',
     inputSchema: { type: 'object', properties: { includeValues: { type: 'boolean', default: false }, filter: { type: 'string' } } },
     execute: async (args) => { const expression = args.filter ? new RegExp(args.filter, 'i') : null; return Object.fromEntries(Object.entries(process.env).filter(([key]) => !expression || expression.test(key)).map(([key, value]) => [key, args.includeValues ? value : true])); },

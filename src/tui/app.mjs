@@ -40,7 +40,7 @@ const VIEWS = [chatView, filesView, capabilitiesView, runtimeView, browserView, 
 // One-line rail titles for every non-chat view's own `rail()` export (see
 // paint() below) — the chat view's rail carries its own titles per tab.
 const PANE_RAIL_TITLES = {
-  files: 'CODE GRAPH', capabilities: 'USAGE', runtime: 'JOB HISTORY', browser: 'CONSOLE / NETWORK', git: 'HISTORY',
+  files: 'Code graph', capabilities: 'Usage', runtime: 'Job history', browser: 'Console and network', git: 'History',
 };
 const EVENT_LIMIT = 400;
 const TERMINAL_LIMIT = 2000;
@@ -51,14 +51,14 @@ const TERMINAL_LIMIT = 2000;
 const BROWSER_POLL_MS = 400;
 const MIN_COLUMNS = 40;
 
-// How a finished heist is announced — in character rather than as a bare
-// status word, since this is the one moment the operator is guaranteed to
+// How a finished run is announced — in plain words rather than as a bare
+// status word, since this is the one moment the user is guaranteed to
 // look up from whatever else they switched to while it ran.
-const HEIST_OUTCOME = {
-  'run.completed': { tone: 'success', label: 'CLEAN GETAWAY' },
-  'run.cancelled': { tone: 'warn', label: 'CALLED OFF' },
-  'run.failed': { tone: 'error', label: 'BLOWN COVER' },
-  'run.max-steps': { tone: 'error', label: 'RAN OUT OF TIME' },
+const RUN_OUTCOME = {
+  'run.completed': { tone: 'success', label: 'Completed' },
+  'run.cancelled': { tone: 'warn', label: 'Cancelled' },
+  'run.failed': { tone: 'error', label: 'Failed' },
+  'run.max-steps': { tone: 'warn', label: 'Step limit reached' },
 };
 const MIN_ROWS = 12;
 
@@ -67,7 +67,7 @@ const MIN_ROWS = 12;
 const SLASH_COMMANDS = [
   { name: 'new', hint: 'start a fresh session' },
   { name: 'clear', hint: 'clear the transcript' },
-  { name: 'model', hint: 'switch persona/model' },
+  { name: 'model', hint: 'switch model' },
   { name: 'sessions', hint: 'browse sessions' },
   { name: 'search', hint: 'grep every session for a phrase' },
   { name: 'context', hint: 'what went into the last request, and why' },
@@ -76,12 +76,12 @@ const SLASH_COMMANDS = [
   { name: 'cost', hint: 'spend per run in this session' },
   { name: 'changes', hint: 'review what the last run changed' },
   { name: 'undo', hint: 'undo the last run\'s file changes' },
-  { name: 'steer', hint: 'tell the running heist something now' },
+  { name: 'steer', hint: 'send a message to the running task now' },
   { name: 'workspace', hint: 'switch workspace' },
   { name: 'tools', hint: 'browse tools' },
   { name: 'skills', hint: 'browse skills' },
   { name: 'mcp', hint: 'manage MCP servers' },
-  { name: 'mods', hint: 'open runtime: automations, processes, browser instances' },
+  { name: 'runtime', hint: 'open runtime: automations, processes, browser instances' },
   { name: 'themes', hint: 'switch colour theme' },
   { name: 'files', hint: 'browse files' },
   { name: 'terminal', hint: 'open terminal' },
@@ -105,7 +105,7 @@ export class MaskShiftTui {
     const preferences = runtime.config.get().ui || {};
     this.theme = theme || new Theme({
       ...(headless ? { depth: 24, unicode: true } : {}),
-      // NO_COLOR (https://no-color.org) is the operator's standing request; a colour depth saved
+      // NO_COLOR (https://no-color.org) is the user's standing request; a colour depth saved
       // in the preferences must not quietly override it.
       ...(preferences.colorDepth === null || preferences.colorDepth === undefined || noColorRequested() ? {} : { depth: Number(preferences.colorDepth) }),
       ...(preferences.unicode === null || preferences.unicode === undefined ? {} : { unicode: Boolean(preferences.unicode) }),
@@ -216,7 +216,7 @@ export class MaskShiftTui {
 
     // 03 CAPABILITIES — tools, skills, MCP, plugins and bridges: one catalogue,
     // five tabs, all sharing a single filter/list the way each used to have
-    // its own (see arsenal/network/modshop.mjs before the merge into capabilities.mjs).
+    // its own (the tools, MCP and plugins views before they were merged into capabilities.mjs).
     this.tools = [];
     this.skills = [];
     this.skillBodies = new Map();
@@ -295,9 +295,8 @@ export class MaskShiftTui {
     // Set true for one frame by whichever empty-state renders the mask glyph,
     // so tick() knows to keep the breathing animation moving — reset before
     // every paint so a view that never touches it correctly reads false.
-    this.maskBreathing = false;
     this.promptQueue = [];
-    // Messages sent to the running heist with ctrl+t, not yet delivered (see engine.steer).
+    // Messages sent to the running task with ctrl+t, not yet delivered (see engine.steer).
     this.steering = [];
     // Slash commands from .maskshift/commands/*.md and friends (see commands.mjs).
     this.customCommands = [];
@@ -313,14 +312,14 @@ export class MaskShiftTui {
     // back to back (or two concurrent subagents can each want one), but only
     // one ConfirmOverlay can be on screen at a time.
     this.confirmationQueue = Promise.resolve();
-    // Tools the operator chose "always" for; cleared when the heist changes (see loadSession).
+    // Tools the user chose "always" for; cleared when the chat changes (see loadSession).
     this.approvedTools = new Set();
     this.runtime.toolRegistry.confirmHandler = (details) => this.requestToolConfirmation(details);
   }
 
-  // Returns a Promise<boolean> resolved once the operator answers the approval
+  // Returns a Promise<boolean> resolved once the user answers the approval
   // dialog this opens — true for YES or ALWAYS, false for NO/escape. ALWAYS also
-  // approves every later call to the same tool until the heist changes. See
+  // approves every later call to the same tool until the chat changes. See
   // ToolRegistry#authorize (src/tools/registry.mjs), wired via confirmHandler above.
   requestToolConfirmation({ name, tool, args }) {
     if (this.approvedTools.has(name)) return Promise.resolve(true);
@@ -338,7 +337,7 @@ export class MaskShiftTui {
         onChoose: (choice) => {
           if (choice === 'always') {
             this.approvedTools.add(name);
-            this.toast(`${name} approved for the rest of this heist`, 'info');
+            this.toast(`${name} approved for the rest of this chat`, 'info');
           }
           finish(choice !== 'no');
           this.closeOverlay();
@@ -470,7 +469,7 @@ export class MaskShiftTui {
     // Anything clock-driven has to keep the loop awake for as long as it is
     // moving, or a toast would sit at half-opacity until the next keystroke.
     if (this.busy || dirty || this.terminalBusy || this.toasts.animating || this.overlay?.pending
-      || this.overlay?.animating || this.maskBreathing) this.requestRender();
+      || this.overlay?.animating) this.requestRender();
   }
 
   requestRender() {
@@ -521,7 +520,7 @@ export class MaskShiftTui {
   async refreshModelProfile() {
     const ref = this.modelRef;
     const profile = await this.runtime.providerManager.modelProfile(ref).catch(() => null);
-    // A slower lookup for a model the operator has since switched away from must not win.
+    // A slower lookup for a model the user has since switched away from must not win.
     if (ref !== this.modelRef) return;
     this.modelProfile = profile;
     this.requestRender();
@@ -561,7 +560,7 @@ export class MaskShiftTui {
         render: (theme, width) => {
           const names = files.slice(0, 3).map((file) => file.path.split('/').pop()).join(', ') + (files.length > 3 ? ` +${files.length - 3}` : '');
           const keys = `  ${typeKey(theme, '^D')}${theme.paint(' review', { fg: theme.roles.muted })}  ${typeKey(theme, '^Z')}${theme.paint(' undo', { fg: theme.roles.muted })}`;
-          const lead = theme.paint(`${files.length} FILE${files.length === 1 ? '' : 'S'} CHANGED BY THIS RUN  `, { fg: theme.roles.label, bold: true });
+          const lead = theme.paint(`${files.length} file${files.length === 1 ? '' : 's'} changed by this run  `, { fg: theme.roles.label, bold: true });
           return [fit(gutter(theme, glyphs(theme).diamond, { tone: theme.roles.info })
             + lead + theme.paint(oneLine(names, Math.max(8, width - visibleWidth(lead) - 22)), { fg: theme.roles.dim }) + keys, width)];
         },
@@ -571,7 +570,7 @@ export class MaskShiftTui {
       entries.push({
         render: (theme, width) => [fit(
           gutter(theme, glyphs(theme).arrowRight, { tone: theme.roles.user })
-          + theme.paint(`STEERING  ${oneLine(text, Math.max(8, width - 12))}`, { fg: theme.roles.muted }),
+          + theme.paint(`Sent  ${oneLine(text, Math.max(8, width - 12))}`, { fg: theme.roles.muted }),
           width,
         )],
       });
@@ -580,7 +579,7 @@ export class MaskShiftTui {
       entries.push({
         render: (theme, width) => [fit(
           gutter(theme, String(index + 1), { tone: theme.roles.warning })
-          + theme.paint(`QUEUED  ${oneLine(queued.prompt, Math.max(8, width - 10))}`, { fg: theme.roles.muted }),
+          + theme.paint(`Queued  ${oneLine(queued.prompt, Math.max(8, width - 10))}`, { fg: theme.roles.muted }),
           width,
         )],
       });
@@ -588,16 +587,15 @@ export class MaskShiftTui {
     return entries;
   }
 
-  // Chrome is upper case; anything the operator is being spoken to in is not.
   composerPlaceholder() {
     return this.busy
-      ? `Run in flight — ^T steers it now, ↵ queues the next order${this.promptQueue.length ? ` (${this.promptQueue.length} queued)` : ''}…`
-      : 'Describe what success looks like…';
+      ? `Task running — ^T sends a message now, ↵ queues the next request${this.promptQueue.length ? ` (${this.promptQueue.length} queued)` : ''}…`
+      : 'Ask anything, or describe a task…';
   }
 
   currentHints() {
     if (this.overlay) return [['↵', 'accept'], ['esc', 'dismiss'], ['↑↓', 'move']];
-    if (this.focus === 'rail') return [['tab', 'rail section'], ['↑↓', 'scroll'], ['^B', 'hide rail']];
+    if (this.focus === 'rail') return [['tab', 'sidebar section'], ['↑↓', 'scroll'], ['^B', 'hide sidebar']];
     const module = this.modules.get(this.view);
     return module?.hints ? module.hints(this) : [];
   }
@@ -672,7 +670,6 @@ export class MaskShiftTui {
     const module = this.modules.get(this.view);
     const region = { row: 2 + marginY, column: marginX, width: mainWidth, height: bodyHeight };
     this.bodyRegion = region;
-    this.maskBreathing = false;
     const rendered = module.render(this, region);
     let body = rendered.lines;
     this.lastRegion = region;
@@ -688,7 +685,7 @@ export class MaskShiftTui {
       const railLines = this.view === 'chat'
         ? rail.render(this, railRegion)
         : rail.renderPane(this, railRegion, {
-          title: PANE_RAIL_TITLES[this.view] || 'CONTEXT',
+          title: PANE_RAIL_TITLES[this.view] || 'Context',
           lines: module.rail ? module.rail(this, railWidth - 2) : [' Nothing to show here yet.'],
           viewport: this.railView,
         });
@@ -741,7 +738,7 @@ export class MaskShiftTui {
         });
         const suggestBottom = this.lastRegion.row + 1 + this.chatPanes.transcriptHeight;
         const lines = panel({
-          theme, width, height: body.length + 2, title: 'COMMANDS', body,
+          theme, width, height: body.length + 2, title: 'Commands', body,
           colour: frameColour(theme, true), focused: true,
         });
         frame = paintOverlay(frame, lines, { row: Math.max(2 + marginY, suggestBottom - lines.length), column: 2 + marginX }, columns);
@@ -990,13 +987,13 @@ export class MaskShiftTui {
     const session = this.runtime.store.getSession(sessionId);
     if (!session) return;
     if (session.workspace_id !== this.workspaceId) {
-      this.toast('That heist belongs to a different workspace', 'error');
+      this.toast('That chat belongs to a different workspace', 'error');
       return;
     }
     if (session.id !== this.sessionId) this.approvedTools.clear();
     this.sessionId = session.id;
     this.messages = this.runtime.store.listMessages(session.id, 1000);
-    this.sessionTitle = this.messages.length ? (session.title || '') : 'STANDBY FOR ORDERS';
+    this.sessionTitle = this.messages.length ? (session.title || '') : 'New chat';
     const previousModel = this.modelRef;
     this.compaction = session.meta?.compaction || null;
     this.modelRef = session.model_id || this.modelRef;
@@ -1039,10 +1036,10 @@ export class MaskShiftTui {
       return;
     }
     this.overlay = new ConfirmOverlay({
-      title: 'SWITCH HEIST', danger: Boolean(this.busy || this.promptQueue.length),
+      title: 'Switch chat', danger: Boolean(this.busy || this.promptQueue.length),
       message: this.busy || this.promptQueue.length
-        ? 'Cancel the active run, discard queued orders and the current draft, then switch heists?'
-        : 'Discard the current draft and switch heists?',
+        ? 'Cancel the active run, discard queued requests and the current draft, then switch chats?'
+        : 'Discard the current draft and switch chats?',
       onConfirm: async () => {
         if (this.busy) this.cancelRun();
         this.promptQueue = [];
@@ -1054,12 +1051,12 @@ export class MaskShiftTui {
 
   newSession({ silent = false } = {}) {
     const session = this.runtime.engine.createSession({
-      workspaceId: this.workspaceId, title: 'New run', modelRef: this.modelRef,
+      workspaceId: this.workspaceId, title: 'New chat', modelRef: this.modelRef,
     });
     this.sessionId = session.id;
     this.approvedTools.clear();
     this.compaction = null;
-    this.sessionTitle = 'STANDBY FOR ORDERS';
+    this.sessionTitle = 'New chat';
     this.messages = [];
     this.activeRun = null;
     this.runId = null;
@@ -1074,7 +1071,7 @@ export class MaskShiftTui {
     this.endedAt = null;
     this.view = 'chat';
     this.focus = 'composer';
-    if (!silent) this.toast('New heist opened', 'success');
+    if (!silent) this.toast('New chat opened', 'success');
     this.requestRender();
   }
 
@@ -1084,10 +1081,10 @@ export class MaskShiftTui {
       return;
     }
     this.overlay = new ConfirmOverlay({
-      title: 'NEW HEIST', danger: Boolean(this.busy || this.promptQueue.length),
+      title: 'New chat', danger: Boolean(this.busy || this.promptQueue.length),
       message: this.busy || this.promptQueue.length
-        ? 'Cancel the active run, discard queued orders and the current draft, then start a new heist?'
-        : 'Discard the current draft and start a new heist?',
+        ? 'Cancel the active run, discard queued requests and the current draft, then start a new chat?'
+        : 'Discard the current draft and start a new chat?',
       onConfirm: async () => {
         if (this.busy) this.cancelRun();
         this.promptQueue = [];
@@ -1109,7 +1106,7 @@ export class MaskShiftTui {
     this.transcript.toBottom();
     if (this.busy) {
       this.promptQueue.push({ id: `queued-${Date.now()}-${this.promptQueue.length}`, prompt, queuedAt: Date.now() });
-      this.toast(`Order queued (${this.promptQueue.length})`, 'info');
+      this.toast(`Request queued (${this.promptQueue.length})`, 'info');
       this.requestRender();
       return;
     }
@@ -1127,13 +1124,13 @@ export class MaskShiftTui {
     if (text.startsWith('/') || !this.busy || !this.runId) { void this.submitPrompt(); return; }
     const result = this.runtime.engine.steer(this.runId, text);
     if (!result.accepted) {
-      this.toast('That run has already finished — press ↵ to send it as a new order', 'warn');
+      this.toast('That run has already finished — press ↵ to send it as a new request', 'warn');
       return;
     }
     this.composer.remember(original);
     this.composer.clear();
     this.transcript.toBottom();
-    this.toast('Steering the running heist — it reads this at its next step', 'info');
+    this.toast('Message sent to the running task — it reads this at its next step', 'info');
     this.requestRender();
   }
 
@@ -1181,7 +1178,7 @@ export class MaskShiftTui {
     this.toast('Retreat signalled', 'warn');
   }
 
-  /** A desktop notification for a run that just finished while the operator
+  /** A desktop notification for a run that just finished while the user
    *  was looking elsewhere — gated on focus (best-effort; see screen.mjs),
    *  on the setting being turned on, and on the run having actually taken
    *  a while, so a two-second lookup doesn't also ping the desktop. */
@@ -1247,17 +1244,17 @@ export class MaskShiftTui {
         this.endedAt = null;
         this.step = 0;
         this.pendingCalls.clear();
-        this.thinkingLabel = 'STUDYING THE TARGET';
+        this.thinkingLabel = 'Thinking';
         break;
       case 'run.model-turn':
         this.step = payload.step || this.step + 1;
-        this.thinkingLabel = `TURN ${String(this.step).padStart(2, '0')} — ${payload.tools?.length ?? 0} TOOLS ACTIVE`;
+        this.thinkingLabel = `Turn ${String(this.step)} — ${payload.tools?.length ?? 0} tools active`;
         this.activeCapabilities = new Set(payload.tools || []);
         this.streamingText = null;
         break;
       case 'run.assistant-delta':
         this.streamingText = payload.content || '';
-        if (this.streamingText) this.thinkingLabel = 'WRITING';
+        if (this.streamingText) this.thinkingLabel = 'Writing';
         break;
       case 'run.assistant': {
         if (payload.usage) {
@@ -1271,7 +1268,7 @@ export class MaskShiftTui {
         for (const call of payload.toolCalls || []) this.pendingCalls.set(call.id, { name: call.name, args: call.args });
         this.streamingText = null;
         this.messages = this.runtime.store.listMessages(this.sessionId, 1000);
-        this.thinkingLabel = payload.toolCalls?.length ? 'EXECUTING TOOLS' : 'WRITING';
+        this.thinkingLabel = payload.toolCalls?.length ? 'Running tools' : 'Writing';
         break;
       }
       case 'run.tool-result':
@@ -1308,7 +1305,7 @@ export class MaskShiftTui {
         if (run?.meta?.costEstimate?.cost) this.totals.cost = run.meta.costEstimate.cost;
         const session = this.runtime.store.getSession(this.sessionId);
         this.sessionTitle = session?.title || this.sessionTitle;
-        const outcome = HEIST_OUTCOME[event.type] || { tone: 'error', label: event.type.replace('run.', '').toUpperCase() };
+        const outcome = RUN_OUTCOME[event.type] || { tone: 'error', label: event.type.replace('run.', '').toUpperCase() };
         this.toast(`${outcome.label}${payload.error ? ` — ${oneLine(payload.error, 90)}` : ''}`, outcome.tone);
         this.notifyRunFinished(outcome.label, run);
         void this.refreshLastRunChanges();
@@ -1515,7 +1512,7 @@ export class MaskShiftTui {
     this.requestRender();
   }
 
-  /** Recent commits touching one file — the 06 GIT rail's history for
+  /** Recent commits touching one file — the Git view's rail history for
    *  whichever changed file is selected (see git.mjs's rail()). Cached the
    *  same way loadGitDetail caches a diff, since render() has to stay
    *  synchronous. */
@@ -1570,7 +1567,7 @@ export class MaskShiftTui {
   confirmDiscardChange(item) {
     const raw = item.raw;
     this.overlay = new ConfirmOverlay({
-      title: 'DISCARD CHANGE', danger: true,
+      title: 'Discard change', danger: true,
       message: `Discard changes to "${raw.path}"? This cannot be undone.`,
       onConfirm: async () => {
         const cwd = this.workspace?.path;
@@ -1591,7 +1588,7 @@ export class MaskShiftTui {
   openGitCommitDialog() {
     const stagedCount = this.gitChanges.filter((change) => change.staged).length;
     this.overlay = new FormOverlay({
-      title: 'COMMIT', submitLabel: stagedCount ? `COMMIT ${stagedCount} FILE${stagedCount === 1 ? '' : 'S'}` : 'COMMIT ALL TRACKED',
+      title: 'Commit', submitLabel: stagedCount ? `Commit ${stagedCount} file${stagedCount === 1 ? '' : 's'}` : 'Commit all tracked',
       note: stagedCount ? '' : 'Nothing staged — this commits every tracked change (git commit -a).',
       fields: [
         { name: 'message', label: 'message', type: 'textarea', value: '' },
@@ -1635,7 +1632,7 @@ export class MaskShiftTui {
     };
     if (this.gitChanges.length) {
       this.overlay = new ConfirmOverlay({
-        title: 'SWITCH BRANCH', danger: true,
+        title: 'Switch branch', danger: true,
         message: `Switch to ${raw.name} with uncommitted changes present? Git refuses if it would overwrite anything.`,
         onConfirm: run,
       });
@@ -1646,7 +1643,7 @@ export class MaskShiftTui {
 
   openGitBranchDialog() {
     this.overlay = new FormOverlay({
-      title: 'NEW BRANCH', submitLabel: 'CREATE + SWITCH',
+      title: 'New branch', submitLabel: 'Create and switch',
       fields: [
         { name: 'name', label: 'name', value: '' },
         { name: 'startPoint', label: 'start point', value: this.gitBranches.find((branch) => branch.current)?.name || 'HEAD' },
@@ -1672,7 +1669,7 @@ export class MaskShiftTui {
     const raw = item.raw;
     if (!raw || raw.remote) return;
     this.overlay = new FormOverlay({
-      title: 'RENAME BRANCH', submitLabel: 'RENAME',
+      title: 'Rename branch', submitLabel: 'Rename',
       fields: [{ name: 'name', label: 'new name', value: raw.name }],
       onSubmit: async (values) => {
         if (!values.name.trim()) throw new Error('A new name is required');
@@ -1694,7 +1691,7 @@ export class MaskShiftTui {
     const raw = item.raw;
     if (!raw || raw.current) { this.toast('Cannot delete the current branch', 'warn'); return; }
     this.overlay = new ConfirmOverlay({
-      title: 'DELETE BRANCH', danger: true,
+      title: 'Delete branch', danger: true,
       message: `Delete branch "${raw.name}"? This cannot be undone if it isn't merged elsewhere.`,
       onConfirm: async () => {
         const cwd = this.workspace?.path;
@@ -1725,7 +1722,7 @@ export class MaskShiftTui {
   confirmDropStash(item) {
     const raw = item.raw;
     this.overlay = new ConfirmOverlay({
-      title: 'DROP STASH', danger: true,
+      title: 'Drop stash', danger: true,
       message: `Drop ${raw.ref} permanently?`,
       onConfirm: async () => {
         const cwd = this.workspace?.path;
@@ -1741,7 +1738,7 @@ export class MaskShiftTui {
 
   openGitStashDialog() {
     this.overlay = new FormOverlay({
-      title: 'STASH CHANGES', submitLabel: 'STASH',
+      title: 'Stash changes', submitLabel: 'Stash',
       fields: [
         { name: 'message', label: 'message', value: '' },
         { name: 'includeUntracked', label: 'include untracked', type: 'toggle', value: true },
@@ -1764,7 +1761,7 @@ export class MaskShiftTui {
     const checkpoint = item.raw;
     if (this.busy) { this.toast('Cancel the active run before restoring a checkpoint', 'warn'); return; }
     this.overlay = new ConfirmOverlay({
-      title: 'RESTORE', danger: true,
+      title: 'Restore', danger: true,
       message: `Restore the workspace to checkpoint ${checkpoint.ref || checkpoint.id}? Uncommitted changes will be replaced.`,
       onConfirm: async () => {
         await this.runtime.workspaceManager.restoreCheckpoint(this.workspaceId, checkpoint);
@@ -1778,7 +1775,7 @@ export class MaskShiftTui {
 
   openGitWorktreeDialog() {
     this.overlay = new FormOverlay({
-      title: 'NEW WORKTREE', submitLabel: 'CREATE',
+      title: 'New worktree', submitLabel: 'Create',
       fields: [
         { name: 'path', label: 'path', value: '' },
         { name: 'branch', label: 'branch (existing, blank for a new one)', value: '' },
@@ -1802,7 +1799,7 @@ export class MaskShiftTui {
   confirmRemoveWorktree(item) {
     const raw = item.raw;
     this.overlay = new ConfirmOverlay({
-      title: 'REMOVE WORKTREE', danger: true,
+      title: 'Remove worktree', danger: true,
       message: `Remove worktree at ${raw.path}?`,
       onConfirm: async () => {
         const cwd = this.workspace?.path;
@@ -1931,14 +1928,14 @@ export class MaskShiftTui {
 
   openMcpDialog() {
     this.overlay = new FormOverlay({
-      title: 'ADD MCP SERVER',
-      submitLabel: 'ADD LINK',
+      title: 'Add MCP server',
+      submitLabel: 'Add link',
       note: 'Environment values may reference shell variables with ${NAME}.',
       fields: [
         { name: 'name', label: 'name', value: '', hint: 'my-server' },
         {
           name: 'transport', label: 'transport', type: 'select', value: 'stdio',
-          options: [{ label: 'STDIO', value: 'stdio' }, { label: 'STREAMABLE HTTP', value: 'http' }],
+          options: [{ label: 'STDIO', value: 'stdio' }, { label: 'Streamable HTTP', value: 'http' }],
         },
         { name: 'command', label: 'command', value: '', hint: 'npx -y @modelcontextprotocol/server-filesystem .', visible: (values) => values.transport === 'stdio' },
         { name: 'url', label: 'url', value: '', hint: 'https://server.example/mcp', visible: (values) => values.transport === 'http' },
@@ -1960,7 +1957,7 @@ export class MaskShiftTui {
 
   confirmRemoveMcp(name) {
     this.overlay = new ConfirmOverlay({
-      title: 'REMOVE SERVER', danger: true,
+      title: 'Remove server', danger: true,
       message: `Remove the MCP server "${name}" from this workspace configuration?`,
       onConfirm: async () => {
         await this.runtime.mcpManager.remove(name, this.workspace?.path || process.cwd());
@@ -1995,14 +1992,14 @@ export class MaskShiftTui {
 
   openAutomationDialog() {
     this.overlay = new FormOverlay({
-      title: 'NEW AUTOMATION', submitLabel: 'ARM AUTOMATION',
+      title: 'New automation', submitLabel: 'Arm automation',
       note: 'Schedules accept "every 6h", cron expressions, or an ISO timestamp.',
       fields: [
         { name: 'name', label: 'name', value: '', hint: 'Nightly repository verification' },
         { name: 'schedule', label: 'schedule', value: 'every 6h' },
         {
           name: 'type', label: 'action', type: 'select', value: 'agent',
-          options: [{ label: 'AGENT RUN', value: 'agent' }, { label: 'SHELL COMMAND', value: 'shell' }, { label: 'TOOL CALL', value: 'tool' }],
+          options: [{ label: 'Agent run', value: 'agent' }, { label: 'Shell command', value: 'shell' }, { label: 'Tool call', value: 'tool' }],
         },
         { name: 'payload', label: 'prompt / command / tool json', type: 'textarea', value: '' },
         { name: 'model', label: 'model override', value: '' },
@@ -2030,15 +2027,15 @@ export class MaskShiftTui {
 
   openPluginDialog() {
     this.overlay = new FormOverlay({
-      title: 'INSTALL PLUGIN', submitLabel: 'INSTALL + ACTIVATE',
+      title: 'Install plugin', submitLabel: 'Install and activate',
       note: 'Plugins run inside MaskShift with full host authority and can register tools, skills, MCP servers and listeners.',
       fields: [
         { name: 'source', label: 'source', value: '', hint: '/path, git URL, or npm package' },
         {
           name: 'kind', label: 'install type', type: 'select', value: 'auto',
           options: [
-            { label: 'AUTO DETECT', value: 'auto' }, { label: 'LOCAL DIRECTORY', value: 'local' },
-            { label: 'GIT REPOSITORY', value: 'git' }, { label: 'NPM PACKAGE', value: 'npm' },
+            { label: 'Auto-detect', value: 'auto' }, { label: 'Local directory', value: 'local' },
+            { label: 'Git repository', value: 'git' }, { label: 'npm package', value: 'npm' },
           ],
         },
         { name: 'name', label: 'local name', value: '' },
@@ -2055,7 +2052,7 @@ export class MaskShiftTui {
 
   openBrowserDialog() {
     this.overlay = new FormOverlay({
-      title: 'LAUNCH BROWSER', submitLabel: 'LAUNCH',
+      title: 'Launch browser', submitLabel: 'Launch',
       note: 'Visible mode is useful for one-time logins; profiles persist and are reused by the autonomous browser tools.',
       fields: [
         { name: 'profile', label: 'profile', value: 'default' },
@@ -2073,7 +2070,7 @@ export class MaskShiftTui {
 
   openBridgeRunner(bridge) {
     this.overlay = new FormOverlay({
-      title: `DELEGATE TO ${String(bridge.title || bridge.name).toUpperCase()}`, submitLabel: 'DELEGATE',
+      title: `Delegate to ${String(bridge.title || bridge.name)}`, submitLabel: 'Delegate',
       note: bridge.available ? `Runs ${bridge.executable}` : 'This bridge is not installed on your PATH.',
       fields: [{ name: 'prompt', label: 'prompt', type: 'textarea', value: '' }],
       onSubmit: async (values) => {
@@ -2083,7 +2080,7 @@ export class MaskShiftTui {
           prompt: values.prompt, workspaceId: this.workspaceId, wait: true,
         });
         this.overlay = new TextOverlay({
-          title: `${String(bridge.name).toUpperCase()} RESULT`,
+          title: `${String(bridge.name)} result`,
           lines: wrap(result.stdout || result.stderr || 'No output', 90),
         });
       },
@@ -2110,7 +2107,7 @@ export class MaskShiftTui {
 
   confirmDeleteAutomation(automation) {
     this.overlay = new ConfirmOverlay({
-      title: 'DELETE AUTOMATION', danger: true,
+      title: 'Delete automation', danger: true,
       message: `Delete "${automation.name}" permanently?`,
       onConfirm: async () => {
         this.runtime.automationScheduler.remove(automation.id);
@@ -2160,7 +2157,7 @@ export class MaskShiftTui {
   openBrowserTargetPicker() {
     if (!this.browsers.length) { this.toast('No browser instances running — launch one from 04 RUNTIME', 'warn'); return; }
     this.overlay = new PickerOverlay({
-      title: 'BROWSER TARGET',
+      title: 'Choose a browser',
       placeholder: 'Filter instances…',
       items: this.browsers.map((instance) => ({
         id: instance.id, label: instance.profile || instance.id,
@@ -2395,7 +2392,7 @@ export class MaskShiftTui {
     const schema = tool.schema?.properties || {};
     const example = Object.fromEntries(Object.keys(schema).slice(0, 6).map((key) => [key, '']));
     this.overlay = new FormOverlay({
-      title: `RUN ${tool.name.toUpperCase()}`, submitLabel: 'EXECUTE',
+      title: `Run ${tool.name}`, submitLabel: 'Run',
       note: tool.description,
       fields: [{ name: 'arguments', label: 'arguments json', type: 'textarea', value: JSON.stringify(example, null, 2) }],
       onSubmit: async (values) => {
@@ -2404,7 +2401,7 @@ export class MaskShiftTui {
         const result = await this.runtime.toolRegistry.execute(tool.name, args, this.toolContext());
         const text = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
         this.overlay = new TextOverlay({
-          title: `${tool.name.toUpperCase()} RESULT`,
+          title: `${tool.name} result`,
           lines: String(text).split('\n').flatMap((line) => wrap(line, 90)).slice(0, 3000),
         });
       },
@@ -2442,15 +2439,15 @@ export class MaskShiftTui {
   openHelp() {
     const theme = this.theme;
     const rows = [
-      ['GLOBAL', ''],
+      ['Global', ''],
       ['ctrl+k', 'command palette — every action MaskShift can perform'],
-      ['ctrl+p', 'switch heist (session)'],
-      ['ctrl+n', 'new heist'],
-      ['ctrl+g', 'change persona (model)'],
+      ['ctrl+p', 'switch chat'],
+      ['ctrl+n', 'new chat'],
+      ['ctrl+g', 'change model'],
       ['ctrl+o', 'open a different workspace'],
-      ['ctrl+b', 'show or hide the right rail'],
-      ['ctrl+r', 'cycle rail: plan → loadout → events'],
-      ['ctrl+y', 'focus the rail'],
+      ['ctrl+b', 'show or hide the sidebar'],
+      ['ctrl+r', 'cycle sidebar: plan → active → events'],
+      ['ctrl+y', 'focus the sidebar'],
       ['ctrl+v', 'record a voice prompt and transcribe it into the composer'],
       ['1 … 6 / alt+1 … 6', 'jump to a view'],
       ['f1 or ?', 'this reference'],
@@ -2459,12 +2456,12 @@ export class MaskShiftTui {
       ['ctrl+c', 'cancel a run, then quit'],
       ['ctrl+q', 'quit immediately'],
       ['', ''],
-      ['01 HEIST', ''],
+      ['Chat', ''],
       ['enter', 'execute the prompt'],
       ['ctrl+j', 'newline inside the composer'],
       ['tab', 'move between transcript and composer'],
       ['t', 'expand or collapse tool output'],
-      ['esc', 'retreat from the running heist'],
+      ['esc', 'stop the running task'],
       ['/command', 'slash commands: /model /new /clear /tools /skills /mcp /help'],
       ['', ''],
       ['02 FILES', ''],
@@ -2501,7 +2498,7 @@ export class MaskShiftTui {
       if (!description) return sectionLabel(theme, key);
       return gutter(theme) + typeKey(theme, fit(key, 18)) + theme.paint(description, { fg: theme.roles.muted });
     });
-    this.overlay = new TextOverlay({ title: 'KEY REFERENCE', lines, stamp: 'esc closes' });
+    this.overlay = new TextOverlay({ title: 'Keyboard shortcuts', lines, stamp: 'esc closes' });
   }
 
   openSessionSummary() {
@@ -2510,7 +2507,7 @@ export class MaskShiftTui {
     const width = Math.min(this.screen.size.columns - 8, 90);
     const lines = renderMarkdown(this.theme, summary, width);
     const stamp = this.compaction.updatedAt ? `updated ${this.stamp(this.compaction.updatedAt)}` : 'esc closes';
-    this.overlay = new TextOverlay({ title: 'SESSION SUMMARY', lines, stamp });
+    this.overlay = new TextOverlay({ title: 'Chat summary', lines, stamp });
   }
 
   openSessionPicker() {
@@ -2518,15 +2515,15 @@ export class MaskShiftTui {
     const mark = glyphs(this.theme);
     const lastAsked = new Map();
     this.overlay = new PickerOverlay({
-      title: 'HEIST ARCHIVE',
-      placeholder: 'Filter heists…',
+      title: 'Chats',
+      placeholder: 'Filter chats…',
       items: sessions.map((session) => ({
         id: session.id, label: session.title || 'Untitled', session,
         detail: `${session.meta?.compaction?.summary ? `${mark.diamond} ` : ''}${session.model_id || ''} · ${this.stamp(session.updated_at)}`,
         tone: session.id === this.sessionId ? this.theme.roles.primary : undefined,
       })),
       selectedId: this.sessionId,
-      // What the heist was for and where it stands, so picking one is not a guess from its title.
+      // What the chat was for and where it stands, so picking one is not a guess from its title.
       preview: (app, item, width) => {
         if (!lastAsked.has(item.id)) {
           const messages = this.runtime.store.listMessages(item.id, 200);
@@ -2548,9 +2545,9 @@ export class MaskShiftTui {
     if (!results.length) { this.toast(`No messages matching "${trimmed}"`, 'info'); return; }
     const needle = trimmed.toLowerCase();
     this.overlay = new PickerOverlay({
-      title: `SEARCH: ${trimmed.toUpperCase()}`,
+      title: `Search: ${trimmed}`,
       placeholder: 'Filter results…',
-      footer: `${results.length} message${results.length === 1 ? '' : 's'} across this target's history`,
+      footer: `${results.length} message${results.length === 1 ? '' : 's'} across this workspace's history`,
       items: results.map((result) => {
         const flat = result.content.replace(/\s+/g, ' ').trim();
         const at = flat.toLowerCase().indexOf(needle);
@@ -2577,8 +2574,8 @@ export class MaskShiftTui {
       items.push({ id: autoId, label: autoId, detail: `${provider.name} — best available`, tone: autoId === this.modelRef ? this.theme.roles.primary : undefined });
     }
     this.overlay = new PickerOverlay({
-      title: 'PERSONA SELECT',
-      placeholder: 'FILTER MODELS…',
+      title: 'Choose model',
+      placeholder: 'Filter models…',
       footer: 'Providers are probed at startup; press f5 to re-discover.',
       items,
       selectedId: this.modelRef,
@@ -2586,7 +2583,7 @@ export class MaskShiftTui {
         this.modelRef = item.id;
         void this.refreshModelProfile();
         if (this.sessionId) this.runtime.store.updateSession(this.sessionId, { model_id: item.id });
-        this.toast(`Persona set to ${item.id}`, 'success');
+        this.toast(`Model set to ${item.id}`, 'success');
       },
     });
   }
@@ -2598,8 +2595,8 @@ export class MaskShiftTui {
       tone: entry.id === this.theme.themeId ? this.theme.roles.primary : undefined,
     }));
     this.overlay = new PickerOverlay({
-      title: 'THEME SELECT',
-      placeholder: 'FILTER THEMES…',
+      title: 'Choose theme',
+      placeholder: 'Filter themes…',
       items,
       selectedId: this.theme.themeId,
       onSelect: (item) => void this.setTheme(item.id, item.label),
@@ -2617,9 +2614,9 @@ export class MaskShiftTui {
   openWorkspaceDialog({ force = false } = {}) {
     if (!force && (this.busy || this.composer.value || this.promptQueue.length)) {
       this.overlay = new ConfirmOverlay({
-        title: 'SWITCH TARGET', danger: Boolean(this.busy || this.promptQueue.length),
+        title: 'Switch workspace', danger: Boolean(this.busy || this.promptQueue.length),
         message: this.busy || this.promptQueue.length
-          ? 'Cancel the active run, discard queued orders and the current draft, then choose another workspace?'
+          ? 'Cancel the active run, discard queued requests and the current draft, then choose another workspace?'
           : 'Discard the current draft and choose another workspace?',
         onConfirm: async () => {
           if (this.busy) this.cancelRun();
@@ -2631,7 +2628,7 @@ export class MaskShiftTui {
       return;
     }
     this.overlay = new FormOverlay({
-      title: 'OPEN WORKSPACE', submitLabel: 'OPEN + INDEX',
+      title: 'Open workspace', submitLabel: 'Open and index',
       note: 'MaskShift detects Git, imports project instructions and MCP configuration, and builds a local context index.',
       fields: [
         { name: 'path', label: 'path', value: this.workspace?.path || process.cwd() },
@@ -2650,18 +2647,18 @@ export class MaskShiftTui {
         await this.loadFileTree({ force: true });
         await this.refreshGit();
         if (values.index) void this.runtime.indexer.index(workspace.id, { force: true }).catch(() => {});
-        this.toast(`Target locked: ${workspace.name}`, 'success');
+        this.toast(`Workspace set: ${workspace.name}`, 'success');
       },
     });
   }
 
   /** Step the permission mode along. Bound to a click on the header chip. */
   async cyclePermissionMode() {
-    const modes = ['overdrive', 'balanced', 'review'];
-    const current = this.runtime.config.get().permissionMode || 'overdrive';
+    const modes = ['autonomous', 'balanced', 'review'];
+    const current = this.runtime.config.get().permissionMode || 'autonomous';
     const next = modes[(modes.indexOf(current) + 1) % modes.length];
     await this.runtime.config.update({ permissionMode: next });
-    this.toast(`Permission mode: ${next.toUpperCase()}`, 'info');
+    this.toast(`Permission mode: ${next}`, 'info');
   }
 
   /**
@@ -2682,27 +2679,27 @@ export class MaskShiftTui {
   openSettings() {
     const config = this.runtime.config.get();
     this.overlay = new FormOverlay({
-      title: 'SETTINGS', submitLabel: 'CONFIRM',
+      title: 'Settings', submitLabel: 'Confirm',
       note: 'Stored in your MaskShift home configuration and applied immediately.',
       fields: [
         { name: 'defaultModel', label: 'default model', value: config.defaultModel },
         {
           name: 'permissionMode', label: 'permission mode', type: 'select', value: config.permissionMode,
           options: [
-            { label: 'OVERDRIVE', value: 'overdrive' }, { label: 'BALANCED', value: 'balanced' }, { label: 'REVIEW', value: 'review' },
+            { label: 'Autonomous', value: 'autonomous' }, { label: 'Balanced', value: 'balanced' }, { label: 'Review', value: 'review' },
           ],
         },
         { name: 'maxAgentSteps', label: 'max agent turns', value: String(config.maxAgentSteps) },
         { name: 'maxParallelSubagents', label: 'max parallel subagents', value: String(config.maxParallelSubagents) },
-        { name: 'autoIndex', label: 'auto index repositories', type: 'toggle', value: config.autoIndex },
+        { name: 'autoIndex', label: 'index workspaces automatically', type: 'toggle', value: config.autoIndex },
         { name: 'autoCheckpoint', label: 'auto checkpoint before run', type: 'toggle', value: config.autoCheckpoint },
         { name: 'autoLoadCapabilities', label: 'auto prime capabilities', type: 'toggle', value: config.autoLoadCapabilities },
         {
           name: 'mouse', label: 'mouse', type: 'select', value: this.screen.mouse,
           options: [
-            { label: 'CLICK', value: 'click' },
-            { label: 'CLICK + HOVER', value: 'hover' },
-            { label: 'OFF (terminal selects)', value: 'off' },
+            { label: 'Click', value: 'click' },
+            { label: 'Click and hover', value: 'hover' },
+            { label: 'Off (terminal selects)', value: 'off' },
           ],
         },
         { name: 'voiceEnabled', label: 'voice input (ctrl+v)', type: 'toggle', value: config.voice?.enabled !== false },
@@ -2770,22 +2767,22 @@ export class MaskShiftTui {
   buildActions() {
     const action = (id, group, label, key = '') => ({ id, group, label, key });
     return [
-      action('run.new', 'heist', 'New heist', 'ctrl+n'),
-      action('run.switch', 'heist', 'Switch heist', 'ctrl+p'),
-      action('run.cancel', 'heist', 'Retreat from the running heist', 'esc'),
-      action('run.rename', 'heist', 'Rename this heist'),
-      action('run.delete', 'heist', 'Delete this heist'),
-      action('run.summary', 'heist', 'Read the session summary', 's'),
-      action('run.changes', 'heist', 'Review what the last run changed', 'ctrl+d'),
-      action('run.undo', 'heist', 'Undo the last run\'s file changes', 'ctrl+z'),
-      action('voice.capture', 'heist', 'Record a voice prompt', 'ctrl+v'),
-      action('model.pick', 'persona', 'Change model', 'ctrl+g'),
-      action('model.discover', 'persona', 'Re-discover providers and models'),
-      action('workspace.open', 'target', 'Open workspace', 'ctrl+o'),
-      action('workspace.index', 'target', 'Rebuild the context index'),
-      action('workspace.inspect', 'target', 'Inspect the workspace'),
-      action('workspace.checkpoint', 'target', 'Create a checkpoint'),
-      action('workspace.restore', 'target', 'Restore a checkpoint'),
+      action('run.new', 'chat', 'New chat', 'ctrl+n'),
+      action('run.switch', 'chat', 'Switch chat', 'ctrl+p'),
+      action('run.cancel', 'chat', 'Stop the running task', 'esc'),
+      action('run.rename', 'chat', 'Rename this chat'),
+      action('run.delete', 'chat', 'Delete this chat'),
+      action('run.summary', 'chat', 'Read the session summary', 's'),
+      action('run.changes', 'chat', 'Review what the last run changed', 'ctrl+d'),
+      action('run.undo', 'chat', 'Undo the last run\'s file changes', 'ctrl+z'),
+      action('voice.capture', 'chat', 'Record a voice prompt', 'ctrl+v'),
+      action('model.pick', 'model', 'Change model', 'ctrl+g'),
+      action('model.discover', 'model', 'Re-discover providers and models'),
+      action('workspace.open', 'workspace', 'Open workspace', 'ctrl+o'),
+      action('workspace.index', 'workspace', 'Rebuild the context index'),
+      action('workspace.inspect', 'workspace', 'Inspect the workspace'),
+      action('workspace.checkpoint', 'workspace', 'Create a checkpoint'),
+      action('workspace.restore', 'workspace', 'Restore a checkpoint'),
       action('view.chat', 'view', 'Go to 01 CHAT', '1'),
       action('view.files', 'view', 'Go to 02 FILES', '2'),
       action('view.capabilities', 'view', 'Go to 03 CAPABILITIES', '3'),
@@ -2793,10 +2790,10 @@ export class MaskShiftTui {
       action('view.browser', 'view', 'Go to 05 BROWSER', '5'),
       action('view.git', 'view', 'Go to 06 GIT', '6'),
       action('browser.pick', 'view', 'Pick a browser tab to watch'),
-      action('rail.toggle', 'rail', 'Show or hide the rail', 'ctrl+b'),
-      action('rail.plan', 'rail', 'Rail: plan of attack'),
-      action('rail.telemetry', 'rail', 'Rail: loadout telemetry'),
-      action('rail.events', 'rail', 'Rail: event feed'),
+      action('rail.toggle', 'sidebar', 'Show or hide the sidebar', 'ctrl+b'),
+      action('rail.plan', 'sidebar', 'Sidebar: plan'),
+      action('rail.telemetry', 'sidebar', 'Sidebar: active tools'),
+      action('rail.events', 'sidebar', 'Sidebar: events'),
       action('mcp.add', 'capabilities', 'Add an MCP server'),
       action('mcp.registry', 'capabilities', 'Search the official MCP registry'),
       action('mcp.connectAll', 'capabilities', 'Connect every configured MCP server'),
@@ -2908,10 +2905,10 @@ export class MaskShiftTui {
 
   openRenameDialog() {
     this.overlay = new FormOverlay({
-      title: 'RENAME HEIST', submitLabel: 'RENAME',
+      title: 'Rename chat', submitLabel: 'Rename',
       fields: [{ name: 'title', label: 'title', value: this.sessionTitle }],
       onSubmit: (values) => {
-        if (!this.sessionId) throw new Error('No active heist');
+        if (!this.sessionId) throw new Error('No active chat');
         this.runtime.store.updateSession(this.sessionId, { title: values.title });
         this.sessionTitle = values.title;
         this.toast('Renamed', 'success');
@@ -2921,13 +2918,13 @@ export class MaskShiftTui {
 
   confirmDeleteSession() {
     if (!this.sessionId) return;
-    if (this.busy) { this.toast('Cancel the active run before deleting this heist', 'warn'); return; }
+    if (this.busy) { this.toast('Cancel the active run before deleting this chat', 'warn'); return; }
     this.overlay = new ConfirmOverlay({
-      title: 'DELETE HEIST', danger: true,
+      title: 'Delete chat', danger: true,
       message: `Delete "${this.sessionTitle}" and every message in it?`,
       onConfirm: () => {
         this.runtime.store.deleteSession(this.sessionId);
-        this.toast('Heist deleted', 'warn');
+        this.toast('Chat deleted', 'warn');
         this.openLatestSession();
       },
     });
@@ -2936,7 +2933,7 @@ export class MaskShiftTui {
   async reindex() {
     if (!this.workspaceId) return;
     return this.withOperation(`index:${this.workspaceId}`, 'Workspace indexing', async () => {
-      this.toast('Indexing the target…', 'info');
+      this.toast('Indexing the workspace…', 'info');
       try {
         const stats = await this.runtime.indexer.index(this.workspaceId, { force: true });
         this.toast(`Indexed ${stats.files ?? stats.chunks ?? 0} entries`, 'success');
@@ -2965,7 +2962,7 @@ export class MaskShiftTui {
         sectionLabel(theme, 'Git status'),
         ...String(report.git?.status || '').split('\n').map((line) => gutter(theme) + theme.paint(line, { fg: theme.roles.muted })),
       ];
-      this.overlay = new TextOverlay({ title: 'TARGET INTEL', lines });
+      this.overlay = new TextOverlay({ title: 'Workspace details', lines });
     } catch (error) {
       this.toast(error.message, 'error');
     }
@@ -2983,7 +2980,7 @@ export class MaskShiftTui {
     });
   }
 
-  /** The newest run in this heist that has a pre-run checkpoint, and that checkpoint. */
+  /** The newest run in this chat that has a pre-run checkpoint, and that checkpoint. */
   lastUndoableRun() {
     const runs = this.runtime.store.listRuns({ sessionId: this.sessionId, limit: 50 });
     const checkpoints = this.runtime.store.listCheckpoints(this.workspaceId, 500);
@@ -3019,7 +3016,7 @@ export class MaskShiftTui {
   async openRunChanges() {
     if (!this.workspaceId || !this.sessionId) return;
     const set = await this.runChangeSet();
-    if (!set) { this.toast('No run in this heist has a checkpoint to compare against', 'warn'); return; }
+    if (!set) { this.toast('No run in this chat has a checkpoint to compare against', 'warn'); return; }
     if (!set.files.length) { this.toast('The last run left the files exactly as it found them', 'info'); return; }
     this.overlay = new ChangesOverlay({
       subtitle: oneLine(set.run.prompt || '', 60),
@@ -3031,10 +3028,10 @@ export class MaskShiftTui {
 
   async openUndoLastRun() {
     if (!this.workspaceId || !this.sessionId) return;
-    if (this.busy) { this.toast('Cancel the running heist before undoing it', 'warn'); return; }
+    if (this.busy) { this.toast('Cancel the running task before undoing it', 'warn'); return; }
     const found = this.lastUndoableRun();
     if (!found) {
-      this.toast(this.runtime.config.get().autoCheckpoint ? 'No run in this heist has a checkpoint to go back to' : 'Checkpoints are off (F2 → auto checkpoint), so there is nothing to undo to', 'warn');
+      this.toast(this.runtime.config.get().autoCheckpoint ? 'No run in this chat has a checkpoint to go back to' : 'Checkpoints are off (F2 → auto checkpoint), so there is nothing to undo to', 'warn');
       return;
     }
     const { run, checkpoint } = found;
@@ -3051,7 +3048,7 @@ export class MaskShiftTui {
     if (rows.length > 12) details.push(theme.paint(`… and ${rows.length - 12} more`, { fg: theme.roles.faint, italic: true }));
     const title = oneLine(run.prompt || 'the last run', 48);
     this.overlay = new ConfirmOverlay({
-      title: 'UNDO LAST RUN', danger: true,
+      title: 'Undo last run', danger: true,
       message: changes
         ? `Put ${total} file${total === 1 ? '' : 's'} back the way they were before “${title}”?`
         : `Restore the workspace to the checkpoint taken before “${title}”? Uncommitted changes since then will be replaced.`,
@@ -3073,8 +3070,8 @@ export class MaskShiftTui {
     const checkpoints = this.runtime.store.listCheckpoints(this.workspaceId, 100);
     if (!checkpoints.length) { this.toast('No checkpoints recorded', 'warn'); return; }
     this.overlay = new PickerOverlay({
-      title: 'RESTORE CHECKPOINT',
-      placeholder: 'FILTER CHECKPOINTS…',
+      title: 'Restore checkpoint',
+      placeholder: 'Filter checkpoints…',
       items: checkpoints.map((checkpoint) => ({
         id: checkpoint.id, label: `${checkpoint.kind} ${checkpoint.ref || ''}`.trim(),
         detail: `${this.stamp(checkpoint.created_at)} · ${checkpoint.manifest?.label || ''}`,
@@ -3082,7 +3079,7 @@ export class MaskShiftTui {
       onSelect: (item) => {
         const checkpoint = checkpoints.find((entry) => entry.id === item.id);
         this.overlay = new ConfirmOverlay({
-          title: 'RESTORE', danger: true,
+          title: 'Restore', danger: true,
           message: `Restore the workspace to checkpoint ${checkpoint.ref || checkpoint.id}? Uncommitted changes will be replaced.`,
           onConfirm: async () => {
             await this.runtime.workspaceManager.restoreCheckpoint(this.workspaceId, checkpoint);
@@ -3124,7 +3121,7 @@ export class MaskShiftTui {
         { fg: provider.status === 'online' ? theme.roles.text : theme.roles.muted },
       )),
     ];
-    this.overlay = new TextOverlay({ title: 'DOCTOR', lines });
+    this.overlay = new TextOverlay({ title: 'Diagnostics', lines });
   }
 
   async showLogs() {
@@ -3136,7 +3133,7 @@ export class MaskShiftTui {
         const tone = /error/i.test(text) ? theme.roles.danger : /warn/i.test(text) ? theme.roles.warning : theme.roles.muted;
         return theme.paint(truncate(text, 110), { fg: tone });
       });
-      this.overlay = new TextOverlay({ title: 'LOG TAIL', lines: lines.length ? lines : ['No entries yet.'] });
+      this.overlay = new TextOverlay({ title: 'Log', lines: lines.length ? lines : ['No entries yet.'] });
     } catch (error) {
       this.toast(error.message, 'error');
     }
@@ -3177,7 +3174,7 @@ export class MaskShiftTui {
 
   async compactNow() {
     if (!this.sessionId) return;
-    if (this.busy) { this.toast('Wait for the running heist to finish, then compact', 'warn'); return; }
+    if (this.busy) { this.toast('Wait for the running task to finish, then compact', 'warn'); return; }
     this.toast('Summarizing older turns…', 'info');
     try {
       const result = await this.runtime.engine.compactSession(this.sessionId, { modelRef: this.modelRef });
@@ -3193,13 +3190,13 @@ export class MaskShiftTui {
     const { theme } = this;
     const mark = glyphs(theme);
     let plan = null;
-    let label = 'LAST REQUEST';
+    let label = 'Last request';
     if (prompt.trim() && this.workspaceId) {
       const profile = this.modelProfile;
       const maxChars = profile ? Math.min(this.runtime.config.get().maxContextChars, Math.floor(profile.contextWindow * 4 * (profile.tier === 'small' ? 0.2 : 0.35))) : undefined;
       const built = await this.runtime.contextBuilder.build({ workspaceId: this.workspaceId, prompt, sessionId: this.sessionId, maxChars }).catch(() => null);
       plan = built?.contextPlan || null;
-      label = 'FOR THAT PROMPT';
+      label = 'This request';
     } else {
       const run = this.runtime.store.listRuns({ sessionId: this.sessionId, limit: 20 }).find((item) => item.meta?.contextPlan);
       plan = run?.meta?.contextPlan || null;
@@ -3211,7 +3208,7 @@ export class MaskShiftTui {
     heading('Model');
     row('model', this.modelRef || '—');
     if (context) {
-      row('window', `${compact(context.window)} tokens (${context.source}) · ${String(context.tier).toUpperCase()} tier · replies up to ${compact(context.maxOutputTokens)}`);
+      row('window', `${compact(context.window)} tokens (${context.source}) · ${String(context.tier)} tier · replies up to ${compact(context.maxOutputTokens)}`);
       row('last used', context.used ? `${compact(context.used)} tokens · ${Math.round(context.ratio * 100)}% of the window` : 'no request yet', context.used ? theme.role(context.tone) : theme.roles.muted);
     }
     heading(`Repository context · ${label}`);
@@ -3230,16 +3227,16 @@ export class MaskShiftTui {
     }
     heading('History');
     row('summary', this.compaction?.summary ? 'earlier turns are summarized · s in the transcript reads it' : 'none yet — the session still fits', this.compaction?.summary ? theme.roles.info : theme.roles.muted);
-    this.overlay = new TextOverlay({ title: 'CONTEXT', lines: lines.slice(1), stamp: 'esc closes' });
+    this.overlay = new TextOverlay({ title: 'Context', lines: lines.slice(1), stamp: 'esc closes' });
   }
 
   openCostReport() {
     const { theme } = this;
     const runs = this.runtime.store.listRuns({ sessionId: this.sessionId, limit: 200 }).filter((run) => run.meta?.costEstimate);
-    if (!runs.length) { this.toast('No finished runs in this heist yet', 'info'); return; }
+    if (!runs.length) { this.toast('No finished runs in this chat yet', 'info'); return; }
     const lines = [];
     let cost = 0; let input = 0; let output = 0; let unpriced = 0;
-    lines.push(gutter(theme) + theme.paint(`${fit('WHEN', 7)}${fit('COST', 11)}${fit('IN / OUT', 16)}PROMPT`, { fg: theme.roles.muted }));
+    lines.push(gutter(theme) + theme.paint(`${fit('When', 7)}${fit('Cost', 11)}${fit('In / out', 16)}Request`, { fg: theme.roles.muted }));
     for (const run of [...runs].reverse()) {
       const estimate = run.meta.costEstimate;
       cost += estimate.cost || 0; input += estimate.inputTokens || 0; output += estimate.outputTokens || 0;
@@ -3251,11 +3248,11 @@ export class MaskShiftTui {
         + theme.paint(fit(`${compact(estimate.inputTokens || 0)} / ${compact(estimate.outputTokens || 0)}`, 16), { fg: theme.roles.text })
         + theme.paint(oneLine(run.prompt || '', 60), { fg: theme.roles.muted }));
     }
-    lines.push('', gutter(theme) + theme.paint(`${fit('TOTAL', 7)}`, { fg: theme.roles.label, bold: true })
+    lines.push('', gutter(theme) + theme.paint(`${fit('Total', 7)}`, { fg: theme.roles.label, bold: true })
       + theme.paint(fit(`$${cost.toFixed(4)}`, 11), { fg: theme.roles.accent, bold: true })
       + theme.paint(`${compact(input)} / ${compact(output)} tokens over ${runs.length} run${runs.length === 1 ? '' : 's'}`, { fg: theme.roles.text }));
     if (unpriced) lines.push('', gutter(theme) + theme.paint(`${unpriced} run${unpriced === 1 ? ' has' : 's have'} usage with no price — add the model under pricing.models to include it.`, { fg: theme.roles.warning, italic: true }));
-    this.overlay = new TextOverlay({ title: 'SESSION COST', lines, stamp: 'esc closes' });
+    this.overlay = new TextOverlay({ title: 'Chat cost', lines, stamp: 'esc closes' });
   }
 
   async runSlash(input) {
@@ -3265,7 +3262,7 @@ export class MaskShiftTui {
       case 'new': this.requestNewSession(); break;
       case 'clear': this.messages = []; this.transcript.toBottom(); break;
       case 'model':
-        if (argument) { this.modelRef = argument; void this.refreshModelProfile(); this.toast(`Persona set to ${argument}`, 'success'); }
+        if (argument) { this.modelRef = argument; void this.refreshModelProfile(); this.toast(`Model set to ${argument}`, 'success'); }
         else this.openModelPicker();
         break;
       case 'sessions': this.openSessionPicker(); break;
@@ -3274,7 +3271,7 @@ export class MaskShiftTui {
       case 'tools': this.switchView(2); this.capabilitiesTab = 'tools'; if (argument) this.capabilitiesFilter.set(argument); break;
       case 'skills': this.switchView(2); this.capabilitiesTab = 'skills'; if (argument) this.capabilitiesFilter.set(argument); break;
       case 'mcp': this.switchView(2); this.capabilitiesTab = 'mcp'; if (argument) this.capabilitiesFilter.set(argument); break;
-      case 'mods': this.switchView(3); break;
+      case 'runtime': case 'mods': this.switchView(3); break;
       case 'themes': case 'theme': this.openThemePicker(); break;
       case 'files': this.switchView(1); break;
       case 'terminal': this.switchView(3); break;
@@ -3291,7 +3288,7 @@ export class MaskShiftTui {
       case 'changes': case 'diff': await this.openRunChanges(); break;
       case 'undo': await this.openUndoLastRun(); break;
       case 'steer':
-        if (!argument) { this.toast('Usage: /steer <message> while a heist is running', 'warn'); break; }
+        if (!argument) { this.toast('Usage: /steer <message> while a task is running', 'warn'); break; }
         this.composer.set(argument);
         this.steerPrompt();
         break;
@@ -3333,11 +3330,11 @@ function sessionPreviewLines(theme, session, lastUser, width, stamp) {
   const add = (name, text, tone = theme.roles.text) => {
     if (text) lines.push(`${label(name)}${theme.paint(oneLine(text, Math.max(8, width - 6)), { fg: tone })}`);
   };
-  add('GOAL', summarySection(summary, 'Goal')[0]);
-  for (const [index, issue] of summarySection(summary, 'Open issues').slice(0, 2).entries()) add(index ? '' : 'OPEN', issue, theme.roles.warning);
-  if (lastUser) add('LAST', `“${oneLine(lastUser.content, 200)}” · ${stamp(lastUser.created_at)}`, theme.roles.dim);
-  if (!lines.length) lines.push(theme.paint('Nothing asked in this heist yet.', { fg: theme.roles.muted, italic: true }));
-  if (!summary && lastUser) lines.push(theme.paint('No summary yet — written once the heist outgrows the model\'s window.', { fg: theme.roles.faint, italic: true }));
+  add('Goal', summarySection(summary, 'Goal')[0]);
+  for (const [index, issue] of summarySection(summary, 'Open issues').slice(0, 2).entries()) add(index ? '' : 'Open', issue, theme.roles.warning);
+  if (lastUser) add('Last', `“${oneLine(lastUser.content, 200)}” · ${stamp(lastUser.created_at)}`, theme.roles.dim);
+  if (!lines.length) lines.push(theme.paint('Nothing asked in this chat yet.', { fg: theme.roles.muted, italic: true }));
+  if (!summary && lastUser) lines.push(theme.paint('No summary yet — written once the chat outgrows the model\'s window.', { fg: theme.roles.faint, italic: true }));
   return lines;
 }
 
