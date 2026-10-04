@@ -34,15 +34,16 @@ import * as capabilitiesView from './views/capabilities.mjs';
 import * as runtimeView from './views/runtime.mjs';
 import * as browserView from './views/browser.mjs';
 import * as gitView from './views/git.mjs';
+import * as fleetView from './views/fleet.mjs';
 import {
   expandGitChanges, parseGitBranches, parseGitLog, parseGitStash, parseGitStatus, parseGitWorktrees,
 } from './views/git.mjs';
 
-const VIEWS = [chatView, filesView, capabilitiesView, runtimeView, browserView, gitView];
+const VIEWS = [chatView, filesView, capabilitiesView, runtimeView, browserView, gitView, fleetView];
 // One-line rail titles for every non-chat view's own `rail()` export (see
 // paint() below) — the chat view's rail carries its own titles per tab.
 const PANE_RAIL_TITLES = {
-  files: 'Code graph', capabilities: 'Usage', runtime: 'Job history', browser: 'Console and network', git: 'History',
+  files: 'Code graph', capabilities: 'Usage', runtime: 'Job history', browser: 'Console and network', git: 'History', fleet: 'Team chatter',
 };
 const EVENT_LIMIT = 400;
 const TERMINAL_LIMIT = 2000;
@@ -89,6 +90,7 @@ const SLASH_COMMANDS = [
   { name: 'terminal', hint: 'open terminal' },
   { name: 'browser', hint: 'watch and control a browser tab' },
   { name: 'git', hint: 'open the git view' },
+  { name: 'fleet', hint: 'run Claude Code, Codex, Hermes, OpenCode… as one team' },
   { name: 'doctor', hint: 'run diagnostics' },
   { name: 'logs', hint: 'view logs' },
   { name: 'settings', hint: 'open settings' },
@@ -173,6 +175,11 @@ export class MaskShiftTui {
 
     // 06 GIT.
     this.gitTab = 'changes';
+    // 07 FLEET — members, their mail, relays and the harnesses available (see views/fleet.mjs).
+    this.fleet = fleetView.createState();
+    this.fleetTab = 'members';
+    this.fleetFilter = new TextField({ placeholder: 'Filter' });
+    this.fleetList = new ListView();
     this.gitFilter = new TextField({ placeholder: 'Filter' });
     this.gitList = new ListView();
     this.gitChanges = [];
@@ -216,8 +223,8 @@ export class MaskShiftTui {
     this.toolExpansionVersion = 0;
     this.autoLoad = runtime.config.get().autoLoadCapabilities !== false;
 
-    // 03 CAPABILITIES — tools, skills, MCP, plugins and bridges: one catalogue,
-    // five tabs, all sharing a single filter/list the way each used to have
+    // 03 CAPABILITIES — tools, skills, MCP and plugins: one catalogue,
+    // four tabs, all sharing a single filter/list the way each used to have
     // its own (the tools, MCP and plugins views before they were merged into capabilities.mjs).
     this.tools = [];
     this.skills = [];
@@ -232,7 +239,6 @@ export class MaskShiftTui {
     this.registryResults = [];
 
     this.plugins = [];
-    this.bridges = [];
 
     // 04 RUNTIME — the host shell (default) plus automations, processes and
     // browser instances behind a secondary tab strip.
@@ -891,7 +897,7 @@ export class MaskShiftTui {
     // Typing into a live page (see views/browser.mjs) owns the keyboard the
     // same way the composer does — a digit meant for a form field shouldn't
     // switch views instead.
-    const typing = ['composer', 'terminal', 'file-filter', 'capabilities-filter', 'runtime-filter', 'git-filter'].includes(this.focus) || this.browserTyping;
+    const typing = ['composer', 'terminal', 'file-filter', 'capabilities-filter', 'runtime-filter', 'git-filter', 'fleet-filter'].includes(this.focus) || this.browserTyping;
 
     if (event.ctrl && event.name === 'c') {
       if (this.busy) { this.cancelRun(); return true; }
@@ -919,8 +925,8 @@ export class MaskShiftTui {
     if (event.name === 'f2') { this.openSettings(); return true; }
     if (event.name === 'f5') { this.refreshAll(); return true; }
 
-    if (event.alt && /^[1-6]$/.test(event.name)) { this.switchView(Number(event.name) - 1); return true; }
-    if (!typing && /^[1-6]$/.test(event.name)) { this.switchView(Number(event.name) - 1); return true; }
+    if (event.alt && /^[1-7]$/.test(event.name)) { this.switchView(Number(event.name) - 1); return true; }
+    if (!typing && /^[1-7]$/.test(event.name)) { this.switchView(Number(event.name) - 1); return true; }
     if (!typing && event.name === '?') { this.openHelp(); return true; }
 
     if (event.name === 'escape') {
@@ -949,7 +955,7 @@ export class MaskShiftTui {
   defaultFocus() {
     return {
       chat: 'composer', files: 'files', capabilities: 'capabilities',
-      runtime: 'terminal', browser: 'browser', git: 'git',
+      runtime: 'terminal', browser: 'browser', git: 'git', fleet: 'fleet',
     }[this.view];
   }
 
@@ -964,6 +970,7 @@ export class MaskShiftTui {
     if (target.id === 'capabilities') void this.refreshCapabilitiesExtras();
     if (target.id === 'runtime') void this.refreshRuntimeExtras();
     if (target.id === 'git') void this.refreshGitView();
+    if (target.id === 'fleet') void fleetView.refresh(this);
     if (target.id === 'browser') this.startBrowserPolling();
     else if (leavingBrowser) this.stopBrowserPolling();
   }
@@ -1265,6 +1272,7 @@ export class MaskShiftTui {
     }
     if (event.type === 'model.context-window.learned') void this.refreshModelProfile();
     if (event.type.startsWith('plugin.')) this.plugins = this.runtime.pluginManager.list();
+    if (event.type.startsWith('fleet.')) fleetView.onEvent(this, event);
     if (event.type.startsWith('automation.')) this.automations = this.runtime.automationScheduler.list({ limit: 200 });
     if (event.type.startsWith('tool.registered') || event.type.startsWith('plugin.activated')) this.refreshCatalogs();
     this.requestRender();
@@ -2016,13 +2024,9 @@ export class MaskShiftTui {
 
   // ------------------------------------------------------- 03 capabilities
 
-  /** Plugins and bridges — the two 03 CAPABILITIES tabs that don't already
-   *  have their own refresh (tools/skills: refreshCatalogs; mcp: refreshMcp). */
-  async refreshCapabilitiesExtras({ force = false } = {}) {
+  /** Plugins — the one 03 CAPABILITIES tab without its own refresh (tools/skills: refreshCatalogs; mcp: refreshMcp). */
+  async refreshCapabilitiesExtras() {
     this.plugins = this.runtime.pluginManager.list();
-    if (force || !this.bridges.length) {
-      try { this.bridges = await this.runtime.bridgeManager.discover({ force }); } catch { /* optional */ }
-    }
     this.requestRender();
   }
 
@@ -2111,25 +2115,6 @@ export class MaskShiftTui {
         await this.runtime.browserManager.launch(values);
         this.toast('Browser launched', 'success');
         await this.refreshRuntimeExtras();
-      },
-    });
-  }
-
-  openBridgeRunner(bridge) {
-    this.overlay = new FormOverlay({
-      title: `Delegate to ${String(bridge.title || bridge.name)}`, submitLabel: 'Delegate',
-      note: bridge.available ? `Runs ${bridge.executable}` : 'This bridge is not installed on your PATH.',
-      fields: [{ name: 'prompt', label: 'prompt', type: 'textarea', value: '' }],
-      onSubmit: async (values) => {
-        if (!values.prompt) throw new Error('A prompt is required');
-        this.toast(`Delegating to ${bridge.name}…`, 'info');
-        const result = await this.runtime.bridgeManager.run(bridge.name, {
-          prompt: values.prompt, workspaceId: this.workspaceId, wait: true,
-        });
-        this.overlay = new TextOverlay({
-          title: `${String(bridge.name)} result`,
-          lines: wrap(result.stdout || result.stderr || 'No output', 90),
-        });
       },
     });
   }
@@ -2517,9 +2502,9 @@ export class MaskShiftTui {
       ['h', 'toggle hidden files'],
       ['', ''],
       ['03 CAPABILITIES', ''],
-      ['tab', 'section: tools, skills, mcp, plugins, bridges'],
+      ['tab', 'section: tools, skills, mcp, plugins'],
       ['x', 'run a tool directly with JSON arguments'],
-      ['enter', 'load a skill body · connect/install a server · toggle a plugin · delegate to a bridge'],
+      ['enter', 'load a skill body · connect/install a server · toggle a plugin'],
       ['a', 'add an MCP server by hand'],
       ['g', 'toggle installed/registry (mcp tab)'],
       ['', ''],
@@ -2539,6 +2524,13 @@ export class MaskShiftTui {
       ['p', 'pop a stash'],
       ['del', 'delete a branch, drop a stash, or remove a worktree'],
       ['P / L / F', 'push / pull / fetch'],
+      ['', ''],
+      ['07 FLEET', ''],
+      ['tab', 'section: members, messages, relays, harnesses'],
+      ['n / t', 'add one agent / start a team (Claude Code, Codex, Hermes, OpenCode…)'],
+      ['↵ / a / m', 'ask a member · queue a message between members'],
+      ['g', 'relay a task: members talk to each other until done'],
+      ['s / x / del', 'stop · reset · remove a member'],
     ];
     const lines = rows.map(([key, description]) => {
       if (!key && !description) return '';
@@ -2836,6 +2828,10 @@ export class MaskShiftTui {
       action('view.runtime', 'view', 'Go to 04 RUNTIME', '4'),
       action('view.browser', 'view', 'Go to 05 BROWSER', '5'),
       action('view.git', 'view', 'Go to 06 GIT', '6'),
+      action('view.fleet', 'view', 'Go to 07 FLEET', '7'),
+      action('fleet.spawn', 'fleet', 'Add an agent to the fleet'),
+      action('fleet.team', 'fleet', 'Start a multi-agent team'),
+      action('fleet.relay', 'fleet', 'Run the fleet on a task'),
       action('browser.pick', 'view', 'Pick a browser tab to watch'),
       action('rail.toggle', 'sidebar', 'Show or hide the sidebar', 'ctrl+b'),
       action('rail.plan', 'sidebar', 'Sidebar: plan'),
@@ -2846,7 +2842,7 @@ export class MaskShiftTui {
       action('mcp.connectAll', 'capabilities', 'Connect every configured MCP server'),
       action('mcp.refresh', 'capabilities', 'Refresh MCP servers'),
       action('capabilities.plugin', 'capabilities', 'Install a plugin'),
-      action('capabilities.refresh', 'capabilities', 'Refresh plugins and bridges'),
+      action('capabilities.refresh', 'capabilities', 'Refresh plugins'),
       action('tools.search', 'capabilities', 'Search tools'),
       action('skills.search', 'capabilities', 'Search skills'),
       action('capabilities.toggleTools', 'capabilities', 'Expand or collapse tool output', 't'),
@@ -2902,6 +2898,10 @@ export class MaskShiftTui {
       case 'view.runtime': this.switchView(3); break;
       case 'view.browser': this.switchView(4); break;
       case 'view.git': this.switchView(5); break;
+      case 'view.fleet': this.switchView(6); break;
+      case 'fleet.spawn': this.switchView(6); fleetView.openSpawn(this); break;
+      case 'fleet.team': this.switchView(6); fleetView.openTeam(this); break;
+      case 'fleet.relay': this.switchView(6); fleetView.openRelay(this); break;
       case 'browser.pick': this.openBrowserTargetPicker(); break;
       case 'rail.toggle': this.railVisible = !this.railVisible; this.screen.invalidate(); break;
       case 'rail.plan': this.railTab = 'plan'; this.railVisible = true; break;
@@ -2912,7 +2912,7 @@ export class MaskShiftTui {
       case 'mcp.connectAll': await this.connectAllMcp(); break;
       case 'mcp.refresh': await this.refreshMcp(); this.toast('MCP refreshed', 'success'); break;
       case 'capabilities.plugin': this.switchView(2); this.capabilitiesTab = 'plugins'; this.openPluginDialog(); break;
-      case 'capabilities.refresh': await this.refreshCapabilitiesExtras({ force: true }); this.toast('Plugins and bridges refreshed', 'success'); break;
+      case 'capabilities.refresh': await this.refreshCapabilitiesExtras({ force: true }); this.toast('Plugins refreshed', 'success'); break;
       case 'tools.search': this.switchView(2); this.capabilitiesTab = 'tools'; this.focus = 'capabilities-filter'; break;
       case 'skills.search': this.switchView(2); this.capabilitiesTab = 'skills'; this.focus = 'capabilities-filter'; break;
       case 'capabilities.toggleTools': this.expandTools = !this.expandTools; break;
@@ -3324,6 +3324,7 @@ export class MaskShiftTui {
       case 'terminal': this.switchView(3); break;
       case 'browser': this.switchView(4); this.openBrowserTargetPicker(); break;
       case 'git': this.switchView(5); break;
+      case 'fleet': case 'team': case 'agents': this.switchView(6); break;
       case 'doctor': await this.showDoctor(); break;
       case 'logs': await this.showLogs(); break;
       case 'settings': this.openSettings(); break;

@@ -39,7 +39,7 @@ recurring report. The model is a line of configuration; the tools are the same w
 - **Reliable tool use.** Near-miss tool names and arguments are repaired in code, edits tolerate
   whitespace and indentation drift, tool output is cleaned and fitted to the model's window, and every
   file edit is checked immediately. → [run guardrails](docs/CONFIGURATION.md#run-guardrails)
-- **Loaded on demand.** 183 native tools, 50 skills and any number of MCP servers are available, but
+- **Loaded on demand.** 191 native tools, 50 skills and any number of MCP servers are available, but
   only what the current step needs enters the model's context.
   → [tools](docs/TOOLS.md) · [skills](docs/SKILLS.md)
 - **Controlled by design.** Automatic checkpoints before each run, an append-only audit log, and three
@@ -51,6 +51,9 @@ recurring report. The model is a line of configuration; the tools are the same w
   and skill upgrades promoted only after measured A/B trials.
 - **Works unattended.** Schedule agent runs, tool calls or shell commands by interval, cron
   expression or timestamp. → [automations](docs/CONFIGURATION.md#automations)
+- **A fleet of agents.** Run Claude Code, Codex, OpenCode, Hermes, Copilot CLI, Aider, custom CLIs and
+  MaskShift's own engine as one team — several of each if you like — that message each other to get a task
+  done, controlled from one view, one command or by the model itself. → [agent fleet](docs/FLEET.md)
 - **Open on both sides.** Use MCP servers, plugins and external coding agents; or run
   `maskshift mcp serve` to expose MaskShift's own tools to Claude Desktop, an IDE or another agent.
 - **Measurable.** `maskshift bench run` scores a model on self-checking tasks — pass rate, turns,
@@ -71,6 +74,7 @@ adds that those tools do not ship as built-in features.
 | Memory that cites files by content hash and goes stale when they change | ✅ | — | — | — | — | — |
 | Full tool use on models with no native tool-calling API | ✅ | — | — | — | — | — |
 | Live, clickable browser view rendered inside the terminal | ✅ | — | — | — | — | — |
+| Drives other agent CLIs (Claude Code, Codex, Hermes, OpenCode…) as a team that messages itself, from one interface | ✅ | — | — | — | — | — |
 
 *Based on each project's public documentation as of October 2026. "—" means not a built-in, documented
 feature; plugins, hooks, MCP servers or third-party wrappers may add something similar. The table is
@@ -121,17 +125,18 @@ Press `ctrl+k` for the command palette and `f2` for settings. Settings live in
 
 ## The interface
 
-`maskshift` opens a full-screen terminal application, driven equally by keyboard and mouse. Six views
-switch with `1`–`6`; `ctrl+b` toggles the sidebar.
+`maskshift` opens a full-screen terminal application, driven equally by keyboard and mouse. Seven views
+switch with `1`–`7`; `ctrl+b` toggles the sidebar.
 
 | View | Holds |
 |---|---|
 | **Chat** | The conversation and composer — markdown, syntax-highlighted code, coloured diffs and live tool calls |
 | **Files** | The workspace tree with a preview; images render inline |
-| **Capabilities** | Every tool, skill, MCP server, plugin and agent bridge in one searchable catalogue |
+| **Capabilities** | Every tool, skill, MCP server, plugin in one searchable catalogue |
 | **Runtime** | A host shell, automations, background processes and browser instances |
 | **Browser** | A live, clickable view of a running browser tab |
 | **Git** | Changes, history, branches, stash, checkpoints and worktrees |
+| **Fleet** | A team of Claude Code, Codex, OpenCode, Hermes and other agents: members, their messages, relays and installed harnesses |
 
 <table>
 <tr>

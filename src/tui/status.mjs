@@ -55,6 +55,9 @@ const VOCABULARY = {
   failed: ['fail', 'Failed'],
   error: ['fail', 'Error'],
   cancelled: ['off', 'Cancelled'],
+  stopped: ['off', 'Stopped'],
+  incomplete: ['warn', 'Unfinished'],
+  interrupted: ['warn', 'Interrupted'],
   max_steps: ['warn', 'Step limit'],
   stagnated: ['warn', 'Stalled'],
 

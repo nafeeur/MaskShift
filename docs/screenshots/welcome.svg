@@ -12,20 +12,20 @@
 <text x="360.40" y="30.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
 <text x="377.20" y="30.00" fill="#7a8494" textLength="42.00" lengthAdjust="spacingAndGlyphs">Model</text>
 <text x="427.60" y="30.00" fill="#ece8e0" textLength="92.40" lengthAdjust="spacingAndGlyphs" font-weight="700">ollama:auto</text>
-<text x="612.40" y="30.00" fill="#7a8494" textLength="33.60" lengthAdjust="spacingAndGlyphs">Mode</text>
-<text x="654.40" y="30.00" fill="#f7c948" textLength="84.00" lengthAdjust="spacingAndGlyphs" font-weight="700">Autonomous</text>
-<text x="746.80" y="30.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="763.60" y="30.00" fill="#7a8494" textLength="42.00" lengthAdjust="spacingAndGlyphs">Tools</text>
-<text x="814.00" y="30.00" fill="#2bd9c0" textLength="25.20" lengthAdjust="spacingAndGlyphs" font-weight="700">183</text>
-<text x="847.60" y="30.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="864.40" y="30.00" fill="#7a8494" textLength="50.40" lengthAdjust="spacingAndGlyphs">Skills</text>
-<text x="923.20" y="30.00" fill="#a78bfa" textLength="16.80" lengthAdjust="spacingAndGlyphs" font-weight="700">59</text>
-<text x="948.40" y="30.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="965.20" y="30.00" fill="#7a8494" textLength="25.20" lengthAdjust="spacingAndGlyphs">MCP</text>
-<text x="998.80" y="30.00" fill="#3d8bf5" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">8</text>
-<text x="1015.60" y="30.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="1032.40" y="30.00" fill="#7a8494" textLength="8.40" lengthAdjust="spacingAndGlyphs">●</text>
-<text x="1049.20" y="30.00" fill="#7a8494" textLength="58.80" lengthAdjust="spacingAndGlyphs" font-weight="700">Offline</text>
+<text x="620.80" y="30.00" fill="#7a8494" textLength="33.60" lengthAdjust="spacingAndGlyphs">Mode</text>
+<text x="662.80" y="30.00" fill="#f7c948" textLength="84.00" lengthAdjust="spacingAndGlyphs" font-weight="700">Autonomous</text>
+<text x="755.20" y="30.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="772.00" y="30.00" fill="#7a8494" textLength="42.00" lengthAdjust="spacingAndGlyphs">Tools</text>
+<text x="822.40" y="30.00" fill="#2bd9c0" textLength="25.20" lengthAdjust="spacingAndGlyphs" font-weight="700">191</text>
+<text x="856.00" y="30.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="872.80" y="30.00" fill="#7a8494" textLength="50.40" lengthAdjust="spacingAndGlyphs">Skills</text>
+<text x="931.60" y="30.00" fill="#a78bfa" textLength="16.80" lengthAdjust="spacingAndGlyphs" font-weight="700">58</text>
+<text x="956.80" y="30.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="973.60" y="30.00" fill="#7a8494" textLength="25.20" lengthAdjust="spacingAndGlyphs">MCP</text>
+<text x="1007.20" y="30.00" fill="#3d8bf5" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">8</text>
+<text x="1024.00" y="30.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="1040.80" y="30.00" fill="#35cf8b" textLength="8.40" lengthAdjust="spacingAndGlyphs">●</text>
+<text x="1057.60" y="30.00" fill="#ece8e0" textLength="50.40" lengthAdjust="spacingAndGlyphs" font-weight="700">Online</text>
 <rect x="32.80" y="34.00" width="8.40" height="18" fill="#e32c40"/>
 <rect x="41.20" y="34.00" width="8.40" height="18" fill="#e32c40"/>
 <text x="41.20" y="48.00" fill="#6b1923" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">1</text>
@@ -46,6 +46,9 @@
 <text x="528.40" y="48.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="545.20" y="48.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">6</text>
 <text x="562.00" y="48.00" fill="#7a8494" textLength="25.20" lengthAdjust="spacingAndGlyphs">Git</text>
+<text x="595.60" y="48.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="612.40" y="48.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">7</text>
+<text x="629.20" y="48.00" fill="#7a8494" textLength="42.00" lengthAdjust="spacingAndGlyphs">Fleet</text>
 <text x="1007.20" y="48.00" fill="#7a8494" textLength="58.80" lengthAdjust="spacingAndGlyphs">Sidebar</text>
 <text x="1074.40" y="48.00" fill="#b8c0cb" textLength="33.60" lengthAdjust="spacingAndGlyphs" font-weight="700">Plan</text>
 <text x="24.40" y="84.00" fill="#67202d" textLength="16.80" lengthAdjust="spacingAndGlyphs">┏━</text>
@@ -458,10 +461,10 @@
 <text x="24.40" y="372.00" fill="#67202d" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
 <text x="839.20" y="372.00" fill="#67202d" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
 <text x="24.40" y="390.00" fill="#67202d" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
-<text x="133.60" y="390.00" fill="#7a8494" textLength="25.20" lengthAdjust="spacingAndGlyphs">183</text>
+<text x="133.60" y="390.00" fill="#7a8494" textLength="25.20" lengthAdjust="spacingAndGlyphs">191</text>
 <text x="167.20" y="390.00" fill="#7a8494" textLength="42.00" lengthAdjust="spacingAndGlyphs">tools</text>
 <text x="226.00" y="390.00" fill="#7a8494" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="251.20" y="390.00" fill="#7a8494" textLength="16.80" lengthAdjust="spacingAndGlyphs">59</text>
+<text x="251.20" y="390.00" fill="#7a8494" textLength="16.80" lengthAdjust="spacingAndGlyphs">58</text>
 <text x="276.40" y="390.00" fill="#7a8494" textLength="50.40" lengthAdjust="spacingAndGlyphs">skills</text>
 <text x="343.60" y="390.00" fill="#7a8494" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
 <text x="368.80" y="390.00" fill="#7a8494" textLength="8.40" lengthAdjust="spacingAndGlyphs">8</text>

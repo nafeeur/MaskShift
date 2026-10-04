@@ -231,6 +231,8 @@ export async function runCommand(command, {
 
     const abort = () => kill();
     signal?.addEventListener('abort', abort, { once: true });
+    // A signal that fired before the child existed never dispatches again.
+    if (signal?.aborted) abort();
 
     child.once('error', (error) => {
       if (settled) return;

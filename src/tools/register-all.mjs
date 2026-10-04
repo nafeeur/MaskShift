@@ -12,6 +12,7 @@ import { registerPlanTools } from './plan-tools.mjs';
 import { registerAgentTools } from './agent-tools.mjs';
 import { registerLspTools } from './lsp-tools.mjs';
 import { registerBridgeTools } from './bridge-tools.mjs';
+import { registerFleetTools } from './fleet-tools.mjs';
 import { registerPluginTools } from './plugin-tools.mjs';
 import { registerAutomationTools } from './automation-tools.mjs';
 import { registerBrowserTools } from './browser-tools.mjs';
@@ -37,6 +38,7 @@ export function registerAllTools(registry, dependencies) {
   registerAgentTools(registry, dependencies);
   registerLspTools(registry, dependencies);
   registerBridgeTools(registry, dependencies);
+  registerFleetTools(registry, dependencies);
   registerPluginTools(registry, dependencies);
   registerAutomationTools(registry, dependencies);
   registerBrowserTools(registry, dependencies);

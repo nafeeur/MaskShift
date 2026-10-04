@@ -1,6 +1,6 @@
 # Native Tool Inventory
 
-Generated from the MaskShift 1.4.1 runtime. **183 native tools** are available before plugins or MCP servers add more capabilities.
+Generated from the MaskShift 1.4.1 runtime. **191 native tools** are available before plugins or MCP servers add more capabilities.
 
 Only activated descriptors enter a model request; this document is the complete local catalog.
 
@@ -129,6 +129,19 @@ Only activated descriptors enter a model request; this document is the complete 
 | `symbol_read` | read | normal | Return one definition (function, class, method as Class.method) with its line range, without reading the whole file. With no symbol, list the definitions in the file. |
 | `symbol_replace` | write | write | Replace one definition by name with new source. You supply only the new text; the old text is located for you, so it never has to be reproduced exactly. Use Class.method for methods. |
 | `text_stats` | read | normal | Report line, word, and byte counts for one or more text files (like wc) without spending context on their contents — use before deciding whether to read a file in full. |
+
+## fleet (8)
+
+| Tool | Access | Risk | Description |
+|---|---|---|---|
+| `fleet_ask` | write | agent | Give one member a task or question and wait for its reply. Its inbox is delivered with it. Any [[send]] messages it writes are queued for the teammates it addresses (use fleet_relay to have them acted on). |
+| `fleet_harnesses` | read | normal | List the agent harnesses a fleet member can run on (claude, codex, opencode, hermes, copilot, aider, any configured custom bridge, or maskshift (the built-in engine)) and whether each is installed. |
+| `fleet_list` | read | normal | List the fleet members with their harness, role, status, unread mail and last reply. Pass name for one member's full history. |
+| `fleet_messages` | read | normal | Read the recent messages passed between fleet members (optionally just those to or from one member). |
+| `fleet_relay` | write | agent | Hand a task to the fleet and let its members work it out together: the lead gets the task, members message each other with [[send]] blocks, and rounds continue until someone writes [[done]], everyone falls quiet, or the round/time limit is reached. Returns the outcome and a per-turn trace. |
+| `fleet_send` | write | state | Queue a message from one member (or you) to another, or to="*" for everyone, without running anyone yet. It is delivered the next time the recipient takes a turn. |
+| `fleet_spawn` | write | agent | Create a persistent, named fleet member backed by claude, codex, opencode, hermes, copilot, aider, any configured custom bridge, or maskshift (the built-in engine). Several members may share a harness. Members keep their history and inbox between turns and can message each other. Use isolated=true to give an editing member its own Git worktree. |
+| `fleet_stop` | write | agent | Cancel a member's current turn, optionally removing it from the fleet. With no name, cancels every member and running relay. |
 
 ## git (10)
 

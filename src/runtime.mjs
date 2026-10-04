@@ -14,6 +14,7 @@ import { ProviderManager } from './agent/providers.mjs';
 import { McpManager } from './mcp/manager.mjs';
 import { LspManager } from './lsp/manager.mjs';
 import { BridgeManager } from './bridges/manager.mjs';
+import { FleetManager } from './fleet/manager.mjs';
 import { PluginManager } from './plugins/manager.mjs';
 import { AutomationScheduler } from './automations/scheduler.mjs';
 import { BrowserManager } from './browser/manager.mjs';
@@ -50,6 +51,7 @@ export async function createRuntime({ configPath, configOverrides = {}, workspac
   const lspManager = new LspManager({ config, logger, eventBus, workspaceManager });
   const processManager = new ProcessManager({ eventBus, logger, config });
   const bridgeManager = new BridgeManager({ config, logger, eventBus, processManager, workspaceManager });
+  const fleetManager = new FleetManager({ config, logger, eventBus, store, bridgeManager, workspaceManager, getEngine: () => engine });
   const browserManager = new BrowserManager({ config, logger, eventBus, workspaceManager });
   const interaction = new InteractionBroker({ eventBus, logger });
   const secretVault = new SecretVault({ config, logger, store });
@@ -60,7 +62,7 @@ export async function createRuntime({ configPath, configOverrides = {}, workspac
   let engine;
   const managerDependencies = {
     config, store, logger, eventBus, hooks, workspaceManager, indexer, codeGraph, contextPlanner, contextBuilder, intelligenceRouter, skillManager, personaManager,
-    providerManager, mcpManager, lspManager, processManager, bridgeManager, browserManager, interaction, secretVault,
+    providerManager, mcpManager, lspManager, processManager, bridgeManager, fleetManager, browserManager, interaction, secretVault,
     toolRegistry, capabilityController, getEngine: () => engine,
   };
   const pluginManager = new PluginManager({
@@ -74,7 +76,7 @@ export async function createRuntime({ configPath, configOverrides = {}, workspac
   managerDependencies.automationScheduler = automationScheduler;
   registerAllTools(toolRegistry, {
     config, store, logger, eventBus, hooks, workspaceManager, indexer, codeGraph, contextPlanner, contextBuilder, intelligenceRouter, skillManager, personaManager,
-    providerManager, mcpManager, lspManager, processManager, bridgeManager, browserManager, interaction, secretVault,
+    providerManager, mcpManager, lspManager, processManager, bridgeManager, fleetManager, browserManager, interaction, secretVault,
     pluginManager, automationScheduler, capabilityController,
     getEngine: () => engine,
   });
@@ -88,10 +90,11 @@ export async function createRuntime({ configPath, configOverrides = {}, workspac
 
   const runtime = {
     config, eventBus, logger, store, hooks, workspaceManager, indexer, codeGraph, contextPlanner, intelligenceRouter, skillManager, personaManager,
-    providerManager, mcpManager, lspManager, bridgeManager, browserManager, interaction, secretVault, pluginManager,
+    providerManager, mcpManager, lspManager, bridgeManager, fleetManager, browserManager, interaction, secretVault, pluginManager,
     automationScheduler, processManager, toolRegistry, capabilityController,
     contextBuilder, promptBuilder, engine,
     async close() {
+      await fleetManager.close();
       await engine.close();
       await automationScheduler.close();
       await pluginManager.close();

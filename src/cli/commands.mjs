@@ -1114,6 +1114,188 @@ const configCommands = {
   },
 };
 
+// ---------------------------------------------------------------------- fleet
+
+const FLEET_TONE = (row, theme) => STATUS_TONE(theme, row.status);
+
+function csv(value) {
+  return value && value !== true ? String(value).split(',').map((item) => item.trim()).filter(Boolean) : [];
+}
+
+const fleetCommands = {
+  harnesses: {
+    usage: 'fleet harnesses [--force]',
+    summary: 'List the harnesses a fleet member can run on, and which are installed',
+    async run(context) {
+      const harnesses = await context.runtime.fleetManager.harnesses({ force: Boolean(context.args.force) });
+      if (context.ui.emit(harnesses)) return;
+      context.ui.table([
+        { key: 'name', label: 'harness' },
+        { key: 'title', label: 'title', max: 26 },
+        { key: 'command', label: 'command' },
+        { key: 'available', label: 'installed', tone: (row, theme) => (row.available ? theme.roles.success : theme.roles.muted) },
+      ], harnesses);
+    },
+  },
+  list: {
+    usage: 'fleet list',
+    summary: 'List fleet members and what each is doing',
+    run(context) {
+      const members = context.runtime.fleetManager.list();
+      if (context.ui.emit(members)) return;
+      if (!members.length) { context.ui.info('The fleet is empty. Add members with: maskshift fleet spawn claude codex hermes'); return; }
+      context.ui.table([
+        { key: 'name', label: 'member' },
+        { key: 'harness', label: 'harness' },
+        { key: 'status', label: 'status', tone: FLEET_TONE },
+        { key: 'mode', label: 'mode' },
+        { key: 'unread', label: 'mail', align: 'right' },
+        { key: 'turns', label: 'turns', align: 'right' },
+        { key: 'role', label: 'role', max: 36 },
+      ], members);
+    },
+  },
+  spawn: {
+    usage: 'fleet spawn HARNESS[:NAME]... [--role TEXT] [--mode inspect|edit] [--model REF] [--isolated] [--fallback a,b]',
+    summary: 'Add one or more members, e.g. `fleet spawn claude codex:reviewer hermes`',
+    async run(context) {
+      if (!context.positional.length) throw new Error('Missing required argument: HARNESS');
+      const workspace = await resolveWorkspace(context);
+      const members = await context.runtime.fleetManager.spawnMany(context.positional, {
+        workspaceId: workspace.id, role: context.args.role && context.args.role !== true ? String(context.args.role) : '',
+        mode: context.args.mode || 'edit', model: context.args.model || null,
+        isolated: Boolean(context.args.isolated), fallbacks: csv(context.args.fallback), cwd: context.args.cwd || null,
+      });
+      if (context.ui.emit(members)) return;
+      for (const member of members) context.ui.ok(`${member.name} · ${member.title}${member.fellBackFrom ? ` (fell back from ${member.fellBackFrom})` : ''}`);
+    },
+  },
+  ask: {
+    usage: 'fleet ask MEMBER MESSAGE...',
+    summary: 'Give one member a task and wait for its reply',
+    async run(context) {
+      const to = requirePositional(context, 0, 'MEMBER');
+      const message = context.positional.slice(1).join(' ');
+      if (!message) throw new Error('Missing required argument: MESSAGE');
+      const result = await context.runtime.fleetManager.ask(to, { message, from: 'user' });
+      if (context.ui.emit(result)) return;
+      if (!result.ok) { context.ui.fail(`${result.name}: ${result.error}`); process.exitCode = 1; return; }
+      context.ui.markdown(result.reply || '(no reply)');
+      for (const sent of result.sends || []) context.ui.info(`${sent.from} → ${sent.to}${sent.dropped ? ` (dropped: ${sent.dropped})` : ' (queued)'}`);
+    },
+  },
+  send: {
+    usage: 'fleet send TO MESSAGE... [--from NAME]',
+    summary: 'Queue a message for a member (or * for everyone) without running it',
+    run(context) {
+      const to = requirePositional(context, 0, 'TO');
+      const record = context.runtime.fleetManager.send({ from: context.args.from || 'user', to, body: context.positional.slice(1).join(' ') });
+      if (context.ui.emit(record)) return;
+      context.ui.ok(`Queued for ${to}`);
+    },
+  },
+  relay: {
+    usage: 'fleet relay TASK... [--lead NAME] [--with claude,codex:reviewer] [--rounds N] [--timeout MS]',
+    summary: 'Let the fleet work a task out between its members until the team says it is done',
+    async run(context) {
+      const manager = context.runtime.fleetManager;
+      const task = context.positional.join(' ');
+      if (!task) throw new Error('Missing required argument: TASK');
+      const workspace = await resolveWorkspace(context);
+      const created = csv(context.args.with).length
+        ? await manager.spawnMany(csv(context.args.with), { workspaceId: workspace.id, mode: context.args.mode || 'edit', isolated: Boolean(context.args.isolated) })
+        : [];
+      const lead = context.args.lead || created[0]?.name || null;
+      const live = (event) => {
+        if (context.ui.json || !event.type.startsWith('fleet.turn.completed')) return;
+        const { member, turn } = event.payload;
+        context.ui.status(turn.ok ? 'ok' : 'fail', `${member.name}${turn.sends.length ? ` → ${turn.sends.map((item) => item.to).join(', ')}` : ''}${turn.done ? ' · done' : ''}`);
+      };
+      const unsubscribe = context.runtime.eventBus.subscribe(live);
+      const controller = new AbortController();
+      const onSignal = () => controller.abort(Object.assign(new Error('Cancelled'), { code: 'CANCELLED' }));
+      process.once('SIGINT', onSignal);
+      let relay;
+      try {
+        relay = await manager.relay({
+          task, lead, members: created.length ? created.map((member) => member.name) : null,
+          maxRounds: context.args.rounds ? Number(context.args.rounds) : null, timeoutMs: context.args.timeout ? Number(context.args.timeout) : null,
+          signal: controller.signal,
+        });
+      } finally {
+        process.off('SIGINT', onSignal);
+        unsubscribe?.();
+      }
+      if (context.ui.emit(relay)) return;
+      context.ui.section(`${relay.status} · ${relay.reason} · ${relay.rounds} round${relay.rounds === 1 ? '' : 's'}`);
+      context.ui.markdown(relay.final || '(no final answer)');
+      if (relay.status !== 'completed') process.exitCode = 1;
+    },
+  },
+  log: {
+    usage: 'fleet log [MEMBER] [--limit N]',
+    summary: 'Show the messages passed between members',
+    run(context) {
+      const items = context.runtime.fleetManager.conversation({ member: context.positional[0] || null, limit: Number(context.args.limit || 40) });
+      if (context.ui.emit(items)) return;
+      context.ui.table([
+        { key: 'at', label: 'time', value: (row) => row.at.slice(11, 19) },
+        { key: 'from', label: 'from' },
+        { key: 'to', label: 'to' },
+        { key: 'kind', label: 'kind' },
+        { key: 'status', label: 'status' },
+        { key: 'body', label: 'message', value: (row) => oneLine(row.dropped || row.body, 70) },
+      ], items);
+    },
+  },
+  show: {
+    usage: 'fleet show MEMBER',
+    summary: 'Show a member\'s role, state and recent turns',
+    run(context) {
+      const member = context.runtime.fleetManager.details(requirePositional(context, 0, 'MEMBER'));
+      if (context.ui.emit(member)) return;
+      context.ui.fields([
+        ['member', member.name], ['harness', `${member.title} (${member.harness})`], ['status', member.status], ['mode', member.mode],
+        ['role', member.role || '—'], ['cwd', member.cwd], ['unread', String(member.unread)], ['error', member.error || '—'],
+      ]);
+      for (const turn of member.history.slice(-5)) {
+        context.ui.section(`${turn.at.slice(11, 19)} · ${turn.ok ? 'ok' : 'failed'} · ${turn.durationMs}ms`);
+        context.ui.paragraph(oneLine(turn.reply || turn.error || '', 400));
+      }
+    },
+  },
+  stop: {
+    usage: 'fleet stop [MEMBER]',
+    summary: 'Cancel a member\'s running turn (or everyone\'s)',
+    run(context) {
+      const manager = context.runtime.fleetManager;
+      const result = context.positional[0] ? manager.stop(context.positional[0]) : manager.stopAll();
+      if (context.ui.emit(result)) return;
+      context.ui.ok('Stop requested');
+    },
+  },
+  reset: {
+    usage: 'fleet reset MEMBER',
+    summary: 'Clear a member\'s history and inbox',
+    run(context) {
+      const member = context.runtime.fleetManager.reset(requirePositional(context, 0, 'MEMBER'));
+      if (context.ui.emit(member)) return;
+      context.ui.ok(`Reset ${member.name}`);
+    },
+  },
+  remove: {
+    usage: 'fleet remove MEMBER...',
+    summary: 'Remove members from the fleet',
+    async run(context) {
+      if (!context.positional.length) throw new Error('Missing required argument: MEMBER');
+      const out = [];
+      for (const name of context.positional) out.push(await context.runtime.fleetManager.remove(name));
+      if (context.ui.emit(out)) return;
+      for (const item of out) context.ui.ok(`Removed ${item.removed}`);
+    },
+  },
+};
+
 export const GROUPS = {
   workspace: { title: 'Workspace', commands: workspaceCommands, defaultCommand: 'info' },
   session: { title: 'Chats', commands: sessionCommands, defaultCommand: 'list' },
@@ -1122,6 +1304,7 @@ export const GROUPS = {
   model: { title: 'Model capability', commands: modelCommands, defaultCommand: 'profile' },
   bench: { title: 'Benchmark', commands: benchCommands, defaultCommand: 'list' },
   mcp: { title: 'MCP network', commands: mcpCommands, defaultCommand: 'list' },
+  fleet: { title: 'Agent fleet', commands: fleetCommands, defaultCommand: 'list' },
   plugins: { title: 'Plugins', commands: pluginCommands, defaultCommand: 'list' },
   automation: { title: 'Automations', commands: automationCommands, defaultCommand: 'list' },
   browser: { title: 'Browser', commands: browserCommands, defaultCommand: 'list' },
