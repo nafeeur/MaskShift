@@ -2,6 +2,8 @@ import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { absolutePath, commandExists, runCommand, shellQuote, truncate } from '../core/utils.mjs';
+import { readDocument } from '../documents/index.mjs';
+import { extractPdf } from '../documents/pdf.mjs';
 
 // Renders a PDF page range to images and OCRs them, for PDFs with little or no extractable
 // text layer (scans, photographed pages). Bounded to maxPages so one huge scan can't hang.
@@ -58,17 +60,44 @@ function summarizeOutputs(outputs = []) {
 
 export function registerDocumentTools(registry) {
   registry.register({
+    name: 'doc_read', title: 'Read a document (PDF, Word, Excel, PowerPoint, …)',
+    description: 'Read the text of a document with no external tools: PDF, Word (.docx), Excel (.xlsx, sheets rendered as tables), PowerPoint (.pptx, with speaker notes), OpenDocument (.odt/.ods/.odp), EPUB, RTF and HTML. Use this instead of fs_read for any non-plain-text document. Legacy binary .doc/.xls/.ppt must be re-saved in the modern format first.',
+    category: 'documents', readOnly: true, alwaysAvailable: true,
+    keywords: ['document', 'word', 'docx', 'excel', 'xlsx', 'spreadsheet', 'powerpoint', 'pptx', 'slides', 'odt', 'epub', 'rtf', 'open file', 'pdf', 'read document'],
+    inputSchema: {
+      type: 'object', required: ['path'],
+      properties: {
+        path: { type: 'string' },
+        firstPage: { type: 'integer', minimum: 1, description: 'PDF only: first page (1-based).' },
+        lastPage: { type: 'integer', minimum: 1, description: 'PDF only: last page.' },
+        maxRows: { type: 'integer', minimum: 1, maximum: 100000, default: 2000, description: 'Spreadsheets only: rows kept per sheet.' },
+        maxChars: { type: 'integer', minimum: 1000, maximum: 2000000, default: 200000 },
+      },
+    },
+    execute: async (args, context) => {
+      const target = absolutePath(args.path, context.workspacePath || process.cwd());
+      const result = await readDocument(target, {
+        maxChars: args.maxChars || 200_000, firstPage: args.firstPage, lastPage: args.lastPage, maxRows: args.maxRows,
+      });
+      if (result.scannedLikely) {
+        result.notes.push('This PDF has little or no text layer (likely scanned). Use pdf_read, which can OCR it when tesseract and pdftoppm are installed.');
+      }
+      return result;
+    },
+  });
+
+  registry.register({
     name: 'pdf_read', title: 'Extract PDF text',
-    description: 'Extract text from a PDF using pdftotext (poppler-utils), with optional page range and layout preservation. Falls back to rendering pages and running OCR when the PDF has little or no extractable text layer (scans, photographed pages).',
+    description: 'Extract text from a PDF with a built-in parser (no external tools needed), with an optional page range. If the PDF is a scan with no text layer, falls back to rendering pages and running OCR when poppler-utils and tesseract are installed; also falls back to pdftotext if the built-in parser cannot read the file.',
     category: 'documents', readOnly: true,
-    keywords: ['pdf', 'document', 'extract text', 'poppler', 'scanned', 'ocr'],
+    keywords: ['pdf', 'document', 'extract text', 'scanned', 'ocr'],
     inputSchema: {
       type: 'object', required: ['path'],
       properties: {
         path: { type: 'string' },
         firstPage: { type: 'integer', minimum: 1 },
         lastPage: { type: 'integer', minimum: 1 },
-        layout: { type: 'boolean', default: true },
+        layout: { type: 'boolean', default: true, description: 'Only affects the pdftotext fallback.' },
         maxChars: { type: 'integer', minimum: 1000, maximum: 2000000, default: 500000 },
         ocrFallback: { type: 'boolean', default: true, description: 'Render and OCR pages when the PDF looks scanned (little/no extractable text).' },
         maxOcrPages: { type: 'integer', minimum: 1, maximum: 50, default: 15 },
@@ -76,26 +105,41 @@ export function registerDocumentTools(registry) {
     },
     execute: async (args, context) => {
       const target = absolutePath(args.path, context.workspacePath || process.cwd());
-      if (!(await commandExists('pdftotext'))) {
-        throw new Error('pdftotext (poppler-utils) is not installed on this host. Install poppler-utils to enable pdf_read.');
-      }
       const maxChars = args.maxChars || 500_000;
-      const flags = [];
-      if (args.firstPage) flags.push('-f', String(args.firstPage));
-      if (args.lastPage) flags.push('-l', String(args.lastPage));
-      if (args.layout !== false) flags.push('-layout');
-      const command = `pdftotext ${flags.join(' ')} ${shellQuote(target)} -`;
-      const result = await runCommand(command, { timeoutMs: 60_000, maxOutputChars: maxChars, signal: context.signal });
-      if (result.code !== 0) throw new Error(`pdftotext failed (${result.code}): ${result.stderr || 'unknown error'}`);
-      const info = await runCommand(`pdfinfo ${shellQuote(target)}`, { timeoutMs: 10_000 }).catch(() => null);
-      const totalPages = Number(info?.stdout?.match(/^Pages:\s+(\d+)/m)?.[1]) || null;
-
-      const rawText = result.stdout || '';
-      let text = rawText;
-      let ocrFallbackUsed = false;
+      let text = '';
+      let totalPages = null;
+      let engine = 'builtin';
+      let looksScanned = false;
       let note = null;
-      const looksScanned = rawText.trim().length < (totalPages || 1) * 20;
+      const notes = [];
 
+      try {
+        const extracted = extractPdf(await fsp.readFile(target), { firstPage: args.firstPage, lastPage: args.lastPage });
+        text = extracted.text;
+        totalPages = extracted.totalPages;
+        looksScanned = extracted.scannedLikely;
+        notes.push(...extracted.notes);
+        if (extracted.totalPages === 0) throw new Error('no pages found');
+      } catch (error) {
+        if (error.code === 'PDF_ENCRYPTED') throw error;
+        // The built-in parser could not make sense of the file; try poppler if it happens to be installed.
+        if (!(await commandExists('pdftotext'))) {
+          throw new Error(`Could not read this PDF with the built-in parser (${error.message}), and pdftotext is not installed as a fallback.`);
+        }
+        engine = 'pdftotext';
+        const flags = [];
+        if (args.firstPage) flags.push('-f', String(args.firstPage));
+        if (args.lastPage) flags.push('-l', String(args.lastPage));
+        if (args.layout !== false) flags.push('-layout');
+        const result = await runCommand(`pdftotext ${flags.join(' ')} ${shellQuote(target)} -`, { timeoutMs: 60_000, maxOutputChars: maxChars, signal: context.signal });
+        if (result.code !== 0) throw new Error(`pdftotext failed (${result.code}): ${result.stderr || 'unknown error'}`);
+        text = result.stdout || '';
+        const info = await runCommand(`pdfinfo ${shellQuote(target)}`, { timeoutMs: 10_000 }).catch(() => null);
+        totalPages = Number(info?.stdout?.match(/^Pages:\s+(\d+)/m)?.[1]) || null;
+        looksScanned = text.trim().length < (totalPages || 1) * 20;
+      }
+
+      let ocrFallbackUsed = false;
       if (looksScanned && args.ocrFallback !== false) {
         const [tesseractAvailable, pdftoppmAvailable] = await Promise.all([commandExists('tesseract'), commandExists('pdftoppm')]);
         if (tesseractAvailable && pdftoppmAvailable) {
@@ -104,9 +148,10 @@ export function registerDocumentTools(registry) {
               firstPage: args.firstPage, lastPage: args.lastPage, totalPages,
               maxPages: args.maxOcrPages || 15, signal: context.signal,
             });
-            if (ocrText.trim().length > rawText.trim().length) {
+            if (ocrText.trim().length > text.replace(/--- Page \d+ ---/g, '').trim().length) {
               text = ocrText;
               ocrFallbackUsed = true;
+              engine = 'ocr';
             }
           } catch (error) {
             note = `OCR fallback failed: ${error.message}`;
@@ -117,11 +162,12 @@ export function registerDocumentTools(registry) {
       }
 
       return {
-        path: target, totalPages,
+        path: target, totalPages, engine,
         text: truncate(text, maxChars),
         truncated: text.length > maxChars,
         ocrFallbackUsed,
         ...(note ? { note } : {}),
+        ...(notes.length ? { notes } : {}),
       };
     },
   });
