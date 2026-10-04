@@ -53,6 +53,27 @@ recurring report. The model is a line of configuration; the tools are the same w
 - **Measurable.** `maskshift bench run` scores a model on self-checking tasks — pass rate, turns,
   tokens per solved task — and can switch individual helpers off to show what each one is worth.
 
+## How MaskShift differs
+
+Other agent harnesses are strong at what they were built for. This table lists only the things MaskShift
+adds that those tools do not ship as built-in features.
+
+| | **MaskShift** | Claude Code | Codex CLI | OpenCode | Gemini CLI | Aider |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| Measures each model with probes and sizes its help to what it can do | ✅ | — | — | — | — | — |
+| Raises the level of help mid-run when a model keeps stumbling | ✅ | — | — | — | — | — |
+| Built-in benchmark that switches individual harness helpers off to measure their value | ✅ | — | — | — | — | — |
+| Token usage split by cause: turns, repairs, verification retries, compaction, hand-offs | ✅ | — | — | — | — | — |
+| Skill changes promoted only after recorded A/B trials show uplift without regressions | ✅ | — | — | — | — | — |
+| Memory that cites files by content hash and goes stale when they change | ✅ | — | — | — | — | — |
+| Full tool use on models with no native tool-calling API | ✅ | — | — | — | — | — |
+| Live, clickable browser view rendered inside the terminal | ✅ | — | — | — | — | — |
+
+*Based on each project's public documentation as of October 2026. "—" means not a built-in, documented
+feature; plugins, hooks, MCP servers or third-party wrappers may add something similar. The table is
+deliberately limited to MaskShift's differences — the other tools have strengths of their own, such as IDE and
+desktop integration, that are not listed here. If a row is out of date, please open an issue.*
+
 ## Install
 
 Requires Node.js 22 or newer and a terminal of at least 80×24 (UTF-8 and truecolor are used when
