@@ -11,7 +11,8 @@ import { detectImageProtocol } from './image/protocol.mjs';
 import { Keyboard } from './input.mjs';
 import { hstack, overlay as paintOverlay, split, vstack } from './layout.mjs';
 import { createInteractionHandler } from './interaction.mjs';
-import { ApprovalOverlay, ChangesOverlay, ConfirmOverlay, FormOverlay, PaletteOverlay, PickerOverlay, TextOverlay } from './overlays.mjs';
+import { InlinePrompt } from './prompt.mjs';
+import { ApprovalOverlay, ChangesOverlay, SAFE_RISKS, ConfirmOverlay, FormOverlay, PaletteOverlay, PickerOverlay, TextOverlay } from './overlays.mjs';
 import { approvalPreview } from './approval.mjs';
 import { commandDirectories, expandCommand, loadCustomCommands } from './commands.mjs';
 import * as rail from './rail.mjs';
@@ -319,6 +320,8 @@ export class MaskShiftTui {
     // Questions from tools (pick a restaurant, enter a password, solve a CAPTCHA) land here.
     // { message, finish } while the agent is waiting for the person to act in the Browser view.
     this.handoff = null;
+    // The question currently shown above the composer (see prompt.mjs), if any.
+    this.prompt = null;
     this.detachInteraction = this.runtime.interaction?.attach(createInteractionHandler(this)) || null;
   }
 
@@ -329,26 +332,30 @@ export class MaskShiftTui {
   requestToolConfirmation({ name, tool, args }) {
     if (this.approvedTools.has(name)) return Promise.resolve(true);
     const run = () => new Promise((resolve) => {
-      // Approved while this request was waiting its turn behind another dialog.
+      // Approved while this request was waiting its turn behind another prompt.
       if (this.approvedTools.has(name)) { resolve(true); return; }
-      let settled = false;
-      const finish = (value) => { if (settled) return; settled = true; resolve(value); };
-      const originalClose = this.closeOverlay.bind(this);
-      this.closeOverlay = () => { this.closeOverlay = originalClose; originalClose(); finish(false); };
       const width = Math.min(this.screen.size.columns - 6, 88) - 4;
-      this.overlay = new ApprovalOverlay({
-        name, tool, mode: this.runtime.config.get().permissionMode,
+      const mode = this.runtime.config.get().permissionMode;
+      this.showPrompt(new InlinePrompt({
+        kind: 'approval',
+        title: `Approve ${name}`,
+        question: `${tool?.title || name} wants to run${tool?.risk ? ` (${tool.risk} risk)` : ''} under ${mode} mode.`,
         preview: approvalPreview(this.theme, name, args || {}, width),
-        onChoose: (choice) => {
+        danger: !SAFE_RISKS.has(tool?.risk || 'normal'),
+        options: [
+          { id: 'yes', label: 'Yes, run it' },
+          { id: 'always', label: 'Yes, and don\'t ask again for this tool in this chat' },
+          { id: 'no', label: 'No' },
+        ],
+        onAnswer: (answer) => {
+          const choice = answer?.choice || 'no';
           if (choice === 'always') {
             this.approvedTools.add(name);
             this.toast(`${name} approved for the rest of this chat`, 'info');
           }
-          finish(choice !== 'no');
-          this.closeOverlay();
+          resolve(choice !== 'no');
         },
-      });
-      this.requestRender();
+      }));
     });
     this.confirmationQueue = this.confirmationQueue.then(run, run);
     return this.confirmationQueue;
@@ -449,6 +456,7 @@ export class MaskShiftTui {
       process.once('SIGCONT', () => {
         process.on('SIGTSTP', suspend);
         resume();
+        this.screen.resync();
       });
       process.kill(process.pid, 'SIGTSTP');
     };
@@ -682,8 +690,11 @@ export class MaskShiftTui {
     // graphics placement doesn't necessarily respect — safer to not (re)send
     // one while anything is drawn on top, and to force a fresh send once it
     // closes rather than trust a placement the curtain may have disturbed.
-    const imageOverlay = this.overlay ? null : rendered.imageOverlay || null;
-    if (this.overlay) this.screen.imageKey = null;
+    // A classic placement floats above the text, so it is withdrawn while a modal is drawn over
+    // it (the screen deletes it when the overlay disappears). A placeholder image is text and the
+    // modal simply covers part of it, so those stay.
+    const wanted = [rendered.imageOverlay].flat().filter(Boolean);
+    const imageOverlay = this.overlay ? wanted.filter((item) => item.protocol === 'kitty-unicode') : wanted;
 
     if (showRail) {
       const railRegion = { row: 2 + marginY, column: marginX + mainWidth, width: railWidth, height: bodyHeight };
@@ -778,10 +789,23 @@ export class MaskShiftTui {
       // Not a keystroke — DEC 1004 focus reporting (see screen.mjs/input.mjs)
       // arrives on the same stream. Tracked so a finished run can tell
       // "nobody's looking at this terminal right now" before it notifies.
-      if (event.name === 'focus') { this.terminalFocused = event.focused; return; }
+      if (event.name === 'focus') {
+        this.terminalFocused = event.focused;
+        // Coming back to this pane or window: redraw everything, images included, rather than
+        // trust whatever the terminal kept or dropped while we were not in front.
+        if (event.focused) { this.screen.resync(); this.requestRender(); }
+        return;
+      }
       if (this.overlay) {
         this.overlay.handle(this, event);
         this.requestRender();
+        return;
+      }
+      // A question above the composer owns the keyboard while the chat is showing, except for the
+      // keys that stop the program or the run.
+      if (this.prompt && !this.prompt.answered && this.view === 'chat' && !(event.ctrl && (event.name === 'c' || event.name === 'q'))) {
+        this.prompt.handle(event);
+        this.afterPromptChange();
         return;
       }
       if (this.globalKey(event)) { this.requestRender(); return; }
@@ -1179,7 +1203,23 @@ export class MaskShiftTui {
     if (!this.busy && this.promptQueue.length) void this.drainPromptQueue();
   }
 
+  /** Called after a prompt handled a key or click: drop it once answered. */
+  afterPromptChange() {
+    if (this.prompt?.answered) this.prompt = null;
+    this.requestRender();
+  }
+
+  /** Shows `prompt` above the composer, bringing the chat to the front so it cannot be missed. */
+  showPrompt(prompt) {
+    this.prompt = prompt;
+    if (this.view !== 'chat') this.switchView(0);
+    this.screen.invalidate();
+    this.requestRender();
+  }
+
   cancelRun() {
+    this.prompt?.decline();
+    if (this.prompt?.answered) this.prompt = null;
     if (!this.runId) return;
     this.runtime.engine.cancel(this.runId);
     this.toast('Retreat signalled', 'warn');

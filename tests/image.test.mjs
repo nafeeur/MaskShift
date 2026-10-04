@@ -137,7 +137,7 @@ test('isImagePath recognises common raster extensions and nothing else', () => {
 });
 
 test('detectImageProtocol picks Kitty, iTerm2 or the universal half-block fallback in that priority', () => {
-  assert.equal(detectImageProtocol({ KITTY_WINDOW_ID: '1' }), 'kitty');
+  assert.equal(detectImageProtocol({ KITTY_WINDOW_ID: '1' }), 'kitty-unicode');
   assert.equal(detectImageProtocol({ TERM_PROGRAM: 'WezTerm' }), 'kitty');
   assert.equal(detectImageProtocol({ TERM_PROGRAM: 'iTerm.app' }), 'iterm');
   assert.equal(detectImageProtocol({ TERM: 'xterm-256color' }), 'halfblock');

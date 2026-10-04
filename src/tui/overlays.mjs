@@ -633,7 +633,7 @@ export class ConfirmOverlay extends Overlay {
  * command twenty times in a row trains people to stop reading the prompt.
  */
 export const APPROVAL_CHOICES = ['yes', 'no', 'always'];
-const SAFE_RISKS = new Set(['normal', 'write', 'state', 'local-index', 'local-snapshot']);
+export const SAFE_RISKS = new Set(['normal', 'write', 'state', 'local-index', 'local-snapshot']);
 
 export class ApprovalOverlay extends Overlay {
   constructor({ tool, name, preview, mode, onChoose }) {

@@ -58,9 +58,7 @@ export function render(app, region) {
         imageOverlay = {
           row: region.row + 2 + (showStrip ? 1 : 0) + (app.handoff ? 1 : 0), // panel top rail (1) + instance strip + this view's own status row (1)
           column: region.column + SPACE.frame + SPACE.pad,
-          escape: built.overlay.escape,
-          key: built.overlay.key,
-          protocol: built.overlay.protocol,
+          ...built.overlay,
         };
       }
     }

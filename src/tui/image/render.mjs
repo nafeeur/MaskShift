@@ -16,6 +16,7 @@ import path from 'node:path';
 import { decodeBmp } from './bmp.mjs';
 import { decodeJpeg } from './jpeg.mjs';
 import { decodePng, encodePng, readPngSize } from './png.mjs';
+import { MAX_PLACEHOLDER_CELLS, imageIdFor, placeholderRows, transmitEscape } from './kitty.mjs';
 import { detectImageProtocol } from './protocol.mjs';
 
 const ESC = '\x1b';
@@ -171,7 +172,7 @@ function buildPreviewFromBuffer(theme, buffer, extension, sourceKey, { maxCols, 
     return overlayResult(escape, cols, usedRows, `${sourceKey}|${cols}x${rows}|iterm`, 'iterm');
   }
 
-  if (protocol === 'kitty') {
+  if (protocol === 'kitty' || protocol === 'kitty-unicode') {
     // Kitty's inline-image transmission (`f=100`) means exactly one thing:
     // the payload is PNG-encoded data — not "any image format", the way
     // iTerm2's protocol works. A PNG file's bytes go straight through; a
@@ -196,6 +197,21 @@ function buildPreviewFromBuffer(theme, buffer, extension, sourceKey, { maxCols, 
       return { lines: [], error: `Kitty's inline-image protocol only accepts PNG data, and MaskShift can't decode ${extension} to convert it yet — open it in an app that can, or try iTerm2, which shows this format directly.` };
     }
     const { cols, rows } = width ? fitCells(width, height, maxCols, maxRows) : { cols: maxCols, rows: Math.min(maxRows, Math.round(maxCols / 2)) };
+    if (protocol === 'kitty-unicode') {
+      // The picture is text (see kitty.mjs): `lines` are the placeholder cells themselves, and the
+      // overlay only carries what has to be transmitted to the terminal before they can show it.
+      const fitted = {
+        cols: Math.min(cols, MAX_PLACEHOLDER_CELLS), rows: Math.min(rows, MAX_PLACEHOLDER_CELLS),
+      };
+      const key = `${sourceKey}|${fitted.cols}x${fitted.rows}|kitty-unicode`;
+      const id = imageIdFor(key);
+      return {
+        lines: placeholderRows(id, fitted.cols, fitted.rows),
+        overlay: { protocol: 'kitty-unicode', id, key, escape: transmitEscape(id, pngBytes, fitted.cols, fitted.rows), rows: fitted.rows },
+        cols: fitted.cols,
+        rows: fitted.rows,
+      };
+    }
     const { anchor: escape, rows: usedRows } = kittyLines(pngBytes, cols, rows);
     return overlayResult(escape, cols, usedRows, `${sourceKey}|${cols}x${rows}|kitty`, 'kitty');
   }
