@@ -1,6 +1,6 @@
 # Native Tool Inventory
 
-Generated from the MaskShift 1.4.1 runtime. **168 native tools** are available before plugins or MCP servers add more capabilities.
+Generated from the MaskShift 1.4.1 runtime. **173 native tools** are available before plugins or MCP servers add more capabilities.
 
 Only activated descriptors enter a model request; this document is the complete local catalog.
 
@@ -104,7 +104,7 @@ Only activated descriptors enter a model request; this document is the complete 
 | `notebook_read` | read | normal | Read a Jupyter (.ipynb) notebook and return each cell's index, type, source, and a bounded summary of its outputs. |
 | `pdf_read` | read | normal | Extract text from a PDF using pdftotext (poppler-utils), with optional page range and layout preservation. Falls back to rendering pages and running OCR when the PDF has little or no extractable text layer (scans, photographed pages). |
 
-## filesystem (13)
+## filesystem (16)
 
 | Tool | Access | Risk | Description |
 |---|---|---|---|
@@ -115,11 +115,14 @@ Only activated descriptors enter a model request; this document is the complete 
 | `fs_list` | read | normal | List a directory tree with file sizes and types. Paths may be workspace-relative or absolute in overdrive mode. |
 | `fs_mkdir` | write | write | Create a directory and missing parent directories. |
 | `fs_move` | write | write | Move or rename a file or directory, optionally replacing the destination. |
-| `fs_patch` | write | write | Apply one or more exact oldText/newText replacements to a file atomically. Fails on missing or ambiguous text unless replaceAll is requested. |
+| `fs_patch` | write | write | Apply one or more oldText/newText replacements to a file atomically. Minor whitespace or indentation differences are tolerated; text that is missing or ambiguous fails with the closest region shown, unless replaceAll is requested. |
 | `fs_read` | read | normal | Read a UTF-8 text file with optional 1-based line range and hard output bounds. |
 | `fs_read_binary` | read | normal | Read a bounded binary file as base64 with MIME-relevant metadata. |
+| `fs_replace_lines` | write | write | Replace lines startLine..endLine (1-based, inclusive, as shown by fs_read) with new text. Pass expect (the first old line) to refuse the edit if the file has moved. Use an empty newText to delete lines, or endLine = startLine - 1 style ranges via fs_patch to insert. |
 | `fs_stat` | read | normal | Return file type, size, timestamps, mode, target and hash metadata. |
 | `fs_write` | write | write | Create or overwrite a file atomically. Parent directories are created automatically. |
+| `symbol_read` | read | normal | Return one definition (function, class, method as Class.method) with its line range, without reading the whole file. With no symbol, list the definitions in the file. |
+| `symbol_replace` | write | write | Replace one definition by name with new source. You supply only the new text; the old text is located for you, so it never has to be reproduced exactly. Use Class.method for methods. |
 | `text_stats` | read | normal | Report line, word, and byte counts for one or more text files (like wc) without spending context on their contents — use before deciding whether to read a file in full. |
 
 ## git (10)
@@ -163,7 +166,7 @@ Only activated descriptors enter a model request; this document is the complete 
 | `memory_save` | write | write | Save a durable project or global fact, architectural decision, convention, result, or reusable lesson. Automatically merges into an existing memory with the same title in the same scope instead of creating a duplicate, unless dedupe is set to false. |
 | `memory_search` | read | normal | Search project and global long-term memory, ranked by a blend of text relevance, importance, and recency (older, untouched memories decay in rank without being deleted). |
 
-## orchestration (14)
+## orchestration (16)
 
 | Tool | Access | Risk | Description |
 |---|---|---|---|
@@ -177,6 +180,8 @@ Only activated descriptors enter a model request; this document is the complete 
 | `capability_activate` | write | dynamic-load | Load selected capabilities into the current model context. Local tools add schemas, skills add instructions, and MCP servers connect lazily and expose their tools. |
 | `capability_search` | read | normal | Search local tools, reusable skills, imported MCP servers, and discovered MCP tools. Use this whenever the current tool set is insufficient. |
 | `capability_state` | read | normal | Show the exact tools, skills, and MCP servers currently loaded for this run. |
+| `model_calibrate` | write | state | Run short probes (tool calling, a precise edit, planning, long-context recall) against a model and store the scores, so the harness sizes its help to what the model can actually do. Costs a few thousand tokens. |
+| `model_profile` | read | normal | Show a model's scaffolding level (0 = leave it alone, 3 = carry it), why it was chosen, the knobs that level sets, and any stored calibration scores or observed track record. |
 | `model_route` | read | normal | Rank configured models for a task using language/domain fit and prior MaskShift outcomes. |
 | `plan_dag_update` | write | state | Create a dependency-aware execution plan whose ready nodes can run concurrently and whose dependent nodes receive predecessor results. |
 | `plan_get` | read | normal | Return the current run plan and progress. |

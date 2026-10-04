@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Added an adaptive harness. Each model gets a 0–3 help level from a measured calibration (`maskshift model calibrate`), its observed track record, or a size prior, and the level rises mid-run when the model keeps stumbling; a context window under 16k always forces the compact prompt and core tools. New `model_profile` and `model_calibrate` tools and `model profile|calibrate` commands.
+- Added forgiving edits: `fs_patch` now tolerates trailing whitespace, indentation, whitespace runs, CRLF, a copied `fs_read` line-number gutter and unambiguous near matches, and shows the closest region of the file on a real miss. New `symbol_read`, `symbol_replace` and `fs_replace_lines` tools edit by name or line range without reproducing old text.
+- Added deterministic tool-call repair: misnamed tools (`read_file`, `bash`, typos, namespaces), misspelled argument keys, wrong scalar types, JSON-encoded containers and flattened edits are fixed in code instead of costing a model turn; a call missing a required argument is rejected before it runs with a usage line.
+- Added observation shaping: ANSI and progress-bar noise removed, results rendered compactly, output condensed to a budget sized to the model's window with error regions kept, file reads cut at line boundaries with a continuation hint, and the full text saved under a self-ignoring `.maskshift/outputs/`.
+- Added post-edit checks: every edit is syntax-checked (and language-server-checked when a server is installed) and problems are appended to the same tool result; JSX, bundler-style ES modules and JSON-with-comments files are not false-flagged.
+- Added `maskshift bench` (`list`, `verify`, `run`, `compare`): 12 self-checking tasks scored by exit code, reporting pass rate, turns, tokens per solved task and where tokens went, with `--without` to switch a helper off and measure it.
+- Run cost estimates now include `bySource`, splitting tokens into ordinary turns and calls the harness caused (repair, verification, nudge, compaction, hand-off).
+- `guardrails` config groups now merge individually, so setting one key no longer discards the other defaults.
 - Added run guardrails (`guardrails` config). Stagnation detection nudges, then stops (status `stagnated`), a run that repeats the same call with the same result or alternates between two actions. Optional verification runs the project's own test/lint/typecheck commands before a run that changed files may finish, and feeds failures back to the model. Long runs now hand off to a fresh context seeded from `.maskshift/progress.md` once history nears the context budget, instead of relying on compaction alone.
 
 ## 1.4.1

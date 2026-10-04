@@ -12,6 +12,8 @@
 const ANSI = /\u001B\[[0-9;?]*[ -/]*[@-~]|\u001B\][^\u0007\u001B]*(?:\u0007|\u001B\\)/g;
 const IMPORTANT = /\b(error|errors|fail|failed|failure|failures|fatal|exception|traceback|panic|assert(?:ion)?|not ok|denied|cannot|can't|unable|undefined|no such|not found|warning|deprecated)\b|✖|✗|✘|^\s*E\s{2,}|^\s*at .+\(.+:\d+:\d+\)|^\s*--- FAIL|^FAIL\b|expected|received|\d+ (?:passed|failed|passing|failing)/i;
 const BULKY_FIELDS = ['content', 'stdout', 'stderr', 'output', 'text', 'diff', 'body', 'log', 'logs', 'result'];
+// Only these are logs, where the lines around an error matter more than the lines between.
+const LOG_FIELDS = new Set(['stdout', 'stderr', 'output', 'log', 'logs']);
 const NOISY_SHELL_FIELDS = new Set(['pid', 'cwd', 'signal', 'aborted', 'command', 'stdout', 'stderr', 'durationMs', 'code', 'timedOut']);
 
 export function cleanText(value) {
@@ -44,13 +46,14 @@ const size = (lines) => lines.reduce((total, line) => total + line.length + 1, 0
  * Fits `text` in `budget` characters: the first lines (what started it), the lines around errors
  * (what went wrong), and the last lines (where it ended up, where a test summary lives).
  */
-export function condenseText(text, budget, { headShare = 0.2, tailShare = 0.35 } = {}) {
+export function condenseText(text, budget, { headShare = 0.2, tailShare = 0.35, important = true } = {}) {
   const cleaned = cleanText(text);
   const lines = dedupeLines(cleaned.split('\n'));
   if (size(lines) <= budget) return { text: lines.join('\n'), omittedLines: 0, condensed: lines.length !== cleaned.split('\n').length };
 
-  const headBudget = Math.floor(budget * headShare);
-  const tailBudget = Math.floor(budget * tailShare);
+  // Without error-hunting (source, diffs), what is kept is just the start and the end.
+  const headBudget = Math.floor(budget * (important ? headShare : 0.55));
+  const tailBudget = Math.floor(budget * (important ? tailShare : 0.4));
   const middleBudget = budget - headBudget - tailBudget - 120;
   const keep = new Set();
 
@@ -64,7 +67,7 @@ export function condenseText(text, budget, { headShare = 0.2, tailShare = 0.35 }
   // Error regions, earliest first, until the middle budget is spent.
   used = 0;
   for (let index = head; index <= tail && used < middleBudget; index += 1) {
-    if (!IMPORTANT.test(lines[index])) continue;
+    if (!important || !IMPORTANT.test(lines[index])) continue;
     for (let at = Math.max(head, index - 1); at <= Math.min(tail, index + 2); at += 1) {
       if (keep.has(at)) continue;
       const cost = Math.min(lines[at].length, 400) + 1;
@@ -128,12 +131,30 @@ function renderShell(value, budget) {
   return { text: `${header}${sections.length ? `\n${sections.join('\n')}` : '\n(no output)'}${tail}`, omittedLines: omitted, condensed };
 }
 
+// A file read that does not fit is cut at a line boundary with a pointer to where it continues:
+// dropping lines from the middle of source code would be worse than not showing them.
+function renderFileRead(value, budget) {
+  const rest = Object.fromEntries(Object.entries(value).filter(([key]) => key !== 'content'));
+  const head = compactJson(rest);
+  const room = Math.max(500, budget - head.length - 160);
+  const lines = String(value.content).split('\n');
+  let used = 0;
+  let kept = 0;
+  while (kept < lines.length && used + lines[kept].length + 1 <= room) { used += lines[kept].length + 1; kept += 1; }
+  if (kept === lines.length) return { text: `${head}\ncontent:\n${value.content}`, omittedLines: 0, condensed: false };
+  kept = Math.max(1, kept);
+  const next = (Number(value.startLine) || 1) + kept;
+  const note = `… [showing ${kept} of ${lines.length} lines; the file continues at line ${next} — read it with fs_read startLine=${next}]`;
+  return { text: `${head}\ncontent:\n${lines.slice(0, kept).join('\n')}\n${note}`, omittedLines: 0, condensed: true };
+}
+
 function renderObject(value, budget) {
+  if (typeof value.content === 'string' && value.content.length > 300 && 'totalLines' in value) return renderFileRead(value, budget);
   const bulky = BULKY_FIELDS.find((key) => typeof value[key] === 'string' && value[key].length > 300);
   if (bulky) {
     const rest = Object.fromEntries(Object.entries(value).filter(([key]) => key !== bulky));
     const head = compactJson(rest);
-    const body = condenseText(value[bulky], Math.max(500, budget - head.length - 20));
+    const body = condenseText(value[bulky], Math.max(500, budget - head.length - 20), { important: LOG_FIELDS.has(bulky) });
     return { text: `${head}\n${bulky}:\n${body.text}`, omittedLines: body.omittedLines, condensed: body.condensed };
   }
   let text = compactJson(value);

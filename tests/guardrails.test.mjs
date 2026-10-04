@@ -226,3 +226,15 @@ test('hand-off can be disabled', async (t) => {
   assert.equal(finished.meta.contextResets, undefined);
   await assert.rejects(fsp.access(path.join(project, '.maskshift', 'progress.md')));
 });
+
+test('the harness state directory ignores itself so it never dirties a foreign repository', async (t) => {
+  const { ensureStateDir } = await import('../src/agent/guardrails.mjs');
+  const project = await createProject(t);
+  const dir = await ensureStateDir(project, 'outputs');
+  await fsp.writeFile(path.join(dir, 'x.txt'), 'noise');
+  const { runCommand } = await import('../src/core/utils.mjs');
+  const status = await runCommand('git status --porcelain', { cwd: project });
+  assert.ok(!status.stdout.includes('.maskshift'), `git saw: ${status.stdout}`);
+  await ensureStateDir(project, 'outputs');
+  assert.equal(await fsp.readFile(path.join(project, '.maskshift', '.gitignore'), 'utf8'), '*\n', 'a second call leaves it alone');
+});

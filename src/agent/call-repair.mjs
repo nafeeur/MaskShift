@@ -155,8 +155,9 @@ function coerce(value, schema, repairs, where) {
     if (Array.isArray(parsed)) { next = parsed; note('coerce', 'JSON text → array'); }
     else if (!Array.isArray(value)) {
       const itemType = typeOf(schema.items);
-      const wrappable = value && typeof value === 'object' ? itemType === 'object' || !itemType : typeof value === itemType || (itemType === 'string' && typeof value !== 'object');
-      if (wrappable) { next = [typeof value === 'string' || typeof value === 'object' ? value : String(value)]; note('wrap', 'single value → one-element array'); }
+      const scalar = typeof value === 'number' && (itemType === 'integer' || itemType === 'number');
+      const wrappable = value && typeof value === 'object' ? itemType === 'object' || !itemType : scalar || typeof value === itemType || (itemType === 'string' && typeof value !== 'object');
+      if (wrappable) { next = [value]; note('wrap', 'single value → one-element array'); }
     }
     if (Array.isArray(next) && schema.items) next = next.map((item, index) => coerceValue(item, schema.items, repairs, `${where}[${index}]`));
   } else if (type === 'object') {

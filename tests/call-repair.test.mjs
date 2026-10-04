@@ -62,6 +62,9 @@ test('normalizeArgs coerces scalar types, enums and JSON-encoded containers', ()
   const { args } = normalizeArgs({ n: '5', flag: 'yes', mode: 'Append', list: '["a","b"]', label: 7, nested: '{"depth":"3"}' }, schema);
   assert.deepEqual(args, { n: 5, flag: true, mode: 'append', list: ['a', 'b'], label: '7', nested: { depth: 3 } });
   assert.deepEqual(normalizeArgs({ n: 2, list: 'one' }, schema).args, { n: 2, list: ['one'] });
+  const numbers = { type: 'object', properties: { ids: { type: 'array', items: { type: 'integer' } } } };
+  assert.deepEqual(normalizeArgs({ ids: 7 }, numbers).args, { ids: [7] }, 'a lone number stays a number');
+  assert.deepEqual(normalizeArgs({ ids: ['1', '2'] }, numbers).args, { ids: [1, 2] });
   assert.equal(normalizeArgs({ n: null, label: 'x' }, schema).args.n, undefined, 'null means absent');
 });
 
@@ -142,4 +145,27 @@ test('a call with a required argument missing is rejected before it runs, with u
   const toolMessage = requests[1].messages.find((message) => message.role === 'tool');
   assert.match(toolMessage.content, /required argument `path`/);
   assert.match(toolMessage.content, /fs_read\(path: string/);
+});
+
+test('a repaired read-only call does not count as a change that needs verifying', async (t) => {
+  let turn = 0;
+  const modelServer = await jsonServer(t, async (request, response) => {
+    if (isDiscoveryProbe(request)) return respondJson(response, 404, { error: 'not found' });
+    await readJsonBody(request);
+    turn += 1;
+    const usage = { prompt_tokens: 5, completion_tokens: 2 };
+    if (turn === 1) return respondOpenAIChatSSE(response, { toolCalls: [{ id: 'c1', name: 'read_file', args: { path: 'index.js' } }], finishReason: 'tool_calls', usage });
+    return respondOpenAIChatSSE(response, { content: 'looked', finishReason: 'stop', usage });
+  });
+  const project = await createProject(t);
+  const runtime = await runtimeForTest(t, project, {
+    defaultModel: 'fixture-repair:repair-model',
+    guardrails: { verification: { commands: ['exit 1'], maxAttempts: 2 } },
+    providers: [{ id: 'fixture-repair', name: 'Fixture', type: 'openai-compatible', baseUrl: modelServer.url, apiKey: 'k', enabled: true, autoDiscover: false, models: [{ id: 'repair-model' }], timeoutMs: 15_000 }],
+  });
+  const workspace = await runtime.workspaceManager.open(project);
+  const run = await runtime.engine.startRun({ workspaceId: workspace.id, prompt: 'look at index.js', modelRef: 'fixture-repair:repair-model' });
+  const finished = await waitFor(async () => (['completed', 'failed'].includes(runtime.store.getRun(run.id).status) ? runtime.store.getRun(run.id) : null), { timeoutMs: 15_000, message: 'run completion' });
+  assert.equal(finished.status, 'completed');
+  assert.equal(finished.meta.verification, undefined, 'reading a file through an alias must not trigger the always-failing project check');
 });

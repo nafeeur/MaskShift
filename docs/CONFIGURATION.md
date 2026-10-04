@@ -46,6 +46,37 @@ Three checks that do not rely on the model's own judgement of its progress. All 
 
 Run events: `stagnation`, `verification` and `context-reset`.
 
+```json
+"guardrails": {
+  "feedback": { "enabled": true, "syntax": true, "lsp": true, "timeoutMs": 8000, "maxIssues": 5 },
+  "features": { "callRepair": true, "fuzzyEdits": true, "observation": true, "editFeedback": true }
+}
+```
+
+- **Edit feedback.** After `fs_write`, `fs_patch`, `fs_replace_lines`, `symbol_replace` or `fs_apply_patch`, each changed file is checked and any problem is appended to *that same tool result*. Syntax first, using only interpreters already on the machine (`node --check`, `python3`'s `ast`, `bash -n`, `gofmt -e`, `ruby -c`, JSON); then language-server errors if a server is installed (`lsp`). A clean edit adds nothing. Files the check cannot judge on its own are left alone: JSX or bundler-style ES modules in `.js`, and JSON-with-comments files such as `tsconfig.json`. One time budget (`timeoutMs`) covers the whole call. Event: `edit-check`.
+- **Always-on helpers.** `features` switches the helpers that are free for every model: `callRepair` (tool names and arguments repaired deterministically — aliases like `read_file`, key spellings like `file_path`, `"5"` → `5`, a flattened edit wrapped into `edits`), `fuzzyEdits` (see below), `observation` (tool output shaping) and `editFeedback`. They exist mostly so `maskshift bench run --without …` can measure each one; leave them on.
+- **Forgiving edits.** `fs_patch` tries exact text first, then ignores trailing whitespace, then indentation (re-indenting the replacement to the file), then runs of whitespace, then CRLF vs LF, then a copied `fs_read` line-number gutter, and finally a near match — accepted only when it is clearly the single best by a margin. An ambiguous match is never guessed at. A real miss returns the closest region of the file with line numbers. A batch is all-or-nothing. When a looser rule applied, the result says so. `symbol_read` / `symbol_replace` (by name, `Class.method` for methods) and `fs_replace_lines` let a model edit without reproducing old text at all.
+- **Observation shaping.** Tool output is stripped of ANSI colour and progress-bar redraws, repeated lines are collapsed, and results are rendered compactly (file text raw rather than as an escaped JSON string; shell results as `$ command → exit N` with the error stream first on failure). Over a budget sized to the model's window (and scaled down at higher help levels), logs keep their head, their tail and the lines around errors; file reads are cut at a line boundary with the exact `startLine` to continue from; diffs keep their start and end; long arrays are trimmed with a count. Whenever something was left out the full text is saved under `.maskshift/outputs/` and referenced, so the model can range-read it. `.maskshift/` ignores itself, so it never dirties a repository.
+
+The cost estimate on every run now carries `bySource`: tokens split into ordinary `turn`s versus calls the harness itself caused — `repair`, `verification`, `nudge`, `compaction` and `handoff`.
+
+## Adaptive scaffolding
+
+Help is a dial, not a mode. Every model gets a level from 0 (leave it alone) to 3 (carry it); each level only *adds* assistance, and the always-on helpers above run at all of them.
+
+| Level | Prompt and tools | Output budget | Repairs allowed | Stagnation nudge after | Plan |
+|---|---|---|---:|---:|---|
+| 0 | full contract, full tool menu | 100% | 2 | 3 repeats | — |
+| 1 | full | 80% | 3 | 3 | — |
+| 2 | compact contract, core tool set, short schemas | 50% | 3 | 2 | — |
+| 3 | compact | 35% | 4 | 2 | `plan_update` asked for before any edit |
+
+The starting level comes from, in order of trust: a **calibration** (`maskshift model calibrate` scores the model 0–1 on tool calling, a precise edit, planning and long-context recall; a few thousand tokens, and opt-in because nothing is spent on a model until you ask), its **observed track record** (a running average of how often it needed the harness to step in, used after two or more runs), and a **prior** from its size and window. A context window under 16k tokens always forces level 2 or higher, however well the model scored — the full prompt does not fit in it. Within a run the level only rises: repeated stumbles (failed edits, parse failures, repaired calls, stagnation, failed verification) add pressure, clean calls relieve it, and past a threshold the level goes up one step (event `scaffold-level`). It never drops mid-run, which would churn the prompt cache; the track record handles easing off over later runs. Inspect any model with `maskshift model profile`.
+
+## Benchmark
+
+`maskshift bench run --model REF` runs 12 small self-checking tasks (an off-by-one, a cross-file rename, a function from a spec, a config edit, a null check, a stub from its tests, a syntax error, a moved import, a tab-indented block, a bug hidden in 3,000 lines of log, dead-code removal, a class-method bug) through the real engine and scores each by the exit code of its check, never by what the model says. The report gives pass rate, average turns, tokens per solved task, a `bySource` token split, and how often each helper stepped in. Reports are saved under `$MASKSHIFT_HOME/bench/`; `bench compare` diffs two of them, and `--without fuzzyEdits` (or `callRepair`, `observation`, `editFeedback`) switches one helper off so the two runs measure what it is worth. `maskshift bench verify` needs no model: it proves every task fails untouched and passes after its reference solution, and is part of the test suite.
+
 ## Terminal interface
 
 | Field | Default | Meaning |

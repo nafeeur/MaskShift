@@ -115,6 +115,17 @@ message. With `--json` it emits a single object:
 | `browser launch` | Launch a persistent Chrome profile. `--profile`, `--url`, `--headed`. |
 | `browser tabs [ID]` / `browser close [ID]` | Tab and instance control. |
 
+## Model capability and benchmark
+
+| Command | Description |
+|---|---|
+| `model profile` | How much help the harness gives a model (level 0–3), why, the knobs that level sets, and any stored calibration or track record. `--model REF`. |
+| `model calibrate` | Measure a model with four short probes (tool calling, a precise edit, planning, long-context recall) and store the scores. A few thousand tokens. `--model REF`. |
+| `bench list` | The benchmark tasks. |
+| `bench verify` | Check every task fails untouched and passes after its reference solution. Needs no model. |
+| `bench run` | Run the tasks against a model and report pass rate, turns, tokens per solved task and how often the harness stepped in. `--model REF`, `--tasks a,b`, `--repeat N`, `--steps N`, `--out FILE`, and `--without callRepair,fuzzyEdits,observation,editFeedback` to measure what a helper is worth. |
+| `bench compare BEFORE.json AFTER.json` | Pass-rate and token deltas, regressions and fixes between two reports. |
+
 ## Inventory and diagnostics
 
 | Command | Description |

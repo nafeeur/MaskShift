@@ -127,3 +127,24 @@ test('a run sees a condensed build log and can recover the rest from the saved f
   const full = await fsp.readFile(path.join(project, reference[1]), 'utf8');
   assert.match(full, /compiling unit 4000/);
 });
+
+test('a file read that does not fit is cut at a line boundary with a pointer to where it continues, never gutted', async () => {
+  const content = Array.from({ length: 400 }, (_, index) => `${String(index + 1).padStart(6)} | const value${index} = compute(${index}); // error handling elsewhere`).join('\n');
+  const { text, condensed } = await shapeObservation({ path: '/p/big.js', size: 30000, totalLines: 400, startLine: 1, endLine: 400, content }, { budget: 4000 });
+  assert.equal(condensed, true);
+  assert.ok(text.length < 4300);
+  assert.match(text, /showing \d+ of 400 lines; the file continues at line \d+ — read it with fs_read startLine=\d+/);
+  const shown = [...text.matchAll(/^ {0,5}(\d+) \| /gm)].map((match) => Number(match[1]));
+  assert.deepEqual(shown, shown.map((_, index) => index + 1), 'what is shown is one unbroken run from the first line');
+  assert.ok(!/omitted/.test(text), 'no lines are silently dropped from the middle of the source');
+  const next = Number(text.match(/continues at line (\d+)/)[1]);
+  assert.equal(next, shown.length + 1);
+});
+
+test('a large diff keeps its start and end rather than lines that merely mention errors', async () => {
+  const diff = Array.from({ length: 800 }, (_, index) => (index === 400 ? '+  throw new Error("boom");' : `+  line${index}();`)).join('\n');
+  const { text } = await shapeObservation({ stat: false, diff }, { budget: 3000 });
+  assert.match(text, /line0\(\)/);
+  assert.match(text, /line799\(\)/);
+  assert.ok(!/boom/.test(text), 'diffs are not error-hunted like logs');
+});

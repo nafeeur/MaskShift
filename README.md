@@ -4,7 +4,7 @@
 
 <p align="center">
   <strong>The full toolbox for any coding model, in one zero-dependency terminal harness.</strong><br>
-  168 tools, 50 skills, persistent code-graph intelligence, a live clickable browser view and
+  173 tools, 50 skills, persistent code-graph intelligence, a live clickable browser view and
   worktree-isolated multi-agent orchestration — but only what the current step needs ever
   touches the model's context.
 </p>
@@ -14,7 +14,7 @@
   <img alt="npm downloads" src="https://img.shields.io/npm/dt/maskshift?style=flat-square&color=cb3837&label=downloads">
   <img alt="Node 22+" src="https://img.shields.io/badge/node-%E2%89%A522-35cf8b?style=flat-square">
   <img alt="Runtime dependencies: none" src="https://img.shields.io/badge/runtime%20deps-0-7fb8ff?style=flat-square">
-  <img alt="168 tools" src="https://img.shields.io/badge/tools-168-2bd9c0?style=flat-square">
+  <img alt="173 tools" src="https://img.shields.io/badge/tools-173-2bd9c0?style=flat-square">
   <img alt="50 skills" src="https://img.shields.io/badge/skills-50-a78bfa?style=flat-square">
   <img alt="GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-e42a3c?style=flat-square">
 </p>
@@ -60,7 +60,7 @@ out of context until a step actually needs it.
 
 | | |
 |---|---|
-| **168 native tools** | Filesystem, shell and process control, search and indexing, Git worktrees and checkpoints, LSP, browsers over CDP, containers and Kubernetes, SSH and rsync, databases, runtimes, images, PDF and Jupyter, web retrieval, plugins, automations, memory and orchestration. → [tool inventory](docs/TOOLS.md) |
+| **173 native tools** | Filesystem, shell and process control, search and indexing, Git worktrees and checkpoints, LSP, browsers over CDP, containers and Kubernetes, SSH and rsync, databases, runtimes, images, PDF and Jupyter, web retrieval, plugins, automations, memory and orchestration. → [tool inventory](docs/TOOLS.md) |
 | **50 bundled skills** | Loaded lazily by description, including 14 Apache-2.0 skills imported from Anthropic, alongside skills from Claude, Codex, Copilot and workspace directories. → [skills](docs/SKILLS.md) |
 | **Named subagent personas** | Bundled `agents/*.md` files (code reviewer, security reviewer, build-error resolver, planner) give `agent_delegate` a role-specific system prompt instead of a generic one; drop project or user personas into `.claude/agents` or `.maskshift/agents` to add your own. |
 | **Lazy MCP fabric** | stdio and Streamable HTTP, stateless and legacy initialization, resources, prompts, qualified tools, imported configs, and the live official MCP Registry. Servers connect on demand, so the catalog never floods the context window. MaskShift is also an MCP server itself — `maskshift mcp serve` exposes its native tool catalog over stdio to Claude Desktop, Claude Code, an IDE, or another MaskShift instance. → [MCP config](docs/CONFIGURATION.md#mcp-definitions) |
@@ -69,6 +69,9 @@ out of context until a step actually needs it.
 | **Provenance-aware memory** | Durable facts can cite workspace files by content hash; changed or missing sources make those memories stale and exclude them from automatic context. |
 | **Intelligence routing** | Task-aware model and external-agent recommendations, adjusted by prior run outcomes when evidence exists. |
 | **Executable DAG agents** | Dependency-aware plans run ready nodes concurrently, pass predecessor results forward, block downstream failures, and isolate edit workers in Git worktrees by default. |
+| **Adaptive to any model** | A 0–3 help level per model, from a measured calibration (`maskshift model calibrate`), then its observed track record, then a size prior — and it rises mid-run if the model keeps stumbling. A capable model is left alone; a weak one gets a compact prompt, a short tool menu, tight output budgets and a plan up front. Nothing names a model or vendor. → [adaptive harness](docs/ARCHITECTURE.md#adaptive-harness) |
+| **Does the fiddly work for the model** | Near-miss tool names and arguments are repaired in code, edits tolerate wrong indentation, CRLF, copied line-number gutters and small typos (and show the closest region on a real miss), tool output is cleaned and condensed to the window, and every edit is syntax-checked with the result in the same reply. A model that gets it right pays nothing for any of it. → [run guardrails](docs/CONFIGURATION.md#run-guardrails) |
+| **Measures itself** | `maskshift bench run` scores a model on 12 self-checking tasks by their exit codes — pass rate, turns, tokens per solved task and where the tokens went — and `--without` switches a helper off so you can see what it is worth. |
 | **Validated skills** | Skill improvements can be promoted only after recorded A/B trials show uplift without regressions. |
 | **Cost-aware** | Anthropic prompt-cache breakpoints on the stable prefix, decay- and access-aware memory ranking, and a `usage_report` tool that prices spend from a user-editable table — never a guessed number. |
 | **Scheduled work** | Agent runs, direct tool calls or host shell commands on an interval, a cron expression or a one-shot timestamp. → [automations](docs/CONFIGURATION.md#automations) |

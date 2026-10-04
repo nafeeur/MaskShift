@@ -31,6 +31,21 @@ test('syntaxProblem finds errors in JSON, JavaScript, Python and shell, and pass
   await assert.rejects(fsp.access(path.join(dir, '__pycache__')), 'no bytecode is left behind');
 });
 
+test('JSON with comments and trailing commas is not called broken, but real errors still are', async (t) => {
+  const dir = await tempDir(t);
+  const jsonc = '{\n  // compiler options\n  "compilerOptions": { "strict": true, },\n  /* block */\n  "include": ["src",],\n  "url": "http://x//y"\n}\n';
+  assert.equal(await syntaxProblem(await write(dir, 'tsconfig.json', jsonc)), null);
+  assert.ok(await syntaxProblem(await write(dir, 'bad.jsonc', '// note\n{"a": 1 "b": 2}')));
+  assert.ok(await syntaxProblem(await write(dir, 'package.json', '{"name": "x",}')), 'strict JSON files keep strict rules');
+});
+
+test('a .js file with JSX or bundler-style ES modules is not blamed on the edit, but a plain syntax error is', async (t) => {
+  const dir = await tempDir(t);
+  assert.equal(await syntaxProblem(await write(dir, 'View.js', 'export default function View() {\n  return <div className="a">hi</div>;\n}\n')), null);
+  assert.equal(await syntaxProblem(await write(dir, 'esm.js', "import fs from 'fs';\nexport const a = fs;\n")), null);
+  assert.match(await syntaxProblem(await write(dir, 'plain.js', 'const a = {\n  b: 1,\n;\n')), /SyntaxError/);
+});
+
 test('syntaxProblem ignores file types it cannot check and files that do not exist', async (t) => {
   const dir = await tempDir(t);
   assert.equal(await syntaxProblem(await write(dir, 'notes.md', '# hi {')), null);

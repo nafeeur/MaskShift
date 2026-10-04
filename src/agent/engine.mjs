@@ -11,11 +11,8 @@ import { CapabilityRegistry } from './capability-profile.mjs';
 import { missingArgumentMessage, missingRequired, normalizeArgs, resolveToolName, unknownToolMessage } from './call-repair.mjs';
 import {
   PROGRESS_FILE, StagnationDetector, fallbackSummary, guardrailSettings, handoffMessage, renderProgress,
-  runVerification, stagnationNudge, verificationFeedback, verificationSummary, writeProgressFile,
+  ensureStateDir, runVerification, stagnationNudge, verificationFeedback, verificationSummary, writeProgressFile,
 } from './guardrails.mjs';
-
-// Bounded (by the model's scaffolding level) so a model that cannot produce valid syntax ends the
-// run instead of looping on it.
 
 function titleFromPrompt(prompt) {
   return String(prompt || '').replace(/\s+/g, ' ').trim().slice(0, 78) || 'MaskShift run';
@@ -41,7 +38,7 @@ function messageForProvider(message) {
 // reading, editing, searching and running code, plus anything it explicitly activates through
 // capability_search/capability_activate — so the whole catalog stays reachable, just on demand.
 const SMALL_MODEL_CORE_TOOLS = new Set([
-  'fs_list', 'fs_read', 'fs_write', 'fs_patch', 'search_text', 'shell_exec',
+  'fs_list', 'fs_read', 'fs_write', 'fs_patch', 'symbol_read', 'symbol_replace', 'fs_replace_lines', 'search_text', 'shell_exec',
   'git_status', 'git_diff', 'plan_update', 'capability_search', 'capability_activate',
 ]);
 
@@ -699,9 +696,11 @@ export class AgentEngine {
           this.#event(run.id, result.isError ? 'tool-error' : 'tool-result', {
             toolCallId: result.call.id, tool: result.call.name, content: result.content,
           }, scope);
-          if (this.toolRegistry.descriptor(result.call.name)?.readOnly !== true) unverifiedChanges = true;
+          // The tool that actually ran, which for a repaired call is not the name the model wrote.
+          const ranAs = result.name || result.call.name;
+          if (this.toolRegistry.descriptor(ranAs)?.readOnly !== true) unverifiedChanges = true;
           const stumbled = [];
-          if (result.isError) stumbled.push(EDIT_TOOLS.has(result.call.name) && /oldText|not found|matched \d+ locations/.test(result.content) ? 'edit-miss' : 'tool-error');
+          if (result.isError) stumbled.push(EDIT_TOOLS.has(ranAs) && /oldText|not found|matched \d+ locations/.test(result.content) ? 'edit-miss' : 'tool-error');
           if (result.repaired) stumbled.push('repaired-call');
           if (result.value?.applied?.some?.((entry) => entry.matchedBy)) stumbled.push('fuzzy-edit');
           if (result.checkProblems) stumbled.push('edit-problem');
@@ -761,7 +760,8 @@ export class AgentEngine {
       return failed;
     } finally {
       clearTimeout(deadlineTimer);
-      if (scaffoldController) this.capabilities.record(scaffoldRef, scaffoldController.summary());
+      // Remembering how the model did must never change how the run ended.
+      try { if (scaffoldController) this.capabilities.record(scaffoldRef, scaffoldController.summary()); } catch (error) { this.logger.warn('Could not record model track record', { error: error.message }); }
       if (sessionEndOutcome) {
         await this.hooks?.run('SessionEnd', { ...scope, workspacePath, ...sessionEndOutcome }).catch(() => {});
       }
@@ -855,8 +855,7 @@ export class AgentEngine {
   }
 
   async #spill(text, { workspacePath, runId }) {
-    const dir = path.join(workspacePath, '.maskshift', 'outputs');
-    await fsp.mkdir(dir, { recursive: true });
+    const dir = await ensureStateDir(workspacePath, 'outputs');
     this.spillCounter = (this.spillCounter || 0) + 1;
     const file = path.join(dir, `${runId}-${this.spillCounter}.txt`);
     await fsp.writeFile(file, text);

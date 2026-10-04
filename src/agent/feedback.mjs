@@ -35,8 +35,34 @@ function lines(text, max = 6) {
   return (/^Traceback/.test(all[0] || '') ? all.slice(-5) : all.slice(0, max)).join('\n');
 }
 
-function jsonProblem(text) {
+// tsconfig.json, .eslintrc, VS Code settings and friends are JSON-with-comments: a strict parse
+// would call every one of them broken. For those files (and only those: a trailing comma in
+// package.json really is an error) comments and trailing commas are tolerated.
+const JSONC_FILE = /(^|[\\/])(tsconfig[^\\/]*\.json|jsconfig[^\\/]*\.json|\.eslintrc[^\\/]*|\.babelrc[^\\/]*|\.swcrc|tslint\.json|devcontainer\.json|[^\\/]+\.jsonc|\.vscode[\\/][^\\/]+\.json)$/i;
+function stripJsonc(text) {
+  let out = '';
+  let inString = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const pair = text.slice(index, index + 2);
+    if (inString) {
+      out += char;
+      if (char === '\\') { out += text[index + 1] ?? ''; index += 1; } else if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') { inString = true; out += char; continue; }
+    if (pair === '//') { while (index < text.length && text[index] !== '\n') index += 1; out += '\n'; continue; }
+    if (pair === '/*') { index += 2; while (index < text.length && text.slice(index, index + 2) !== '*/') index += 1; index += 1; continue; }
+    out += char;
+  }
+  return out.replace(/,(\s*[}\]])/g, '$1');
+}
+
+function jsonProblem(text, file = '') {
   try { JSON.parse(text); return null; } catch (error) {
+    if (JSONC_FILE.test(file)) {
+      try { JSON.parse(stripJsonc(text)); return null; } catch { /* genuinely broken: report the original error */ }
+    }
     const message = String(error.message).split('\n')[0].slice(0, 200);
     const at = Number(message.match(/position (\d+)/)?.[1]);
     if (Number.isFinite(at) && !/line \d+/.test(message)) {
@@ -46,6 +72,12 @@ function jsonProblem(text) {
     return message;
   }
 }
+
+// What `node --check` cannot judge on its own: JSX or TypeScript sitting in a .js file, and ES
+// modules in a package that never declared "type": "module" (a bundler handles both). Neither is
+// a mistake the edit made, so neither is reported.
+const JSX = /<[A-Z][A-Za-z0-9.]*[\s/>]|<\/[A-Za-z][\w.]*>|<>|<\/>/;
+const MODULE_SYSTEM = /Cannot use import statement|Unexpected token 'export'|Cannot use 'import\.meta'|await is only valid|Unexpected identifier 'as'|Unexpected token ':'|Unexpected token '<'|Unexpected token '\?'/;
 
 // `only` limits a report to genuine syntax errors, so "module not found" or a missing interpreter
 // feature is never blamed on the edit.
@@ -64,9 +96,9 @@ const CHECKS = {
 /** A syntax problem in `file`, or null. Uses only interpreters already on the machine. */
 export async function syntaxProblem(file, { timeoutMs = 6000, signal } = {}) {
   const extension = path.extname(file).toLowerCase();
-  if (extension === '.json') {
+  if (extension === '.json' || extension === '.jsonc') {
     const text = await fsp.readFile(file, 'utf8').catch(() => null);
-    return text === null ? null : jsonProblem(text);
+    return text === null ? null : jsonProblem(text, file);
   }
   const check = CHECKS[extension]?.(file);
   if (!check || !(await has(check.needs))) return null;
@@ -75,6 +107,11 @@ export async function syntaxProblem(file, { timeoutMs = 6000, signal } = {}) {
   if (!result || result.code === 0 || result.timedOut) return null;
   const output = result.stderr || result.stdout;
   if (check.only && !check.only.test(output)) return null;
+  if (extension === '.js' || extension === '.cjs') {
+    if (MODULE_SYSTEM.test(output)) return null;
+    const source = await fsp.readFile(file, 'utf8').catch(() => '');
+    if (JSX.test(source)) return null;
+  }
   return lines(output);
 }
 
@@ -123,12 +160,15 @@ export class EditFeedback {
     try {
       const files = editedFiles(name, args, value, workspacePath);
       const reports = [];
+      // One budget for the whole call, however many files an edit touched.
+      const deadline = Date.now() + settings.timeoutMs;
       for (const file of files) {
+        if (Date.now() > deadline) break;
         const display = workspacePath ? path.relative(workspacePath, file) || file : file;
         const syntax = settings.syntax ? await syntaxProblem(file, { timeoutMs: Math.min(6000, settings.timeoutMs), signal }) : null;
         if (syntax) { reports.push({ file: display, kind: 'syntax', detail: syntax }); continue; }
         if (!settings.lsp) continue;
-        const errors = await this.#lspErrors(workspaceId, file, settings.timeoutMs);
+        const errors = await this.#lspErrors(workspaceId, file, Math.max(200, deadline - Date.now()));
         for (const item of errors.slice(0, settings.maxIssues)) {
           const line = (item.range?.start?.line ?? 0) + 1;
           reports.push({ file: display, kind: severityName(item.severity), detail: `line ${line}: ${String(item.message || '').split('\n')[0].slice(0, 240)}` });
