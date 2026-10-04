@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" role="img" aria-label="MaskShift — a general-purpose agent harness">
+  <rect width="1280" height="640" fill="#0E1117"/>
+  <text x="640" y="304" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="150" font-weight="700" letter-spacing="-6" fill="#F4EFE6">mask<tspan fill="#E42A3C">shift</tspan></text>
+  <text x="640" y="382" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="38" fill="#B8C0CB">A general-purpose agent harness for any model</text>
+  <text x="640" y="470" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="26" fill="#6B7684">Local or hosted models  ·  Zero runtime dependencies  ·  Runs in your terminal</text>
+</svg>

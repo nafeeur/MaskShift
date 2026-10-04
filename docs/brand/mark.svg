@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="MaskShift">
-  <rect width="256" height="256" rx="48" fill="#161A20"/>
-  <svg x="28" y="28" width="200" height="200" viewBox="0 0 512 512">
-    <rect x="72" y="72" width="272" height="272" rx="60" fill="none" stroke="#F4EFE6" stroke-width="26"/>
-    <rect x="168" y="168" width="272" height="272" rx="60" fill="#E42A3C"/>
-    <path d="M262 252L336 304L262 356" fill="none" stroke="#F4EFE6" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>
-</svg>
