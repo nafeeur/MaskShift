@@ -118,9 +118,7 @@ export function render(app, region) {
         imageOverlay = {
           row: region.row + 1,
           column: region.column + treeWidth + 1,
-          escape: cached.overlay.escape,
-          key: cached.overlay.key,
-          protocol: cached.overlay.protocol,
+          ...cached.overlay,
         };
       }
     }

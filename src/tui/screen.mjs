@@ -6,6 +6,7 @@
 
 import { ESC } from './theme.mjs';
 import { fit, sanitizeTerminalLine } from './text.mjs';
+import { DELETE_ALL, deleteEscape } from './image/kitty.mjs';
 
 const CSI = `${ESC}[`;
 const BEL = String.fromCharCode(7);
@@ -83,12 +84,17 @@ export class Screen {
     // position instead of following the content it was anchored to.
     this.imageRow = null;
     this.imageColumn = null;
+    // Placeholder images (see image/kitty.mjs) the terminal currently holds, id -> key. They are
+    // drawn by ordinary text cells, so the only state to keep right is "has this one been
+    // transmitted yet", and anything the terminal may have lost is simply sent again.
+    this.images = new Map();
     // Deliberately doesn't also reset imageKey/imageProtocol: render()'s own
     // overlay diff is the one place that decides an image needs clearing
     // from the real terminal, and it can only make that call correctly if
     // it still remembers what (if anything) is actually sitting there.
     this.handleResize = () => {
       this.previous = [];
+      this.images.clear();
       if (this.onResize) this.onResize(this.size);
     };
   }
@@ -123,7 +129,8 @@ export class Screen {
     // that's the terminal's own behaviour to rely on, not a guarantee — the
     // explicit delete costs nothing and closes the one path a stray image
     // could otherwise survive past MaskShift's own exit.
-    const clearImage = this.imageProtocol === 'kitty' ? ANSI.kittyDeleteImages : '';
+    const clearImage = (this.imageProtocol === 'kitty' || this.images.size) ? (this.images.size ? DELETE_ALL : ANSI.kittyDeleteImages) : '';
+    this.images.clear();
     this.imageKey = null;
     this.imageProtocol = null;
     this.imageRow = null;
@@ -171,8 +178,13 @@ export class Screen {
    * only as this separate, structurally distinct parameter, never smuggled
    * through a line string. Only code inside MaskShift itself constructs one.
    */
-  render(lines, cursor = null, overlay = null) {
+  render(lines, cursor = null, overlays = null) {
     const { columns, rows } = this.size;
+    // One overlay, several, or none. Placeholder images are drawn by the text rows themselves and
+    // only need transmitting; at most one classic placement is positioned on top of the text.
+    const list = (Array.isArray(overlays) ? overlays : [overlays]).filter(Boolean);
+    const overlay = list.find((item) => item.protocol !== 'kitty-unicode') || null;
+    const placeholders = list.filter((item) => item.protocol === 'kitty-unicode');
     // invalidate()/a resize dropped the cached frame — every row is about to
     // be rewritten from scratch, which on a real terminal can itself be what
     // disturbs (or outright clears) an existing Kitty placement. An
@@ -184,6 +196,14 @@ export class Screen {
       frame.push(fit(sanitizeTerminalLine(lines[row] ?? ''), columns));
     }
     let out = '';
+    // Transmit before the rows that refer to the image, in the same write, so a placeholder
+    // never reaches the terminal ahead of its picture.
+    const wanted = new Set(placeholders.map((item) => item.id));
+    for (const item of placeholders) {
+      if (this.images.get(item.id) === item.key) continue;
+      out += item.escape;
+      this.images.set(item.id, item.key);
+    }
     let changedRows = 0;
     for (let row = 0; row < rows; row += 1) {
       if (this.previous[row] === frame[row]) continue;
@@ -211,6 +231,12 @@ export class Screen {
       this.imageRow = null;
       this.imageColumn = null;
     }
+    // Images no row refers to any more are freed in the terminal instead of piling up there.
+    for (const id of [...this.images.keys()]) {
+      if (wanted.has(id)) continue;
+      out += deleteEscape(id);
+      this.images.delete(id);
+    }
     if (cursor) out += `${ANSI.moveTo(cursor.row, cursor.column)}${ANSI.showCursor}`;
     else if (this.cursor) out += ANSI.hideCursor;
     this.cursor = cursor;
@@ -226,5 +252,17 @@ export class Screen {
   // imageKey/imageProtocol alone for the same reason handleResize does.
   invalidate() {
     this.previous = [];
+  }
+
+  /**
+   * Make the terminal match what this screen believes it is showing. Called when the terminal
+   * regains focus, the process resumes or the window is resized — the moments a terminal (or tmux,
+   * or a window manager) may have dropped, kept or moved graphics behind our back. Repaints every
+   * row and sends every image again; a classic placement is re-placed with its own delete first.
+   */
+  resync() {
+    this.previous = [];
+    this.images.clear();
+    this.imageKey = null;
   }
 }

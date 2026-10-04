@@ -13,6 +13,7 @@ import { createRuntime } from '../src/runtime.mjs';
 import { MaskShiftTui } from '../src/tui/app.mjs';
 import { Theme, PALETTE } from '../src/tui/theme.mjs';
 import { charWidth } from '../src/tui/text.mjs';
+import { createInteractionHandler } from '../src/tui/interaction.mjs';
 import { parseArgs, runCommand } from '../src/core/utils.mjs';
 
 const ESC = String.fromCharCode(27);
@@ -289,6 +290,20 @@ try {
       });
       await new Promise((resolve) => setImmediate(resolve));
     }],
+    ['choice', 'MaskShift — choosing from a list', async () => {
+      app.view = 'chat';
+      runtime.config.get().permissionMode = 'autonomous';
+      void createInteractionHandler(app).choose({
+        title: 'Restaurants', question: 'Which restaurants should I compare?', multi: true, allowOther: true,
+        options: [
+          { id: 'a', label: 'Luigi Pizza', price: '$2.99 delivery', rating: '4.5', detail: '20–30 min' },
+          { id: 'b', label: 'Sushi Go', price: '$1.99 delivery', rating: '4.7', detail: '30–40 min' },
+          { id: 'c', label: 'Taco Town', price: 'Free delivery', rating: '4.2', detail: '15–25 min' },
+        ],
+      });
+      await new Promise((resolve) => setImmediate(resolve));
+      app.onKey({ name: 'space', sequence: ' ', printable: true });
+    }],
     ['changes', 'MaskShift — what the last run changed', async () => {
       app.view = 'chat';
       runtime.config.get().permissionMode = 'autonomous';
@@ -346,6 +361,7 @@ try {
   const written = [];
   for (const [name, title, prepare] of captures) {
     app.closeOverlay();
+    if (app.prompt) { app.prompt.decline(); app.prompt = null; }
     await prepare();
     app.screen.invalidate();
     const frame = app.snapshot();

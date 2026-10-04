@@ -69,7 +69,7 @@ failed tool are now the same red and the same mark.
 
 Truecolor, 256-colour and 16-colour palettes are generated from the same hex
 values. `NO_COLOR`, `MASKSHIFT_COLOR=off` and dumb terminals get clean
-monochrome; `MASKSHIFT_ASCII=1` swaps every box-drawing glyph for ASCII.
+monochrome; `MASKSHIFT_ASCII=1` swaps every box-drawing glyph for ASCII. Inline images use Kitty Unicode placeholders on Kitty and Ghostty (drawn as text, so they cannot ghost or vanish on a pane switch), the classic Kitty protocol on WezTerm, iTerm2's own protocol there, and coloured half-blocks everywhere else, including inside tmux and screen; `MASKSHIFT_IMAGE=kitty-unicode|kitty|iterm|halfblock|off` overrides the choice.
 
 ## Layout
 
@@ -136,6 +136,8 @@ In `balanced` and `review` modes, a gated tool call shows what it will do before
 it runs (see [Approving tool calls](#approving-tool-calls)):
 
 ![Approving a tool call](screenshots/approval.svg)
+
+![Choosing from a list](screenshots/choice.svg)
 
 `ctrl+d` reviews everything the last run changed, diffed against the checkpoint
 taken before it, and `u` undoes it:
@@ -265,14 +267,33 @@ model family, a learned overflow, or an assumed default) and the reply cap. See
 
 ### Approving tool calls
 
-In `balanced` and `review` permission modes a gated call opens an approval
-dialog showing what it will actually do: the command and its directory, a file's
-new contents, or an edit as a coloured diff. Answer `y`, `n`, or `a` to approve
-the tool for the rest of the chat. Enter defaults to No for anything that can
+In `balanced` and `review` permission modes a gated call is put to you inside the
+chat, directly above the composer — not in a dialog — showing what it will actually
+do: the command and its directory, a file's new contents, or an edit as a coloured
+diff. Press `y`, `n` or `a` (or move with `↑↓` and press `↵`) to approve once, decline,
+or approve the tool for the rest of the chat; `esc` declines. Enter defaults to No for anything that can
 reach outside the workspace (host or remote execution, installs, secrets,
 destructive calls) and to Yes for plain edits. Switching chats or workspaces while a run,
 queue or draft exists requires an explicit confirmation so work cannot silently
 cross chat or workspace boundaries.
+
+### Questions from the agent
+
+When a tool needs a decision — which restaurant, which of several files, an address, a
+password, a yes/no before paying — the question appears in the same place, above the
+composer, and the keyboard answers it until you do:
+
+| Key | Action |
+|---|---|
+| `↑` `↓`, `1`–`9` | Move, or jump to an option |
+| `space` | Select or deselect (when several may be chosen) |
+| `↵` | Submit (single choice: choose the highlighted option) |
+| last row | Type your own answer; arriving on it and typing is enough |
+| `esc` | Decline; the run is told you did not answer |
+
+Click works too. Secrets are masked as you type and never drawn. Questions queue if
+several arrive together. In `--plain` mode the same questions are asked as numbered
+prompts.
 
 ### Catalogue views
 

@@ -429,7 +429,13 @@ export function render(app, region) {
   const draftRows = app.composer.layout(composerWidth, 6).total;
   const draftVisibleRows = Math.max(1, Math.min(6, draftRows, Math.max(1, height - 8)));
   const composerRows = draftVisibleRows;
-  const transcriptHeight = Math.max(1, height - 3 - composerRows);
+  // A pending question (a choice, a confirmation, a tool approval) sits between the transcript and
+  // the composer and takes the rows it needs from the transcript while it is open.
+  const promptView = app.prompt && !app.prompt.answered
+    ? app.prompt.render(app, width - 4, Math.max(5, Math.min(18, height - 8)))
+    : null;
+  const promptRows = promptView ? promptView.lines.length : 0;
+  const transcriptHeight = Math.max(1, height - 3 - composerRows - promptRows);
 
   // One column of scrollbar and one of breathing room sit to the right of the
   // text, so nothing ever butts against the track.
@@ -445,24 +451,22 @@ export function render(app, region) {
   const bar = app.transcript.scrollbar(theme, transcriptHeight);
   const transcriptRows = visible.map((line, index) => `${fit(line, textWidth + 1)}${bar[index] ?? ' '}`);
 
-  // A Kitty/iTerm2 placement (see image/render.mjs) only goes out when its
-  // whole block is on screen at once — scrolling it half out of view would
-  // otherwise either overflow past the pane or need clipping neither
-  // protocol offers cleanly here. A half-block image needs none of this:
-  // it's already just ordinary coloured text, clipped by Viewport like any
-  // other line.
+  // A classic Kitty/iTerm2 placement (see image/render.mjs) floats above the text, so it only goes
+  // out when its whole block is on screen at once — half of one cannot be clipped. A placeholder
+  // image (Kitty, Ghostty) is ordinary text and clips like any other line, so every block that
+  // shows even one row needs its picture transmitted. A half-block image needs nothing at all.
   const scrollOffset = app.transcript.offset;
-  let imageOverlay = null;
+  const imageOverlay = [];
   for (const block of app._transcriptImageBlocks || []) {
-    if (block.startLine >= scrollOffset && block.startLine + block.rows <= scrollOffset + transcriptHeight) {
-      imageOverlay = {
+    const end = block.startLine + block.rows;
+    if (block.overlay.protocol === 'kitty-unicode') {
+      if (end > scrollOffset && block.startLine < scrollOffset + transcriptHeight) imageOverlay.push(block.overlay);
+    } else if (!imageOverlay.length && block.startLine >= scrollOffset && end <= scrollOffset + transcriptHeight) {
+      imageOverlay.push({
+        ...block.overlay,
         row: region.row + 1 + (block.startLine - scrollOffset),
         column: region.column + CONTENT_OFFSET,
-        escape: block.overlay.escape,
-        key: block.overlay.key,
-        protocol: block.overlay.protocol,
-      };
-      break;
+      });
     }
   }
 
@@ -475,7 +479,7 @@ export function render(app, region) {
 
   // The seam labels the composer and carries its keys, so the pane that owns
   // the keyboard is named on the rule that bounds it.
-  const composerFocused = app.focus === 'composer';
+  const composerFocused = app.focus === 'composer' && !promptView;
   const paneFocused = composerFocused || app.focus === 'transcript';
   // No text label here: the seam's rule line already sweeps/animates while
   // busy (see `busy` in rule()/fillRule() in box.mjs), so a word on top of it
@@ -487,7 +491,9 @@ export function render(app, region) {
     weight: paneFocused ? 'heavy' : 'light',
     colour: frameColour(theme, paneFocused),
     busy: app.busy,
-    stamp: composerFocused
+    stamp: promptView
+      ? 'answer the question above'
+      : composerFocused
       ? (app.busy ? `^T steers ${mark.dot} ↵ queues ${mark.dot} esc cancels` : `↵ execute ${mark.dot} ^J newline`)
       : 'tab or click to type',
   });
@@ -526,27 +532,38 @@ export function render(app, region) {
     theme, width, height, title: app.sessionTitle || 'New chat', note,
     busy: app.busy && paneFocused,
     stamp: stampParts.join(` ${mark.dot} `),
-    body: [...transcriptRows, seam, ...composerBody],
-    seamRows: [transcriptHeight],
+    body: [...transcriptRows, ...(promptView ? promptView.lines : []), seam, ...composerBody],
+    seamRows: [transcriptHeight + promptRows],
     focused: paneFocused,
   });
 
   // Keyboard scrolling needs the same page size the mouse wheel uses.
-  app.chatPanes = { transcriptHeight, composerRows };
-  registerRegions(app, region, { transcriptHeight, composerRows, textWidth, body });
-
-  const cursor = composerFocused
-    ? {
-      row: region.row + 1 + transcriptHeight + 1 + layout.caret.row,
-      column: region.column + 2 + composerGutterWidth + layout.caret.column,
+  app.chatPanes = { transcriptHeight, composerRows, promptRows };
+  registerRegions(app, region, { transcriptHeight, composerRows, promptRows, textWidth, body });
+  if (promptView) {
+    for (const { offset, index } of promptView.hit) {
+      app.regions.add({
+        row: region.row + 1 + transcriptHeight + offset, column: region.column + 1, width: Math.max(0, region.width - 2), height: 1,
+        id: `chat:prompt:${index}`, layer: LAYER.body + 2,
+        onPress: (target) => { target.prompt?.activate(index); target.afterPromptChange(); },
+      });
     }
-    : null;
+  }
+
+  const cursor = promptView
+    ? (promptView.cursor ? { row: region.row + 1 + transcriptHeight + promptView.cursor.row, column: region.column + 2 + promptView.cursor.column } : null)
+    : composerFocused
+      ? {
+        row: region.row + 1 + transcriptHeight + 1 + layout.caret.row,
+        column: region.column + 2 + composerGutterWidth + layout.caret.column,
+      }
+      : null;
 
   return { lines, cursor, imageOverlay };
 }
 
 // Every pane, the scrollbar track and each starter prompt become click targets.
-function registerRegions(app, region, { transcriptHeight, composerRows, textWidth, body }) {
+function registerRegions(app, region, { transcriptHeight, composerRows, promptRows = 0, textWidth, body }) {
   const regions = app.regions;
   if (!regions) return;
   const transcriptTop = region.row + 1;
@@ -583,7 +600,7 @@ function registerRegions(app, region, { transcriptHeight, composerRows, textWidt
     onDrag: jump,
   });
 
-  const seamRow = transcriptTop + transcriptHeight;
+  const seamRow = transcriptTop + transcriptHeight + promptRows;
   regions.add({
     row: seamRow,
     column: region.column,
@@ -684,7 +701,9 @@ export function handle(app, event) {
   return app.composer.handle(event);
 }
 
-export const hints = (app) => (app.focus === 'composer'
+export const hints = (app) => (app.prompt && !app.prompt.answered
+  ? [['↵', 'answer'], ['esc', 'decline']]
+  : app.focus === 'composer'
   ? [
     ...(app.busy
       ? [['↵', 'queue', (target) => void target.submitPrompt()], ['^T', 'steer now', (target) => target.steerPrompt()]]

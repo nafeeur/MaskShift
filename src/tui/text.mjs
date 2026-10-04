@@ -89,6 +89,8 @@ export function charWidth(character) {
 }
 
 function graphemeWidth(grapheme) {
+  // A Kitty image placeholder cell (see image/kitty.mjs) is one cell however many marks follow it.
+  if (grapheme.codePointAt(0) === 0x10eeee) return 1;
   // Emoji ZWJ sequences, skin-tone clusters and regional-indicator flags are
   // displayed as one two-column glyph by modern terminals.
   if (/\u200d|[\u{1f1e6}-\u{1f1ff}]|\p{Extended_Pictographic}/u.test(grapheme)) return 2;

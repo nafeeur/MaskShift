@@ -70,24 +70,76 @@ test('the transcript marks where the saved summary ends, and s opens it', async 
   assert.match(screenText(app), /SUMMARY-MARKER/);
 });
 
-test('the approval dialog shows what the call does, and "always" approves the tool for the chat', async (t) => {
+test('approval is asked inline above the composer, shows what the call does, and "always" approves the tool for the chat', async (t) => {
   const { app } = await tui(t);
   const tool = { title: 'Execute shell command', risk: 'host-exec' };
   const first = app.requestToolConfirmation({ name: 'shell_exec', tool, args: { command: 'rm -rf build && npm ci' } });
   await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(app.overlay.title, 'Approve tool call');
-  assert.equal(app.overlay.choice, 1, 'a host-exec call defaults to NO');
-  assert.match(screenText(app), /\$ rm -rf build && npm ci/);
-  app.overlay.handle(app, { name: 'a' });
+  assert.equal(app.overlay, null, 'no dialog: the question is part of the chat');
+  assert.equal(app.view, 'chat');
+  assert.equal(app.prompt.kind, 'approval');
+  assert.equal(app.prompt.options[app.prompt.cursor].id, 'no', 'a host-exec call defaults to No');
+  const text = screenText(app);
+  assert.match(text, /Approve shell_exec/);
+  assert.match(text, /\$ rm -rf build && npm ci/);
+  assert.match(text, /Yes, run it/);
+  app.onKey({ name: 'a', sequence: 'a', printable: true });
   assert.equal(await first, true);
+  assert.equal(app.prompt, null);
   assert.equal(await app.requestToolConfirmation({ name: 'shell_exec', tool, args: { command: 'ls' } }), true);
-  assert.equal(app.overlay, null, 'no second dialog once always-approved');
+  assert.equal(app.prompt, null, 'no second question once always-approved');
 
   const denied = app.requestToolConfirmation({ name: 'fs_write', tool: { risk: 'write' }, args: { path: 'a', content: 'b' } });
   await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(app.overlay.choice, 0, 'a plain write defaults to YES');
-  app.overlay.handle(app, { name: 'n' });
+  assert.equal(app.prompt.options[app.prompt.cursor].id, 'yes', 'a plain write defaults to Yes');
+  app.onKey({ name: 'n', sequence: 'n', printable: true });
   assert.equal(await denied, false);
+  const escaped = app.requestToolConfirmation({ name: 'git_push', tool: { risk: 'network' }, args: {} });
+  await new Promise((resolve) => setImmediate(resolve));
+  app.onKey({ name: 'escape', sequence: '\x1b' });
+  assert.equal(await escaped, false, 'escape declines');
+});
+
+test('a tool can ask the person to choose several options or type their own answer, inside the chat', async (t) => {
+  const { app } = await tui(t);
+  const { createInteractionHandler } = await import('../src/tui/interaction.mjs');
+  const handler = createInteractionHandler(app);
+  const key = (name, extra = {}) => app.onKey({ name, sequence: name, printable: name.length === 1, ...extra });
+  const options = [{ id: 'a', label: 'Margherita', price: '$12' }, { id: 'b', label: 'Pepperoni' }, { id: 'c', label: 'Veggie' }];
+
+  const many = handler.choose({ title: 'Toppings', question: 'Which pizzas?', options, multi: true, allowOther: true, otherLabel: 'Something else…' });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(screenText(app), /Which pizzas\?[\s\S]*Margherita[\s\S]*Pepperoni[\s\S]*Veggie[\s\S]*Something else/);
+  key('space');
+  key('down'); key('down');
+  key('space');
+  key('enter');
+  assert.deepEqual(await many, { ids: ['a', 'c'], other: null });
+  assert.equal(app.prompt, null);
+
+  const own = handler.choose({ title: 'Pick', question: 'Where?', options, allowOther: true });
+  await new Promise((resolve) => setImmediate(resolve));
+  key('4');
+  for (const letter of 'Home') key(letter);
+  key('enter');
+  assert.deepEqual(await own, { ids: [], other: 'Home' });
+
+  const single = handler.choose({ title: 'Pick', question: 'One?', options });
+  await new Promise((resolve) => setImmediate(resolve));
+  key('2');
+  assert.deepEqual(await single, { ids: ['b'], other: null });
+
+  const secret = handler.secret({ title: 'Password', question: 'Password for example.com' });
+  await new Promise((resolve) => setImmediate(resolve));
+  for (const letter of 'hunter2') key(letter);
+  assert.doesNotMatch(screenText(app), /hunter2/, 'a secret is never drawn');
+  key('enter');
+  assert.deepEqual(await secret, { value: 'hunter2' });
+
+  const declined = handler.choose({ title: 'Pick', question: 'One?', options });
+  await new Promise((resolve) => setImmediate(resolve));
+  key('escape');
+  assert.deepEqual(await declined, { cancelled: true });
 });
 
 test('approval previews render commands, edits as diffs, and file writes', () => {
