@@ -431,6 +431,43 @@ const skillCommands = {
   },
 };
 
+// ---------------------------------------------------------------------------- model
+
+const modelCommands = {
+  profile: {
+    usage: 'model profile [--model REF]',
+    summary: 'Show how much help the harness gives a model, and why',
+    async run(context) {
+      const ref = context.args.model || context.runtime.config.get().defaultModel;
+      const profile = await context.runtime.providerManager.modelProfile(ref);
+      const described = context.runtime.engine.capabilities.describe(profile.ref, profile);
+      if (context.ui.emit(described)) return;
+      context.ui.heading(described.ref, `level ${described.level} of 3 (${described.source})`);
+      context.ui.key('window', `${profile.contextWindow} tokens, tier ${profile.tier}`, 18);
+      context.ui.key('score', String(Math.round(described.score * 100) / 100), 18);
+      context.ui.key('help', Object.entries(described.knobs).filter(([name]) => name !== 'level').map(([name, value]) => `${name}=${value}`).join('  '), 18);
+      if (described.calibration) {
+        context.ui.key('calibrated', `${described.calibration.at}`, 18);
+        for (const probe of described.calibration.probes || []) context.ui.key(`  ${probe.name}`, `${probe.score}  ${probe.detail}`, 18);
+      } else context.ui.info('Not calibrated: run `maskshift model calibrate` to measure it instead of estimating from its size.');
+      if (described.observed) context.ui.key('observed', `${described.observed.runs} runs, stumble rate ${Math.round(described.observed.ema * 100) / 100}`, 18);
+    },
+  },
+  calibrate: {
+    usage: 'model calibrate [--model REF]',
+    summary: 'Measure a model with short probes (a few thousand tokens) and store the result',
+    async run(context) {
+      const ref = context.args.model || context.runtime.config.get().defaultModel;
+      const workspace = await resolveWorkspace(context);
+      const result = await context.runtime.toolRegistry.execute('model_calibrate', { model: ref }, toolContext(context.runtime, workspace));
+      if (context.ui.emit(result)) return;
+      context.ui.heading(result.ref, `composite ${result.composite} → level ${result.decision.level}`);
+      for (const probe of result.probes) context.ui.key(probe.name, `${probe.score}  ${probe.detail}`, 14);
+      context.ui.info(`${result.tokens.input + result.tokens.output} tokens used`);
+    },
+  },
+};
+
 // ------------------------------------------------------------------------ mcp
 
 const mcpCommands = {
@@ -1011,6 +1048,7 @@ export const GROUPS = {
   session: { title: 'Heists', commands: sessionCommands, defaultCommand: 'list' },
   tools: { title: 'Tools', commands: toolCommands, defaultCommand: 'list' },
   skills: { title: 'Skills', commands: skillCommands, defaultCommand: 'list' },
+  model: { title: 'Model capability', commands: modelCommands, defaultCommand: 'profile' },
   mcp: { title: 'MCP network', commands: mcpCommands, defaultCommand: 'list' },
   plugins: { title: 'Plugins', commands: pluginCommands, defaultCommand: 'list' },
   automation: { title: 'Automations', commands: automationCommands, defaultCommand: 'list' },

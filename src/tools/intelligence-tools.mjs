@@ -1,3 +1,4 @@
+import { calibrateModel } from '../agent/calibration.mjs';
 function validateDag(nodes) {
   const ids = new Set(nodes.map((node) => node.id));
   if (ids.size !== nodes.length) throw new Error('DAG node IDs must be unique');
@@ -16,7 +17,7 @@ function validateDag(nodes) {
   for (const node of nodes) visit(node.id);
 }
 
-export function registerIntelligenceTools(registry, { intelligenceRouter, getEngine, config, store, skillManager }) {
+export function registerIntelligenceTools(registry, { intelligenceRouter, getEngine, config, store, skillManager, providerManager }) {
   registry.register({
     name: 'model_route', title: 'Route task to model',
     description: 'Rank configured models for a task using language/domain fit and prior MaskShift outcomes.',
@@ -24,6 +25,41 @@ export function registerIntelligenceTools(registry, { intelligenceRouter, getEng
     keywords: ['choose model', 'model router', 'benchmark routing'],
     inputSchema: { type: 'object', required: ['task'], properties: { task: { type: 'string' } } },
     execute: async (args, context) => intelligenceRouter.routeModel(args.task, { workspaceId: context.workspaceId, fallback: config.get().defaultModel }),
+  });
+
+  registry.register({
+    name: 'model_profile', title: 'Show how much help a model gets',
+    description: "Show a model's scaffolding level (0 = leave it alone, 3 = carry it), why it was chosen, the knobs that level sets, and any stored calibration scores or observed track record.",
+    category: 'orchestration', readOnly: true,
+    keywords: ['model capability', 'scaffolding level', 'calibration', 'adaptive harness'],
+    inputSchema: { type: 'object', properties: { model: { type: 'string', description: 'provider:model; defaults to the configured default model' } } },
+    execute: async (args) => {
+      const ref = args.model || config.get().defaultModel;
+      const profile = await providerManager.modelProfile(ref);
+      return getEngine().capabilities.describe(profile.ref, profile);
+    },
+  });
+
+  registry.register({
+    name: 'model_calibrate', title: 'Measure a model',
+    description: 'Run short probes (tool calling, a precise edit, planning, long-context recall) against a model and store the scores, so the harness sizes its help to what the model can actually do. Costs a few thousand tokens.',
+    category: 'orchestration', risk: 'state',
+    keywords: ['benchmark model', 'calibrate', 'capability probe', 'measure model'],
+    inputSchema: {
+      type: 'object',
+      properties: {
+        model: { type: 'string', description: 'provider:model; defaults to the configured default model' },
+        probes: { type: 'array', items: { type: 'string', enum: ['toolCalling', 'editing', 'planning', 'longContext'] } },
+      },
+    },
+    execute: async (args, context) => {
+      const ref = args.model || config.get().defaultModel;
+      const resolved = await providerManager.modelProfile(ref);
+      const result = await calibrateModel({ providerManager, modelRef: resolved.ref, signal: context.signal, only: args.probes?.length ? args.probes : null });
+      const engine = getEngine();
+      engine.capabilities.saveProfile(resolved.ref, { ...result, partial: Boolean(args.probes?.length) });
+      return { ...result, decision: engine.capabilities.decide(resolved.ref, resolved) };
+    },
   });
 
   registry.register({
