@@ -10,7 +10,7 @@
 // the same shape runtime.mjs's shell tab already uses for "this pane owns
 // the keyboard now").
 //
-// The instance strip below used to be its own catalogue entry (Mod Shop's
+// The instance strip below used to be its own catalogue entry (the old plugins view's
 // BROWSER tab, now 04 RUNTIME's) — picking which live instance to watch
 // belongs here, next to the page it drives, rather than in a separate list.
 
@@ -74,20 +74,20 @@ export function render(app, region) {
     ? truncate(app.browserFrame?.url || `${app.browserTarget.instanceId} · ${app.browserTarget.tabId}`, Math.max(10, inner - 24))
     : 'no target';
   const mode = app.browserTyping
-    ? theme.paint(' TYPING — esc to stop ', { fg: theme.roles.onPrimary, bg: theme.roles.accent, bold: true })
+    ? theme.paint(' Typing — esc to stop ', { fg: theme.roles.onPrimary, bg: theme.roles.accent, bold: true })
     : theme.paint(' i to type · click to focus ', { fg: theme.roles.muted });
   const status = fit(`${gutter(theme)}${theme.paint(statusLeft, { fg: theme.roles.label })}`, Math.max(0, inner - 30)) + mode;
 
   const strip = showStrip
-    ? tabRow(app, app.browsers.map((instance) => ({ id: instance.id, label: truncate((instance.profile || instance.id).toUpperCase(), 18) })), app.browserTarget?.instanceId, inner, {
+    ? tabRow(app, app.browsers.map((instance) => ({ id: instance.id, label: truncate(instance.profile || instance.id, 18) })), app.browserTarget?.instanceId, inner, {
       origin: { row: region.row + 1, column: region.column + SPACE.frame },
       onPick: (target, id) => void target.openBrowserView(id),
     })
     : '';
 
   const framed = panel({
-    theme, width, height, title: app.browserFrame?.title || app.browserFrame?.url || 'BROWSER',
-    note: app.browserPollBusy ? 'LIVE' : '',
+    theme, width, height, title: app.browserFrame?.title || app.browserFrame?.url || 'Browser',
+    note: app.browserPollBusy ? 'Live' : '',
     busy: false,
     focused: app.focus === 'browser',
     body: showStrip ? [strip, status, ...body] : [status, ...body],
@@ -131,7 +131,7 @@ export const hints = (app) => app.browserTyping
   ? [['esc', 'stop typing into the page']]
   : [['↵', 'pick a tab'], ['i', 'type into the page'], ['click', 'click the page'], ['scroll', 'scroll the page'], ['r', 'refresh now']];
 
-export const meta = { id: 'browser', index: '05', title: 'BROWSER', shortcut: '5' };
+export const meta = { id: 'browser', index: '5', title: 'Browser', shortcut: '5' };
 
 // -------------------------------------------------------------------- rail
 //
@@ -169,14 +169,14 @@ export function rail(app, width) {
   const { theme } = app;
   if (!app.browserTarget) return [gutter(theme) + theme.paint('No browser tab selected.', { fg: theme.roles.muted, italic: true })];
   const lines = [];
-  lines.push(theme.paint('CONSOLE', { fg: theme.roles.label, bold: true }));
+  lines.push(theme.paint('Console', { fg: theme.roles.label, bold: true }));
   if (!app.browserConsoleLog.length) lines.push(gutter(theme) + theme.paint('Nothing logged yet.', { fg: theme.roles.muted, italic: true }));
   for (const event of app.browserConsoleLog.slice(-15)) {
     const { tone, text } = consoleLine(theme, event);
     lines.push(gutter(theme) + theme.paint(truncate(text, width - SPACE.gutter), { fg: tone }));
   }
   lines.push('');
-  lines.push(theme.paint('NETWORK', { fg: theme.roles.label, bold: true }));
+  lines.push(theme.paint('Network', { fg: theme.roles.label, bold: true }));
   if (!app.browserNetworkLog.length) lines.push(gutter(theme) + theme.paint('Nothing captured yet.', { fg: theme.roles.muted, italic: true }));
   for (const event of app.browserNetworkLog.slice(-15)) {
     const { tone, text } = networkLine(theme, event);

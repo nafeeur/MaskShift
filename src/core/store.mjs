@@ -269,7 +269,7 @@ export class Store {
     this.db.prepare('UPDATE workspaces SET last_opened_at = ? WHERE id = ?').run(nowIso(), workspaceId);
   }
 
-  createSession({ workspaceId, title = 'New run', modelId = null, meta = {} } = {}) {
+  createSession({ workspaceId, title = 'New chat', modelId = null, meta = {} } = {}) {
     const timestamp = nowIso();
     const session = {
       id: id('ses'), workspace_id: workspaceId || null, title, model_id: modelId,

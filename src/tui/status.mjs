@@ -12,6 +12,7 @@
 
 import { glyphs } from './box.mjs';
 import { spin } from './motion.mjs';
+import { sentence } from './text.mjs';
 
 /**
  * The seven kinds.
@@ -42,61 +43,61 @@ export const KINDS = {
 // up legibly instead of silently rendering as grey.
 const VOCABULARY = {
   // Runs.
-  idle: ['off', 'IDLE'],
-  standby: ['off', 'STANDBY'],
-  queued: ['pending', 'QUEUED'],
-  running: ['active', 'RUNNING'],
-  cancelling: ['warn', 'STOPPING'],
-  completed: ['done', 'COMPLETE'],
-  complete: ['done', 'COMPLETE'],
-  succeeded: ['done', 'COMPLETE'],
+  idle: ['off', 'Idle'],
+  standby: ['off', 'Idle'],
+  queued: ['pending', 'Queued'],
+  running: ['active', 'Running'],
+  cancelling: ['warn', 'Stopping'],
+  completed: ['done', 'Complete'],
+  complete: ['done', 'Complete'],
+  succeeded: ['done', 'Complete'],
   ok: ['done', 'OK'],
-  failed: ['fail', 'FAILED'],
-  error: ['fail', 'ERROR'],
-  cancelled: ['off', 'CANCELLED'],
-  max_steps: ['warn', 'STEP LIMIT'],
-  stagnated: ['warn', 'STAGNATED'],
+  failed: ['fail', 'Failed'],
+  error: ['fail', 'Error'],
+  cancelled: ['off', 'Cancelled'],
+  max_steps: ['warn', 'Step limit'],
+  stagnated: ['warn', 'Stalled'],
 
   // Plan steps.
-  pending: ['pending', 'PENDING'],
-  active: ['active', 'IN FLIGHT'],
-  in_progress: ['active', 'IN FLIGHT'],
-  done: ['done', 'DONE'],
-  blocked: ['fail', 'BLOCKED'],
-  skipped: ['off', 'SKIPPED'],
+  pending: ['pending', 'Pending'],
+  active: ['active', 'In progress'],
+  in_progress: ['active', 'In progress'],
+  done: ['done', 'Done'],
+  blocked: ['fail', 'Blocked'],
+  skipped: ['off', 'Skipped'],
 
   // MCP and bridges.
-  connected: ['done', 'CONNECTED'],
-  disconnected: ['pending', 'OFFLINE'],
-  available: ['ready', 'AVAILABLE'],
-  missing: ['off', 'NOT FOUND'],
-  disabled: ['off', 'DISABLED'],
-  registry: ['ready', 'REGISTRY'],
+  connected: ['done', 'Connected'],
+  disconnected: ['pending', 'Offline'],
+  available: ['ready', 'Available'],
+  missing: ['off', 'Not found'],
+  disabled: ['off', 'Disabled'],
+  registry: ['ready', 'Registry'],
 
   // Automations, plugins, processes, browsers.
-  armed: ['ready', 'ARMED'],
-  paused: ['off', 'PAUSED'],
-  loaded: ['done', 'LOADED'],
-  exited: ['off', 'EXITED'],
-  headless: ['ready', 'HEADLESS'],
-  visible: ['ready', 'VISIBLE'],
+  armed: ['ready', 'Armed'],
+  paused: ['off', 'Paused'],
+  loaded: ['done', 'Loaded'],
+  exited: ['off', 'Exited'],
+  headless: ['ready', 'Headless'],
+  visible: ['ready', 'Visible'],
 
   // Git.
-  staged: ['done', 'STAGED'],
-  modified: ['warn', 'MODIFIED'],
-  untracked: ['pending', 'UNTRACKED'],
-  deleted: ['fail', 'DELETED'],
-  renamed: ['ready', 'RENAMED'],
-  conflict: ['fail', 'CONFLICT'],
-  current: ['done', 'CURRENT'],
-  local: ['ready', 'LOCAL'],
-  remote: ['off', 'REMOTE'],
+  staged: ['done', 'Staged'],
+  modified: ['warn', 'Modified'],
+  untracked: ['pending', 'Untracked'],
+  deleted: ['fail', 'Deleted'],
+  renamed: ['ready', 'Renamed'],
+  conflict: ['fail', 'Conflict'],
+  current: ['done', 'Current'],
+  local: ['ready', 'Local'],
+  remote: ['off', 'Remote'],
 };
 
 /** Resolve any subsystem state string to a kind, a tone and a label. */
 export function statusOf(value, { label = null } = {}) {
   const key = String(value ?? '').toLowerCase().replace(/[\s-]+/g, '_');
-  const [kind, text] = VOCABULARY[key] || ['off', String(value ?? '').toUpperCase() || 'UNKNOWN'];
+  const [kind, text] = VOCABULARY[key] || ['off', sentence(String(value ?? '').replace(/[_-]+/g, ' ')) || 'Unknown'];
   return { kind, label: label ?? text, ...KINDS[kind] };
 }
 

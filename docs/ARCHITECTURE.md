@@ -10,7 +10,7 @@ blast radius of changing a file or symbol and to identify affected tests.
 `ContextPlanner` allocates a bounded character budget across the workspace snapshot, source tree,
 instructions, memory, retrieved source, and reserve. Candidates are ranked by query overlap,
 retrieval rank, code role, recency, and provenance. The selection report is stored with the run so
-operators can answer why a file entered context without exposing model chain-of-thought.
+users can answer why a file entered context without exposing model chain-of-thought.
 
 Durable memories may cite source files. MaskShift stores each source's hash and checks it before
 recall; changed, deleted, or escaped sources mark the memory stale and keep it out of automatic
@@ -59,7 +59,7 @@ In-process runtime ───── event bus ───── audit + telemetry
         │     ├── capability controller
         │     └── plan / tool / subagent loop
         │
-        ├── Native tool registry (149 tools)
+        ├── Native tool registry (173 tools)
         ├── Skill manager (metadata eager, body lazy)
         ├── MCP manager (definition eager, connection/schema lazy)
         ├── Workspace + index + checkpoint managers
@@ -143,7 +143,7 @@ Large binary artifacts remain on disk and are referenced by path.
 
 MaskShift’s default execution target is the account running the daemon. Native tools support foreground commands, persistent PTY-like process interaction through stdin/stdout buffers, parallel commands, arbitrary host paths, SSH, rsync, containers, Kubernetes, database CLIs, Python cells, and Node cells.
 
-The tool registry still attaches risk and read/write metadata for routing, display, and audit purposes. In `overdrive` mode those labels do not create approval prompts.
+The tool registry still attaches risk and read/write metadata for routing, display, and audit purposes. In `autonomous` mode those labels do not create approval prompts.
 
 ## Terminal interface
 
@@ -153,7 +153,7 @@ under `src/tui/` that talk to the same in-process runtime objects the CLI uses.
 
 The renderer is written from scratch against Node's built-ins:
 
-- `theme.mjs` — the Phantom Protocol palette, generated for truecolor, 256-colour
+- `theme.mjs` — the MaskShift palette, generated for truecolor, 256-colour
   and 16-colour terminals from one set of hex values.
 - `text.mjs` — ANSI-aware measurement, slicing and wrapping, including wide-glyph
   handling, so styled strings keep panel alignment.
@@ -174,21 +174,21 @@ The renderer is written from scratch against Node's built-ins:
 
 Primary views:
 
-- 01 HEIST: transcript, composer, plan, live tool calls.
-- 02 FILES: workspace tree and syntax-tinted source preview.
-- 03 CAPABILITIES: searchable native tools, skills, MCP servers (installed and
+- Chat: conversation, composer, plan, live tool calls.
+- Files: workspace tree and syntax-tinted preview.
+- Capabilities: searchable native tools, skills, MCP servers (installed and
   the official registry), plugins and agent bridges, one catalogue behind five
   tabs.
-- 04 RUNTIME: direct unrestricted command execution, plus automations,
+- Runtime: direct unrestricted command execution, plus automations,
   background processes and browser instances behind a secondary tab strip.
-- 05 BROWSER: a live, clickable view of a running browser tab.
-- 06 GIT: working tree changes, log, branches, stash, checkpoints, worktrees.
+- Browser: a live, clickable view of a running browser tab.
+- Git: working tree changes, log, branches, stash, checkpoints, worktrees.
 
-On 01 HEIST, the right rail carries the plan, live loadout telemetry and the raw
-event bus; every other view gets the same slot for its own context instead (a
+In Chat, the right sidebar carries the plan, the tools in use and the raw
+event feed; every other view gets the same slot for its own context instead (a
 file's place in the code graph, a capability's usage, shell job history, a
 browser tab's console/network tail, or a changed file's commit history). Below
-108 columns the rail hides itself and the header sheds telemetry chips, so the
+108 columns the sidebar hides itself and the header sheds telemetry chips, so the
 interface stays usable at 80×24.
 
 ## Command line
@@ -210,7 +210,7 @@ A plugin exports `activate(api)` and may:
 
 Plugins run in the daemon process with the same authority as MaskShift. Activation and deactivation update the live tool registry without restarting the server.
 
-Install through the Mod Shop (`5`), the `maskshift plugins` subcommands, or the tool directly:
+Install through the Capabilities view (`3`), the `maskshift plugins` subcommands, or the tool directly:
 
 ```text
 plugin_install source=/absolute/path/to/plugin kind=local
@@ -220,7 +220,7 @@ plugin_install source=@scope/maskshift-plugin kind=auto
 
 A complete worked example is in [`examples/plugins/telemetry-pack`](../examples/plugins/telemetry-pack).
 
-MaskShift also detects compatible local coding CLIs — Claude Code, Codex, OpenCode, GitHub
+MaskShift also detects compatible local agent CLIs — Claude Code, Codex, OpenCode, GitHub
 Copilot CLI, Nous Hermes, Aider, plus any custom `agentBridges` entry — and can delegate scoped
 work to them while retaining the parent run, telemetry and repository context. These CLIs are
 not vendored; a bridge activates when the executable is on `PATH`.

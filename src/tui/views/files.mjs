@@ -82,11 +82,11 @@ export function render(app, region) {
   // reads as a column, not a stray number.
   const sizeHeader = gutter(theme) + columns(theme, [
     { text: '' },
-    { text: 'SIZE', width: SIZE_WIDTH, align: 'right', tone: theme.roles.faint },
+    { text: 'Size', width: SIZE_WIDTH, align: 'right', tone: theme.roles.faint },
   ], Math.max(0, treeWidth - 4 - SPACE.gutter));
   const tree = panel({
-    theme, width: treeWidth, height, title: 'WORKSPACE',
-    stamp: `${entries.length} NODES`, focused: app.focus === 'files',
+    theme, width: treeWidth, height, title: 'Workspace',
+    stamp: `${entries.length} items`, focused: app.focus === 'files',
     body: [filter, sizeHeader, ...rows],
   });
 
@@ -110,7 +110,7 @@ export function render(app, region) {
       previewBody.push(gutter(theme) + theme.paint(cached.error, { fg: theme.roles.danger }));
     } else {
       previewBody.push(...cached.lines);
-      previewStamp = `${cached.lines.length} ROWS`;
+      previewStamp = `${cached.lines.length} rows`;
       if (cached.overlay) {
         // previewBody[0] lands on the side pane's own line 1 (its line 0 is
         // the title rule), one column in from its left edge (the pane's own
@@ -139,13 +139,13 @@ export function render(app, region) {
     ));
     app.preview.set(painted);
     previewBody.push(...app.preview.render(height - 1, previewWidth - 2));
-    previewStamp = `${app.previewLines.length} LINES`;
+    previewStamp = `${app.previewLines.length} lines`;
   }
 
   // No frame here: the tree's own right-hand rule already divides the two.
   const preview = sidePane(app, {
     width: previewWidth, height,
-    title: app.previewPath ? truncate(app.previewPath, 40) : 'SOURCE VIEW',
+    title: app.previewPath ? truncate(app.previewPath, 40) : 'Source',
     stamp: previewStamp,
     focused: app.focus === 'preview',
     body: previewBody,
@@ -248,11 +248,11 @@ export const hints = () => [
   ['↑↓', 'browse'], ['↵', 'open/fold'], ['/', 'filter'], ['a', 'attach'], ['h', 'hidden'], ['r', 'refresh'], ['tab', 'preview'],
 ];
 
-export const meta = { id: 'files', index: '02', title: 'FILES', shortcut: '2' };
+export const meta = { id: 'files', index: '2', title: 'Files', shortcut: '2' };
 
 // -------------------------------------------------------------------- rail
 //
-// The chat rail's plan/loadout/events tabs are chat-specific (see app.mjs's
+// The chat rail's plan/active/events tabs are chat-specific (see app.mjs's
 // paint()) — every other view gets this slot for its own context instead.
 // Here that's the selected file's place in the persistent code graph
 // (src/indexer/code-graph.mjs): its symbols, what it imports and what

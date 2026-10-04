@@ -4,7 +4,7 @@ import { notify } from '../src/notify/index.mjs';
 
 test('notify launches the OS default notifier and never throws even for a missing binary', async () => {
   await new Promise((resolve) => {
-    notify({ title: 'MaskShift — CLEAN GETAWAY', message: 'Refactor the frame renderer' }, {
+    notify({ title: 'MaskShift — Completed', message: 'Refactor the frame renderer' }, {
       onError: () => resolve(), // a real box may or may not have osascript/notify-send/powershell
     });
     // If spawn succeeded synchronously with no error, that's success too.

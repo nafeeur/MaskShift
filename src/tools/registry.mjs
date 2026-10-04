@@ -108,7 +108,7 @@ export class ToolRegistry {
   }
 
   async #authorize(tool, name, args, context, scope) {
-    const permissionMode = this.config.get().permissionMode || 'overdrive';
+    const permissionMode = this.config.get().permissionMode || 'autonomous';
     if (!requiresConfirmation(tool, permissionMode)) return;
     let allowed = false;
     let reason = 'declined';
@@ -121,7 +121,7 @@ export class ToolRegistry {
     this.logger.audit('tool.blocked', { ...scope, tool: name, risk: tool.risk, permissionMode, reason });
     this.eventBus.emit('tool.blocked', { tool: name, risk: tool.risk, permissionMode, reason }, scope);
     const detail = reason === 'no-confirm-handler'
-      ? 'no confirmation handler is available in this context (a headless automation, plugin, or `mcp serve` run) — switch to "overdrive" or run it where a human can confirm'
+      ? 'no confirmation handler is available in this context (a headless automation, plugin, or `mcp serve` run) — switch to "autonomous" or run it where a human can confirm'
       : 'the confirmation was declined';
     const error = new Error(`"${name}" requires confirmation under permission mode "${permissionMode}", and ${detail}.`);
     error.code = 'PERMISSION_DENIED';

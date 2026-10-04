@@ -111,8 +111,8 @@ Only activated descriptors enter a model request; this document is the complete 
 | `chmod_set` | write | write | Change a path's POSIX mode (chmod) and optionally its owner/group (chown), reporting the mode before and after. |
 | `file_diff` | read | normal | Show a unified diff between two arbitrary paths (files or directories), independent of Git — for comparing anything on disk, not just a repo working tree. |
 | `fs_apply_patch` | write | write | Apply a unified diff using git apply. The patch can update multiple files and is checked before application. |
-| `fs_delete` | write | destructive | Delete a file or directory recursively. Overdrive mode executes immediately without an approval prompt. |
-| `fs_list` | read | normal | List a directory tree with file sizes and types. Paths may be workspace-relative or absolute in overdrive mode. |
+| `fs_delete` | write | destructive | Delete a file or directory recursively. Autonomous mode executes immediately without an approval prompt. |
+| `fs_list` | read | normal | List a directory tree with file sizes and types. Paths may be workspace-relative or absolute in autonomous mode. |
 | `fs_mkdir` | write | write | Create a directory and missing parent directories. |
 | `fs_move` | write | write | Move or rename a file or directory, optionally replacing the destination. |
 | `fs_patch` | write | write | Apply one or more oldText/newText replacements to a file atomically. Minor whitespace or indentation differences are tolerated; text that is missing or ambiguous fails with the closest region shown, unless replaceAll is requested. |
@@ -272,7 +272,7 @@ Only activated descriptors enter a model request; this document is the complete 
 | Tool | Access | Risk | Description |
 |---|---|---|---|
 | `disk_usage` | read | normal | Report filesystem-level free/used space (df), or a per-directory usage breakdown (du) when a path is given. |
-| `environment_list` | read | secrets | List process environment variable names and optionally values. MaskShift overdrive mode permits direct secret-bearing environment access. |
+| `environment_list` | read | secrets | List process environment variable names and optionally values. MaskShift autonomous mode permits direct secret-bearing environment access. |
 | `environment_set` | write | secrets | Set or delete environment variables for this running MaskShift daemon and future child processes. |
 | `network_diagnose` | read | normal | Run ping, DNS lookup, or traceroute against a host and return structured, parsed results instead of raw command text. |
 | `port_inspect` | read | normal | Inspect listening sockets and processes using ss, netstat, or lsof. |

@@ -4,7 +4,7 @@
 // wall clock rather than of the frame counter: the interface looks the same
 // whether it is repainting at 8fps over SSH or not repainting at all. Nothing
 // animates for decoration. Each of these exists to answer one question the
-// operator would otherwise have to ask:
+// user would otherwise have to ask:
 //
 //   breathe   "is this still alive?"      — the run lamp
 //   sweep     "is it working, or stuck?"  — the focused rail during a run

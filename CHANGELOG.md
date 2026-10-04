@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Rebranded MaskShift from a coding harness to a general-purpose agent harness. The system prompt, starter prompts, documentation and examples now cover any kind of task rather than software alone, and the prompt tells the model to treat the content of files, web pages and tool results as data, never as instructions.
+- Replaced the themed interface language with plain, professional wording and ordinary sentence case, keeping the colour scheme: sessions are now **chats**, views are Chat / Files / Capabilities / Runtime / Browser / Git, the sidebar tabs are Plan / Active / Events, run outcomes read Completed / Cancelled / Failed / Step limit reached, and the header shows Workspace and Model. The idle screen drops the mask artwork for the wordmark, a one-line description and three starters. The `/mods` slash command is now `/runtime` (the old name still works), and the new default chat title is "New chat".
+- Renamed the `overdrive` permission mode to `autonomous`. Existing configuration files that say `overdrive` keep working and are read as `autonomous`. `docs/PERMISSIVE_MODE.md` is now `docs/PERMISSIONS.md`.
+- New brand mark and banner (same colours), regenerated screenshots against a neutral demo workspace including a welcome screen, and a README rewritten around the general-purpose positioning with the duplicated feature tables and the competitor comparison removed.
+- The `terminal-phantom-ui` skill is now `terminal-ui`.
+
 - Added an adaptive harness. Each model gets a 0–3 help level from a measured calibration (`maskshift model calibrate`), its observed track record, or a size prior, and the level rises mid-run when the model keeps stumbling; a context window under 16k always forces the compact prompt and core tools. New `model_profile` and `model_calibrate` tools and `model profile|calibrate` commands.
 - Added forgiving edits: `fs_patch` now tolerates trailing whitespace, indentation, whitespace runs, CRLF, a copied `fs_read` line-number gutter and unambiguous near matches, and shows the closest region of the file on a real miss. New `symbol_read`, `symbol_replace` and `fs_replace_lines` tools edit by name or line range without reproducing old text.
 - Added deterministic tool-call repair: misnamed tools (`read_file`, `bash`, typos, namespaces), misspelled argument keys, wrong scalar types, JSON-encoded containers and flattened edits are fixed in code instead of costing a model turn; a call missing a required argument is rejected before it runs with a usage line.

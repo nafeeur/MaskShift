@@ -1,6 +1,6 @@
 // Styled output for the non-interactive CLI.
 //
-// The CLI wears the same Phantom Protocol palette as the TUI: crimson rules,
+// The CLI wears the same palette as the TUI: crimson rules,
 // bone text, gold keys. Every printer degrades to plain text under --json,
 // NO_COLOR or a redirected stdout.
 
@@ -8,7 +8,7 @@ import { glyphs, meter, rule } from '../tui/box.mjs';
 import { heroBlock, SUBTITLE } from '../tui/brand.mjs';
 import { renderMarkdown } from '../tui/markdown.mjs';
 import { Theme } from '../tui/theme.mjs';
-import { fit, oneLine, padStart, repeat, truncate, visibleWidth, wrap } from '../tui/text.mjs';
+import { fit, oneLine, padStart, repeat, sentence, truncate, visibleWidth, wrap } from '../tui/text.mjs';
 
 export class Ui {
   constructor({ json = false, stream = process.stdout, errorStream = process.stderr } = {}) {
@@ -37,8 +37,8 @@ export class Ui {
     if (compact) {
       // The wordmark, drawn as text rather than as a fill — the same mark the
       // full-screen interface puts in its identity band.
-      this.write(theme.paint('MASK', { fg: theme.roles.primary, bold: true })
-        + theme.paint('SHIFT', { fg: theme.roles.text, bold: true })
+      this.write(theme.paint('Mask', { fg: theme.roles.primary, bold: true })
+        + theme.paint('Shift', { fg: theme.roles.text, bold: true })
         + theme.paint(`  ${SUBTITLE}  ${this.marks.dot}  v${version}`, { fg: theme.roles.muted }));
       return;
     }
@@ -50,7 +50,7 @@ export class Ui {
   heading(text, index = '') {
     if (this.json) return;
     const { theme } = this;
-    const label = `${index ? `${index} ` : ''}${text.toUpperCase()}`;
+    const label = `${index ? `${index} ` : ''}${text}`;
     this.write('');
     // A heading is a name on a rule, not a block of colour. Filled chips are
     // for the one selected thing in a strip of peers, and a command's output
@@ -62,7 +62,7 @@ export class Ui {
   section(text) {
     if (this.json) return;
     this.write('');
-    this.write(this.theme.paint(text.toUpperCase(), { fg: this.theme.roles.label, bold: true }));
+    this.write(this.theme.paint(text, { fg: this.theme.roles.label, bold: true }));
   }
 
   line(text = '') { if (!this.json) this.write(text); }
@@ -84,7 +84,7 @@ export class Ui {
     for (const [label, value, tone] of pairs) {
       if (value === undefined || value === null || value === '') continue;
       const body = wrap(String(value), Math.max(10, this.width - labelWidth - 2));
-      this.write(theme.paint(fit(String(label).toUpperCase(), labelWidth), { fg: theme.roles.muted })
+      this.write(theme.paint(fit(sentence(String(label)), labelWidth), { fg: theme.roles.muted })
         + theme.paint(body[0] ?? '', { fg: tone || theme.roles.text }));
       for (const piece of body.slice(1)) this.write(`${' '.repeat(labelWidth)}${theme.paint(piece, { fg: tone || theme.roles.text })}`);
     }
@@ -109,7 +109,7 @@ export class Ui {
       sizes[widest] = Math.max(8, sizes[widest] - (total - this.width));
     }
     this.write(columns.map((column, index) => theme.paint(
-      fit(String(column.label || column.key).toUpperCase(), sizes[index], { align: column.align || 'left' }),
+      fit(sentence(String(column.label || column.key)), sizes[index], { align: column.align || 'left' }),
       { fg: theme.roles.label, bold: true },
     )).join('  '));
     this.write(theme.paint(sizes.map((size) => repeat(theme.unicode ? '─' : '-', size)).join('  '), { fg: theme.roles.border }));

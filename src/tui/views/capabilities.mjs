@@ -1,12 +1,12 @@
 // 03 CAPABILITIES — every native tool and skill, MCP servers (installed and
 // the official registry), plugins and agent bridges: one catalogue, five
-// tabs. Used to be three separate views (arsenal/network/modshop.mjs) built
+// tabs. Used to be three separate views (tools, MCP, plugins) built
 // on the same list+detail chrome with tabs bolted on for each; this merges
 // them into the one shared tab switcher catalog.mjs already provides.
 
 import { glyphs } from '../box.mjs';
 import { renderMarkdown } from '../markdown.mjs';
-import { fit, oneLine, truncate, wrap } from '../text.mjs';
+import { fit, oneLine, sentence, truncate, wrap } from '../text.mjs';
 import { statusGlyph, statusOf } from '../status.mjs';
 import { SPACE } from '../tokens.mjs';
 import { gutter, label as typeLabel } from '../type.mjs';
@@ -16,11 +16,11 @@ import { fuzzy, highlightMatch } from '../widgets.mjs';
 const RISK_TONES = { high: 'danger', elevated: 'warning', normal: 'muted', low: 'muted' };
 
 const TABS = [
-  { id: 'tools', label: 'TOOLS' },
-  { id: 'skills', label: 'SKILLS' },
+  { id: 'tools', label: 'Tools' },
+  { id: 'skills', label: 'Skills' },
   { id: 'mcp', label: 'MCP' },
-  { id: 'plugins', label: 'PLUGINS' },
-  { id: 'bridges', label: 'BRIDGES' },
+  { id: 'plugins', label: 'Plugins' },
+  { id: 'bridges', label: 'Bridges' },
 ];
 
 const NAME_WIDTH = 28;
@@ -92,8 +92,8 @@ function toolRow(app, item, selected, width) {
   const accent = item.kind === 'tool' ? theme.roles.tool : theme.roles.skill;
   const loaded = app.activeCapabilities.has(item.name);
   const access = item.kind === 'tool'
-    ? (item.readOnly ? 'READ' : 'WRITE')
-    : (item.category || 'SKILL').slice(0, 5).toUpperCase();
+    ? (item.readOnly ? 'Read' : 'Write')
+    : sentence((item.category || 'Skill').slice(0, 5));
   return listRow(app, {
     selected, width,
     marker: loaded ? mark.lamp : '',
@@ -110,7 +110,7 @@ function mcpRow(app, item, selected, width) {
   const { theme } = app;
   const state = statusOf(item.status);
   const tone = theme.role(state.tone);
-  const count = item.toolCount ? `${item.toolCount} TOOLS` : '';
+  const count = item.toolCount ? `${item.toolCount} tools` : '';
   return listRow(app, {
     selected, width,
     marker: statusGlyph(theme, item.status, { animate: false }),
@@ -169,7 +169,7 @@ function toolDetail(app, item, width) {
     { field: 'category', value: item.category },
     { field: 'access', value: item.readOnly ? 'read only' : 'writes / executes', tone: item.readOnly ? theme.roles.success : theme.roles.danger },
     { field: 'risk', value: item.risk || 'normal', tone: theme.role(RISK_TONES[item.risk] || 'muted') },
-    { field: 'always on', value: item.alwaysAvailable ? 'yes' : 'summoned on demand' },
+    { field: 'always on', value: item.alwaysAvailable ? 'yes' : 'loaded on demand' },
     { heading: 'parameters' },
     { raw: schemaLines(app, item.schema, Math.max(8, width - SPACE.gutter)) },
   ]);
@@ -291,7 +291,7 @@ export function render(app, region) {
   const stamps = {
     tools: `${list.length} OF ${counts.tools}`,
     skills: `${list.length} OF ${counts.skills}`,
-    mcp: app.mcpMode === 'registry' ? `${app.registryResults.length} FOUND` : `${app.mcpServers.filter((s) => s.status === 'connected').length} CONNECTED`,
+    mcp: app.mcpMode === 'registry' ? `${app.registryResults.length} found` : `${app.mcpServers.filter((s) => s.status === 'connected').length} connected`,
     plugins: `${list.length} OF ${counts.plugins}`,
     bridges: `${list.length} OF ${counts.bridges}`,
   };
@@ -308,8 +308,8 @@ export function render(app, region) {
     stamp: stamps[app.capabilitiesTab],
     empty: EMPTY_HINTS(app),
     detail: detail(app, Math.max(30, Math.floor(region.width * 0.4) - 4)),
-    detailTitle: app.capabilitiesList.current?.name ? truncate(app.capabilitiesList.current.name, 30) : 'DOSSIER',
-    detailStamp: { tool: 'TOOL', skill: 'SKILL', server: 'MCP', registry: 'REGISTRY', plugin: 'PLUGIN', bridge: 'BRIDGE' }[app.capabilitiesList.current?.kind] || '',
+    detailTitle: app.capabilitiesList.current?.name ? truncate(app.capabilitiesList.current.name, 30) : 'Details',
+    detailStamp: { tool: 'Tool', skill: 'Skill', server: 'MCP', registry: 'Registry', plugin: 'Plugin', bridge: 'Bridge' }[app.capabilitiesList.current?.kind] || '',
     onTab: (target, id) => { target.capabilitiesTab = id; target.capabilitiesFilter.clear(); target.capabilitiesList.first(); },
     onActivate: (target, item) => activate(target, item),
   });
@@ -366,14 +366,14 @@ export function handle(app, event) {
 
 export const hints = (app) => {
   const base = [['tab', 'section'], ['/', 'search']];
-  if (app.capabilitiesTab === 'tools') return [...base, ['↵', 'load'], ['x', 'run tool'], ['→', 'dossier']];
-  if (app.capabilitiesTab === 'skills') return [...base, ['↵', 'load'], ['→', 'dossier']];
+  if (app.capabilitiesTab === 'tools') return [...base, ['↵', 'load'], ['x', 'run tool'], ['→', 'details']];
+  if (app.capabilitiesTab === 'skills') return [...base, ['↵', 'load'], ['→', 'details']];
   if (app.capabilitiesTab === 'mcp') return [...base, ['↵', 'connect/install'], ['a', 'add server'], ['d', 'disconnect'], ['del', 'remove'], ['g', 'installed/registry']];
   if (app.capabilitiesTab === 'plugins') return [...base, ['↵', 'toggle'], ['n', 'install'], ['l', 'reload']];
   return [...base, ['↵', 'delegate'], ['r', 'rescan']];
 };
 
-export const meta = { id: 'capabilities', index: '03', title: 'CAPABILITIES', shortcut: '3' };
+export const meta = { id: 'capabilities', index: '3', title: 'Capabilities', shortcut: '3' };
 
 // -------------------------------------------------------------------- rail
 //

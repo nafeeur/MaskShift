@@ -7,11 +7,12 @@ function contextFor(runtime, workspace, project) {
   return { workspaceId: workspace.id, workspacePath: project, eventBus: runtime.eventBus, scope: { workspaceId: workspace.id } };
 }
 
-test('requiresConfirmation never gates readOnly tools or overdrive mode', () => {
+test('requiresConfirmation never gates readOnly tools or autonomous mode', () => {
   const readOnlyTool = { readOnly: true, risk: 'host-exec' };
   assert.equal(requiresConfirmation(readOnlyTool, 'review'), false);
   const writeTool = { readOnly: false, risk: 'write' };
-  assert.equal(requiresConfirmation(writeTool, 'overdrive'), false);
+  assert.equal(requiresConfirmation(writeTool, 'autonomous'), false);
+  assert.equal(requiresConfirmation(writeTool, 'overdrive'), false, 'the legacy name still means autonomous');
 });
 
 test('balanced gates only high-risk tiers; review gates every non-readOnly tool', () => {

@@ -6,7 +6,7 @@
 //   1. A pane's frame states focus and nothing else. Focus is a warm, dark
 //      line — not a saturated box. An earlier revision drew a full crimson
 //      heavy frame around whichever pane held the keyboard, which put the
-//      loudest thing on screen around the thing the operator was already
+//      loudest thing on screen around the thing the user was already
 //      looking at.
 //
 //   2. A rail label is text, never a filled chip. The one filled chip in the
@@ -69,7 +69,7 @@ export function frameSet(theme, weight = 'light') {
  * Unfocused panes recede to a hairline. A focused pane's frame is the border
  * carried toward the *deep* end of the brand, not toward the accent: a frame
  * mixed with full crimson traces a bright pink rectangle around whatever the
- * operator is already looking at, which made the border the loudest element on
+ * user is already looking at, which made the border the loudest element on
  * every screen. Dark red says "this one" without saying it twice.
  */
 export function frameColour(theme, focused) {

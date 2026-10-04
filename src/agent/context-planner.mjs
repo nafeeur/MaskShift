@@ -56,7 +56,7 @@ export class ContextPlanner {
     };
     const budgets = allocate(total, weights);
     // Repository instructions (AGENTS.md, CLAUDE.md, …) are the one section a smaller budget
-    // must not squeeze out: they are how the operator steers every run.
+    // must not squeeze out: they are how the user steers every run.
     const instructionsFull = allocate(full, weights).instructions;
     budgets.instructions = Math.min(instructionsFull, Math.max(budgets.instructions, 12_000));
     return budgets;

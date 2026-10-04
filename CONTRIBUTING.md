@@ -12,7 +12,7 @@ Core expectations:
 
 - preserve lazy capability loading; do not inject the full catalog into every model request;
 - add tools through a focused registration module and provide precise input schemas;
-- mark tools with correct category, read-only state, and risk label even though overdrive does not prompt;
+- mark tools with correct category, read-only state, and risk label even though autonomous mode does not prompt;
 - bound model-facing output and include actionable errors;
 - add regression coverage for fixed defects;
 - keep the terminal interface dependency-free, and verify it renders at 80×24 as well as at 200×60;

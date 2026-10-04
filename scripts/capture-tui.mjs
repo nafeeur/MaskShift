@@ -19,7 +19,32 @@ const ESC = String.fromCharCode(27);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = parseArgs(process.argv.slice(2));
 const outputDir = path.resolve(args.out || path.join(root, 'docs', 'screenshots'));
-const workspacePath = path.resolve(args.workspace || root);
+// The demo workspace is a scratch folder of everyday documents, not this repository, so the
+// captures show what the product does for any kind of work.
+async function scratchWorkspace() {
+  const base = await fsp.mkdtemp(path.join(os.tmpdir(), 'maskshift-demo-'));
+  const dir = path.join(base, 'Documents');
+  const files = {
+    'README.md': '# Documents\n\nInvoices, reports and planning notes.\n',
+    'Invoices/northwind-0412.pdf': 'placeholder\n',
+    'Invoices/contoso-0418.pdf': 'placeholder\n',
+    'Invoices/fabrikam-0502.pdf': 'placeholder\n',
+    'Reports/q2-by-vendor.xlsx': 'placeholder\n',
+    'Notes/offsite-plan.md': '# Team offsite\n\n- Venue shortlist\n- Agenda draft\n- Budget under $6,000\n',
+    'Notes/meeting-2025-09-12.md': '# Meeting notes\n\nAction items are listed below.\n',
+  };
+  for (const [name, content] of Object.entries(files)) {
+    await fsp.mkdir(path.dirname(path.join(dir, name)), { recursive: true });
+    await fsp.writeFile(path.join(dir, name), content);
+  }
+  await runCommand('git init -q -b main && git config user.email demo@maskshift.invalid && git config user.name demo && git add . && git commit -qm "Initial documents"', { cwd: dir });
+  await fsp.writeFile(path.join(dir, 'Notes/offsite-plan.md'), '# Team offsite\n\n- Venue shortlist (3 options)\n- Agenda draft for two days\n- Budget under $6,000\n- Travel plan\n');
+  await fsp.writeFile(path.join(dir, 'Reports/q3-by-vendor.xlsx'), 'placeholder\n');
+  await fsp.rm(path.join(dir, 'Notes/meeting-2025-09-12.md'));
+  return dir;
+}
+
+const workspacePath = path.resolve(args.workspace || await scratchWorkspace());
 
 const COLUMNS = Number(args.columns || 132);
 const ROWS = Number(args.rows || 38);
@@ -198,32 +223,32 @@ try {
   await app.refreshRuntimeExtras({ force: true });
   await app.refreshGitView({ force: true });
 
-  // A representative transcript so the hero capture shows real work.
+  // A representative conversation so the main capture shows real, non-trivial work.
   const now = new Date().toISOString();
-  app.sessionTitle = 'RENDERER REFACTOR';
+  app.sessionTitle = 'Q3 invoice summary';
   app.messages = [
-    { role: 'user', created_at: now, meta: {}, content: 'Refactor the frame renderer so repaints only rewrite changed rows, then prove it with a test.' },
+    { role: 'user', created_at: now, meta: {}, content: 'Go through the PDFs in ~/Documents/Invoices, total the amounts by vendor for Q3, and write the result to a spreadsheet I can send to finance.' },
     {
-      role: 'assistant', created_at: now, meta: { modelRef: 'ollama:qwen3-coder' },
-      content: '## Plan\n\nThe screen currently repaints every row. I will diff against the previous frame instead.\n\n- read `src/tui/screen.mjs`\n- keep the previous frame and rewrite only changed rows\n- add a regression test\n\n```js\nfor (let row = 0; row < rows; row += 1) {\n  if (this.previous[row] === frame[row]) continue;\n  out += `${moveTo(row, 0)}${clearLine}${frame[row]}`;\n}\n```\n',
+      role: 'assistant', created_at: now, meta: { modelRef: 'anthropic:claude-sonnet-5' },
+      content: '## Plan\n\nThere are 23 PDFs. I will extract the vendor and amount from each one, check that the totals add up, and write one row per vendor.\n\n- list the folder and read each invoice\n- group the amounts by vendor\n- write `q3-by-vendor.xlsx` and verify it by reading it back\n\n```python\ntotals = defaultdict(float)\nfor invoice in invoices:\n    totals[invoice.vendor] += invoice.amount\n```\n',
     },
-    { role: 'tool', meta: { toolName: 'fs_read', isError: false }, content: 'src/tui/screen.mjs — 94 lines' },
-    { role: 'tool', meta: { toolName: 'fs_apply_patch', isError: false }, content: '1 file changed, 12 insertions(+), 4 deletions(-)' },
-    { role: 'tool', meta: { toolName: 'shell_exec', isError: false }, content: 'node --test tests/tui.test.mjs → 12 pass, 0 fail' },
-    { role: 'assistant', created_at: now, meta: {}, content: 'Done. Repaints now touch only the rows that changed, and `tests/tui.test.mjs` asserts an unchanged frame writes nothing at all.' },
+    { role: 'tool', meta: { toolName: 'fs_list', isError: false }, content: '~/Documents/Invoices — 23 files' },
+    { role: 'tool', meta: { toolName: 'pdf_read', isError: false }, content: '23 invoices read — 2 needed OCR' },
+    { role: 'tool', meta: { toolName: 'python_cell', isError: false }, content: '9 vendors, total $48,215.60 — matches the sum of the invoices' },
+    { role: 'assistant', created_at: now, meta: {}, content: 'Done. `q3-by-vendor.xlsx` has one row per vendor (9 in total) and a total of $48,215.60. I re-opened the file to confirm the totals match the invoices. Two scans were low quality, so I listed them on a second sheet for you to double-check.' },
   ];
   app.plan = {
-    summary: 'Diff frames instead of repainting the screen.',
+    summary: 'Total Q3 invoices by vendor.',
     steps: [
-      { title: 'Read the screen module', status: 'done' },
-      { title: 'Keep the previous frame and diff rows', status: 'done' },
-      { title: 'Add a regression test for an unchanged frame', status: 'active' },
-      { title: 'Run the suite', status: 'pending' },
+      { title: 'Read every invoice in the folder', status: 'done' },
+      { title: 'Group the amounts by vendor', status: 'done' },
+      { title: 'Write the spreadsheet', status: 'active' },
+      { title: 'Check the totals against the invoices', status: 'pending' },
     ],
   };
   app.capabilitySnapshot = {
-    tools: ['fs_read', 'fs_apply_patch', 'shell_exec', 'repo_search'],
-    skills: ['test-engineering', 'code-review'],
+    tools: ['fs_list', 'pdf_read', 'python_cell', 'fs_write'],
+    skills: ['data-analysis', 'xlsx'],
     mcpServers: [],
   };
   app.tokenHistory = [12, 48, 26, 84, 51, 96, 38, 72, 44, 88];
@@ -233,13 +258,19 @@ try {
   app.startedAt = Date.now() - 112_000;
   app.step = 9;
 
+  // Two scheduled jobs so the Runtime view shows something real.
+  const workspaceId = app.workspaceId;
+  await runtime.toolRegistry.execute('automation_create', { name: 'weekly-notes-summary', schedule: 'every 7d', action: { type: 'agent', prompt: "Summarize this week's notes and list the open action items" } }, { workspaceId, workspacePath, scope: { workspaceId }, eventBus: runtime.eventBus });
+  await runtime.toolRegistry.execute('automation_create', { name: 'invoice-check', schedule: '0 9 * * 1', action: { type: 'agent', prompt: 'Check the Invoices folder for new files and add them to the Q3 summary' } }, { workspaceId, workspacePath, scope: { workspaceId }, eventBus: runtime.eventBus });
+  await app.refreshRuntimeExtras({ force: true });
+
   const captures = [
-    ['heist', 'MaskShift — 01 HEIST', () => { app.view = 'chat'; app.focus = 'composer'; app.railTab = 'plan'; }],
-    ['loadout', 'MaskShift — live loadout telemetry', () => { app.view = 'chat'; app.railTab = 'telemetry'; }],
-    ['files', 'MaskShift — 02 FILES', () => { app.view = 'files'; app.focus = 'files'; app.fileList.selected = 6; }],
-    ['capabilities', 'MaskShift — 03 CAPABILITIES', () => { app.view = 'capabilities'; app.focus = 'capabilities'; app.capabilitiesTab = 'mcp'; app.capabilitiesFilter.clear(); }],
-    ['runtime', 'MaskShift — 04 RUNTIME', () => { app.view = 'runtime'; app.runtimeTab = 'automations'; app.focus = 'runtime'; }],
-    ['git', 'MaskShift — 06 GIT', async () => {
+    ['chat', 'MaskShift — Chat', () => { app.view = 'chat'; app.focus = 'composer'; app.railTab = 'plan'; }],
+    ['active-tools', 'MaskShift — tools in use', () => { app.view = 'chat'; app.railTab = 'telemetry'; }],
+    ['files', 'MaskShift — Files', () => { app.view = 'files'; app.focus = 'files'; app.fileList.selected = Math.max(0, app.fileEntries.findIndex((entry) => entry.path === 'Notes/offsite-plan.md')); }],
+    ['capabilities', 'MaskShift — Capabilities', () => { app.view = 'capabilities'; app.focus = 'capabilities'; app.capabilitiesTab = 'mcp'; app.capabilitiesFilter.clear(); }],
+    ['runtime', 'MaskShift — Runtime', () => { app.view = 'runtime'; app.runtimeTab = 'automations'; app.focus = 'runtime'; }],
+    ['git', 'MaskShift — Git', async () => {
       app.view = 'git'; app.gitTab = 'changes'; app.focus = 'git';
       // The list is only populated inside the view's own render(), so force
       // one before asking for its current row's diff.
@@ -250,64 +281,64 @@ try {
     ['palette', 'MaskShift — command palette', () => { app.view = 'chat'; app.openPalette(); app.overlay.field.set('mcp'); }],
     ['approval', 'MaskShift — approving a tool call', async () => {
       app.view = 'chat';
-      // Approvals only exist outside overdrive; the next capture puts the mode back.
+      // Approvals only exist outside autonomous mode; the next capture puts the mode back.
       runtime.config.get().permissionMode = 'balanced';
       void app.requestToolConfirmation({
         name: 'shell_exec', tool: runtime.toolRegistry.descriptor('shell_exec'),
-        args: { command: 'rm -rf node_modules/.cache && npm ci --no-audit && npm test', cwd: workspacePath },
+        args: { command: 'python3 summarize_invoices.py --quarter Q3 --out Reports/q3-by-vendor.xlsx', cwd: '~/Documents' },
       });
       await new Promise((resolve) => setImmediate(resolve));
     }],
     ['changes', 'MaskShift — what the last run changed', async () => {
       app.view = 'chat';
-      runtime.config.get().permissionMode = 'overdrive';
+      runtime.config.get().permissionMode = 'autonomous';
       const scratch = await changedRepo();
       const workspaceId = app.workspaceId;
       app.workspaceId = scratch.workspaceId;
-      app.lastUndoableRun = () => ({ run: { id: 'capture', prompt: 'Refactor the frame renderer so repaints only rewrite changed rows' }, checkpoint: scratch.checkpoint });
+      app.lastUndoableRun = () => ({ run: { id: 'capture', prompt: 'Total the Q3 invoices by vendor and write the summary report' }, checkpoint: scratch.checkpoint });
       await app.openRunChanges();
       app.snapshot();
       await new Promise((resolve) => setTimeout(resolve, 300));
       app.workspaceId = workspaceId;
     }],
-    ['sessions', 'MaskShift — heist archive', () => {
+    ['chats', 'MaskShift — chats', () => {
       app.view = 'chat';
-      const summary = '## Goal\n- Make repaints rewrite only changed rows, and prove it with a test.\n## Open issues\n- Resize still forces a full repaint.\n- The Windows console path is untested.';
+      const summary = '## Goal\n- Total the Q3 invoices by vendor and write them to a spreadsheet.\n## Open issues\n- Two scans are low quality and need a manual check.\n- Finance has not confirmed the currency for one vendor.';
       const make = (title, prompt, withSummary) => {
         const session = runtime.engine.createSession({ workspaceId: app.workspaceId, title, modelRef: 'anthropic:claude-sonnet-5' });
         runtime.store.addMessage({ sessionId: session.id, role: 'user', content: prompt });
         if (withSummary) runtime.store.updateSession(session.id, { meta: { compaction: { summary, throughMessageId: 'capture' } } });
         return session;
       };
-      make('Add a dark-mode toggle', 'Add a dark-mode toggle to settings and persist it', false);
-      make('Flaky CI on Windows', 'Why does the TUI test hang on the Windows runner?', false);
-      const current = make('RENDERER REFACTOR', 'Now handle resize too — the previous frame must be dropped', true);
+      make('Plan the team offsite', 'Draft a two-day agenda for twelve people and a budget under $6,000', false);
+      make('Compare laptop options', 'Compare three laptops for video editing and summarize the trade-offs', false);
+      const current = make('Q3 invoice summary', 'Now add a second sheet listing the two low-quality scans', true);
       const sessionId = app.sessionId;
       app.sessionId = current.id;
       app.openSessionPicker();
       app.sessionId = sessionId;
     }],
     ['settings', 'MaskShift — settings', () => { app.view = 'chat'; app.openSettings(); }],
+    ['welcome', 'MaskShift — new chat', () => {
+      app.view = 'chat'; app.focus = 'composer'; app.railTab = 'plan';
+      app.sessionTitle = ''; app.messages = []; app.plan = { summary: '', steps: [] };
+    }],
   ];
 
   // The changes capture needs a real diff, made in a throwaway repository rather than by
   // checkpointing whatever repository the capture happens to run in.
   async function changedRepo() {
     const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'maskshift-capture-repo-'));
-    await fsp.mkdir(path.join(root, 'src/tui'), { recursive: true });
-    const screen = 'export class Screen {\n  paint(frame) {\n    let out = "";\n    for (let row = 0; row < frame.length; row += 1) {\n      out += moveTo(row) + frame[row];\n    }\n    return out;\n  }\n}\n';
-    await fsp.writeFile(path.join(root, 'src/tui/screen.mjs'), screen);
-    await fsp.writeFile(path.join(root, 'src/tui/legacy-paint.mjs'), 'export const legacy = true;\n');
+    await fsp.mkdir(path.join(root, 'report'), { recursive: true });
+    const summary = '# Q3 invoice summary\n\nVendors: 8\nTotal: $41,980.00\n';
+    await fsp.writeFile(path.join(root, 'report/summary.md'), summary);
+    await fsp.writeFile(path.join(root, 'report/draft-notes.txt'), 'scratch notes\n');
     await runCommand('git init -q && git config user.email capture@maskshift.invalid && git config user.name capture && git add . && git commit -qm init', { cwd: root });
     const workspace = await runtime.workspaceManager.open(root);
     const checkpoint = await runtime.workspaceManager.createCheckpoint(workspace.id, { runId: 'capture' });
-    await fsp.writeFile(path.join(root, 'src/tui/screen.mjs'), screen
-      .replace('    let out = "";', '    let out = "";\n    const previous = this.previous || [];')
-      .replace('      out += moveTo(row) + frame[row];', '      if (previous[row] === frame[row]) continue;\n      out += moveTo(row) + frame[row];')
-      .replace('    return out;', '    this.previous = frame.slice();\n    return out;'));
-    await fsp.mkdir(path.join(root, 'tests'), { recursive: true });
-    await fsp.writeFile(path.join(root, 'tests/screen.test.mjs'), "test('an unchanged frame writes nothing', () => {});\n");
-    await fsp.rm(path.join(root, 'src/tui/legacy-paint.mjs'));
+    await fsp.writeFile(path.join(root, 'report/summary.md'), '# Q3 invoice summary\n\nVendors: 9\nTotal: $48,215.60\n\nTwo scans were low quality and are listed on the second sheet.\n');
+    await fsp.writeFile(path.join(root, 'report/totals.csv'), 'vendor,total\nNorthwind,12400.00\nContoso,9815.60\n');
+    await fsp.rm(path.join(root, 'report/draft-notes.txt'));
     return { workspaceId: workspace.id, checkpoint };
   }
 

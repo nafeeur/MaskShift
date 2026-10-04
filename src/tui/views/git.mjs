@@ -1,7 +1,7 @@
 // 06 GIT — the dedicated source-control view: working tree changes, commit
 // history, branches, stash, checkpoints and worktrees, all in one place.
 //
-// Replaces the old small "GIT" tab that used to live in the right-hand rail
+// Replaces the old small "Git" tab that used to live in the right-hand rail
 // (a raw `git status --short` dump with no way to act on anything). This
 // view can actually do something with what it shows: stage/unstage/discard/
 // commit, switch/create/rename/delete branches, apply/pop/drop stash, restore
@@ -12,7 +12,7 @@
 // app.mjs's gitStageToggle/gitPush/etc.) rather than going through the tool
 // registry — the same pattern the header's branch readout already used in
 // refreshGit(). This keeps the deliberately curated agent-facing tool surface
-// untouched while still giving the human operator full control from the TUI.
+// untouched while still giving the human user full control from the TUI.
 
 import { glyphs } from '../box.mjs';
 import { fit, oneLine, truncate } from '../text.mjs';
@@ -23,12 +23,12 @@ import { detailBlock, handleCatalog, listRow, renderCatalog } from './catalog.mj
 import { fuzzy } from '../widgets.mjs';
 
 const TABS = [
-  { id: 'changes', label: 'CHANGES' },
-  { id: 'log', label: 'LOG' },
-  { id: 'branches', label: 'BRANCHES' },
-  { id: 'stash', label: 'STASH' },
-  { id: 'checkpoints', label: 'CHECKPOINTS' },
-  { id: 'worktrees', label: 'WORKTREES' },
+  { id: 'changes', label: 'Changes' },
+  { id: 'log', label: 'Log' },
+  { id: 'branches', label: 'Branches' },
+  { id: 'stash', label: 'Stash' },
+  { id: 'checkpoints', label: 'Checkpoints' },
+  { id: 'worktrees', label: 'Worktrees' },
 ];
 
 const STATUS_LABEL = { M: 'modified', A: 'added', D: 'deleted', R: 'renamed', C: 'copied', U: 'conflict', T: 'modified' };
@@ -401,10 +401,10 @@ export function render(app, region) {
     list: app.gitList,
     row: (item, selected, width) => row(app, item, selected, width),
     stamp,
-    note: app.gitBusy ? 'SYNCING' : '',
+    note: app.gitBusy ? 'Syncing' : '',
     empty,
     detail: detail(app, Math.max(30, Math.floor(region.width * 0.4) - 4)),
-    detailTitle: app.gitList.current?.name ? truncate(app.gitList.current.name, 30) : 'DOSSIER',
+    detailTitle: app.gitList.current?.name ? truncate(app.gitList.current.name, 30) : 'Details',
     onTab: (target, id) => { target.gitTab = id; target.gitList.first(); },
     onSelect: (target, item) => { void target.loadGitDetail(item); },
     onActivate: (target, item) => activate(target, item),
@@ -507,4 +507,4 @@ export const hints = (app) => {
   return [...base, ['n', 'new worktree'], ['del', 'remove']];
 };
 
-export const meta = { id: 'git', index: '06', title: 'GIT', shortcut: '6' };
+export const meta = { id: 'git', index: '6', title: 'Git', shortcut: '6' };

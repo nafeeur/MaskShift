@@ -1,5 +1,5 @@
 // What a gated tool call is about to do, drawn for the approval dialog. A yes/no over a bare
-// tool name asks the operator to approve something they cannot see; this shows the command,
+// tool name asks the user to approve something they cannot see; this shows the command,
 // the file and its new contents, or the exact edit as a diff.
 
 import { diffLines, looksLikeDiff } from './diff.mjs';

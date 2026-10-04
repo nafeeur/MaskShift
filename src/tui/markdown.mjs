@@ -5,7 +5,7 @@
 //
 // Two rules separate this from the chrome that surrounds it. Content keeps the
 // case its author wrote — an earlier revision upper-cased every heading, so a
-// model's prose shouted back at the operator from inside a quiet panel. And
+// model's prose shouted back at the user from inside a quiet panel. And
 // content never borrows crimson: identity and focus own that colour, so
 // keywords, headings and table headers are drawn from the code palette below.
 
@@ -69,7 +69,7 @@ export function inline(theme, text) {
 function codeBlock(theme, width, language, lines) {
   const mark = glyphs(theme);
   const out = [];
-  const label = (language || 'text').toUpperCase();
+  const label = language || 'text';
   // The language is a caption on the opening rule, not a filled chip: a solid
   // block on every fenced block put three of them in a single reply.
   const head = theme.paint(`${label} `, { fg: theme.roles.muted });

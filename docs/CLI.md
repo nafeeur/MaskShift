@@ -61,19 +61,19 @@ message. With `--json` it emits a single object:
 | `workspace checkpoints` | List recorded checkpoints. |
 | `workspace restore ID` | Restore the working tree to a checkpoint. |
 
-## Heists (sessions)
+## Chats
 
 | Command | Description |
 |---|---|
-| `session list` | Recent heists with model and status. |
+| `session list` | Recent chats with model and status. |
 | `session show ID` | Full transcript, including tool calls. |
-| `session new [TITLE]` | Create an empty heist. |
-| `session rename ID TITLE…` | Rename a heist. |
-| `session delete ID` | Delete a heist and its messages. |
-| `session runs ID` | Runs inside one heist. |
+| `session new [TITLE]` | Create an empty chat. |
+| `session rename ID TITLE…` | Rename a chat. |
+| `session delete ID` | Delete a chat and its messages. |
+| `session runs ID` | Runs inside one chat. |
 | `session export ID` | Export session, messages and runs as JSON. `--out FILE` writes to disk. |
 
-## Arsenal
+## Tools and skills
 
 | Command | Description |
 |---|---|
@@ -99,7 +99,7 @@ message. With `--json` it emits a single object:
 | `mcp install REGISTRY_NAME` | Install from the registry. `--prefer remote\|package`. |
 | `mcp serve` | Run MaskShift itself as a stdio MCP server for the current workspace, so Claude Desktop, Claude Code, an IDE, or another MaskShift instance can drive its native tool catalog. `--read-only` exposes only read-only tools; `--tools a,b,c` restricts the catalog to an explicit allowlist. |
 
-## Mod shop
+## Plugins, automation and browsers
 
 | Command | Description |
 |---|---|
@@ -132,7 +132,7 @@ message. With `--json` it emits a single object:
 |---|---|
 | `models [--discover]` | Providers and their models. |
 | `lsp [--force]` | Discover and list language servers. |
-| `bridges [--force]` | Coding-agent CLIs MaskShift can delegate to. |
+| `bridges [--force]` | External agent CLIs MaskShift can delegate to. |
 | `ps [--running]` | Background processes MaskShift started. |
 | `logs [--limit N]` | Tail the MaskShift log. |
 | `events [--limit N] [--follow]` | Recent runtime events, optionally following the live bus. |

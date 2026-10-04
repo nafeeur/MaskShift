@@ -9,12 +9,12 @@ test('configuration overrides are isolated and persisted under the requested hom
   const home = await tempDir(t, 'maskshift-config-');
   const config = new ConfigManager({
     configPath: path.join(home, 'config.json'),
-    overrides: { home, port: 0, permissionMode: 'overdrive', automations: { enabled: false } },
+    overrides: { home, port: 0, permissionMode: 'autonomous', automations: { enabled: false } },
   });
   await config.load();
   assert.equal(config.get().home, home);
   assert.equal(config.get().dataFile, path.join(home, 'maskshift.sqlite'));
-  assert.equal(config.get().permissionMode, 'overdrive');
+  assert.equal(config.get().permissionMode, 'autonomous');
   assert.equal(config.get().automations.enabled, false);
   // Both off/unset by default — an external notify command and a spend
   // guardrail are things an operator opts into, never a silent default.
@@ -69,8 +69,8 @@ test('searchMessages greps every session in a workspace, not just the open one',
   const workspace = store.upsertWorkspace(path.join(root, 'repo'), 'repo', {});
   const other = store.upsertWorkspace(path.join(root, 'other'), 'other', {});
 
-  const sessionA = store.createSession({ workspaceId: workspace.id, title: 'First heist' });
-  const sessionB = store.createSession({ workspaceId: workspace.id, title: 'Second heist' });
+  const sessionA = store.createSession({ workspaceId: workspace.id, title: 'First chat' });
+  const sessionB = store.createSession({ workspaceId: workspace.id, title: 'Second chat' });
   const sessionC = store.createSession({ workspaceId: other.id, title: 'Different target' });
 
   store.addMessage({ sessionId: sessionA.id, role: 'user', content: 'How do I configure the vault door widget?' });
@@ -105,4 +105,18 @@ test('guardrail config groups merge individually and keep their other defaults',
   assert.equal(guardrails.verification.maxAttempts, 3, 'untouched keys in the same group survive');
   assert.equal(guardrails.stagnation.repeatThreshold, 3, 'untouched groups survive');
   assert.deepEqual([guardrails.features.fuzzyEdits, guardrails.features.callRepair], [false, true]);
+});
+
+test('the legacy "overdrive" permission mode is read as "autonomous", and unknown values fall back to it', async (t) => {
+  const { normalizePermissionMode } = await import('../src/core/config.mjs');
+  assert.equal(normalizePermissionMode('overdrive'), 'autonomous');
+  assert.equal(normalizePermissionMode('OVERDRIVE'), 'autonomous');
+  assert.equal(normalizePermissionMode('balanced'), 'balanced');
+  assert.equal(normalizePermissionMode('review'), 'review');
+  assert.equal(normalizePermissionMode('yolo'), 'autonomous');
+  assert.equal(normalizePermissionMode(undefined), 'autonomous');
+  const home = await tempDir(t, 'maskshift-legacy-');
+  const config = new ConfigManager({ configPath: path.join(home, 'config.json'), overrides: { home, permissionMode: 'overdrive' } });
+  await config.load();
+  assert.equal(config.get().permissionMode, 'autonomous');
 });

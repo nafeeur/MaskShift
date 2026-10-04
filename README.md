@@ -3,10 +3,9 @@
 </h1>
 
 <p align="center">
-  <strong>The full toolbox for any coding model, in one zero-dependency terminal harness.</strong><br>
-  173 tools, 50 skills, persistent code-graph intelligence, a live clickable browser view and
-  worktree-isolated multi-agent orchestration — but only what the current step needs ever
-  touches the model's context.
+  <strong>A general-purpose agent harness for any model, in one terminal application with no runtime dependencies.</strong><br>
+  Give a model controlled access to your files, shell, browser, documents and services, and let it carry
+  a task through to a verified result.
 </p>
 
 <p align="center">
@@ -14,283 +13,169 @@
   <img alt="npm downloads" src="https://img.shields.io/npm/dt/maskshift?style=flat-square&color=cb3837&label=downloads">
   <img alt="Node 22+" src="https://img.shields.io/badge/node-%E2%89%A522-35cf8b?style=flat-square">
   <img alt="Runtime dependencies: none" src="https://img.shields.io/badge/runtime%20deps-0-7fb8ff?style=flat-square">
-  <img alt="173 tools" src="https://img.shields.io/badge/tools-173-2bd9c0?style=flat-square">
-  <img alt="50 skills" src="https://img.shields.io/badge/skills-50-a78bfa?style=flat-square">
   <img alt="GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-e42a3c?style=flat-square">
 </p>
 
-![MaskShift interface](docs/screenshots/heist.svg)
+![MaskShift interface](docs/screenshots/chat.svg)
 
-MaskShift gives a coding model one control plane for repository understanding, file edits, the
-host shell, Git recovery, language servers, browsers, containers, databases, remote machines,
-memory, scheduled work, plugins, external coding agents, skills and MCP servers. The full
-catalog is always available to the harness; only the capabilities relevant to the current step
-are inserted into model context.
+MaskShift connects a language model to the tools it needs to get real work done — reading and writing
+files, running commands, browsing the web, working with PDFs and notebooks, querying databases,
+calling MCP servers, remembering what matters and delegating to sub-agents — and keeps a person in
+control with checkpoints, an audit log and optional approvals.
 
-It runs on Node.js 22 using only built-in modules — the interface renderer included. No npm
-runtime dependency tree, no HTTP server, no browser, no listening socket.
+It works for software engineering, but nothing about it is specific to code: summarize a folder of
+invoices into a spreadsheet, research a topic and write up the findings, reorganize files, run a
+recurring report. The model is a line of configuration; the tools are the same whichever one you use.
 
-### How it differs
+## Highlights
 
-Most terminal coding agents pick a model vendor and a fixed tool list. MaskShift is built the
-other way around: the model is a config line, and the tool surface is the whole catalog, held
-out of context until a step actually needs it.
-
-| | **MaskShift** | Claude Code | OpenCode | Codex CLI | Nous Hermes Agent |
-|---|:---:|:---:|:---:|:---:|:---:|
-| Any model provider, local or cloud | ✅ | ❌ | ✅ | ❌ | ✅ |
-| Open source | ✅ | ❌ | ✅ | ✅ | ✅ |
-| Zero runtime dependencies | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Persistent code graph with change impact | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Worktree-isolated multi-agent plans | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Live, clickable browser inside the terminal | ✅ | ❌ | ❌ | ❌ | ❌ |
-| IDE or desktop app | ❌ | ✅ | ✅ | ✅ | ❌ |
-| Sandboxed by default | ❌ | ❌ | ❌ | ✅ | ❌ |
-
----
-
-## Contents
-
-[Features](#features) · [Install](#install) · [Run it with Ollama](#run-it-with-ollama) ·
-[Configure](#configure) · [The interface](#the-interface) · [The command line](#the-command-line) ·
-[Documentation](#documentation) · [Contributing](#contributing) · [Development](#development) ·
-[Deployment](#deployment)
-
-## Features
-
-| | |
-|---|---|
-| **173 native tools** | Filesystem, shell and process control, search and indexing, Git worktrees and checkpoints, LSP, browsers over CDP, containers and Kubernetes, SSH and rsync, databases, runtimes, images, PDF and Jupyter, web retrieval, plugins, automations, memory and orchestration. → [tool inventory](docs/TOOLS.md) |
-| **50 bundled skills** | Loaded lazily by description, including 14 Apache-2.0 skills imported from Anthropic, alongside skills from Claude, Codex, Copilot and workspace directories. → [skills](docs/SKILLS.md) |
-| **Named subagent personas** | Bundled `agents/*.md` files (code reviewer, security reviewer, build-error resolver, planner) give `agent_delegate` a role-specific system prompt instead of a generic one; drop project or user personas into `.claude/agents` or `.maskshift/agents` to add your own. |
-| **Lazy MCP fabric** | stdio and Streamable HTTP, stateless and legacy initialization, resources, prompts, qualified tools, imported configs, and the live official MCP Registry. Servers connect on demand, so the catalog never floods the context window. MaskShift is also an MCP server itself — `maskshift mcp serve` exposes its native tool catalog over stdio to Claude Desktop, Claude Code, an IDE, or another MaskShift instance. → [MCP config](docs/CONFIGURATION.md#mcp-definitions) |
-| **Any model** | Ollama, OpenAI Responses, OpenAI-compatible servers, Anthropic, Gemini, OpenRouter, LM Studio and vLLM — with a text protocol that gives models *without* a native tool API the full tool surface. → [providers](docs/CONFIGURATION.md#providers) |
-| **Codebase intelligence** | Persistent file/symbol/import/call graph, reverse change-impact analysis, likely-test discovery, and budgeted context selection with decision metadata. → [architecture](docs/ARCHITECTURE.md) |
-| **Provenance-aware memory** | Durable facts can cite workspace files by content hash; changed or missing sources make those memories stale and exclude them from automatic context. |
-| **Intelligence routing** | Task-aware model and external-agent recommendations, adjusted by prior run outcomes when evidence exists. |
-| **Executable DAG agents** | Dependency-aware plans run ready nodes concurrently, pass predecessor results forward, block downstream failures, and isolate edit workers in Git worktrees by default. |
-| **Adaptive to any model** | A 0–3 help level per model, from a measured calibration (`maskshift model calibrate`), then its observed track record, then a size prior — and it rises mid-run if the model keeps stumbling. A capable model is left alone; a weak one gets a compact prompt, a short tool menu, tight output budgets and a plan up front. Nothing names a model or vendor. → [adaptive harness](docs/ARCHITECTURE.md#adaptive-harness) |
-| **Does the fiddly work for the model** | Near-miss tool names and arguments are repaired in code, edits tolerate wrong indentation, CRLF, copied line-number gutters and small typos (and show the closest region on a real miss), tool output is cleaned and condensed to the window, and every edit is syntax-checked with the result in the same reply. A model that gets it right pays nothing for any of it. → [run guardrails](docs/CONFIGURATION.md#run-guardrails) |
-| **Measures itself** | `maskshift bench run` scores a model on 12 self-checking tasks by their exit codes — pass rate, turns, tokens per solved task and where the tokens went — and `--without` switches a helper off so you can see what it is worth. |
-| **Validated skills** | Skill improvements can be promoted only after recorded A/B trials show uplift without regressions. |
-| **Cost-aware** | Anthropic prompt-cache breakpoints on the stable prefix, decay- and access-aware memory ranking, and a `usage_report` tool that prices spend from a user-editable table — never a guessed number. |
-| **Scheduled work** | Agent runs, direct tool calls or host shell commands on an interval, a cron expression or a one-shot timestamp. → [automations](docs/CONFIGURATION.md#automations) |
-| **Extensible** | Plugins register tools, skill directories, MCP servers and event listeners in-process; bridges delegate scoped work to Claude Code, Codex, OpenCode, Copilot CLI, Hermes or Aider. → [extension boundary](docs/ARCHITECTURE.md#extension-boundary) |
-| **Permissive by default** | `permissionMode: "overdrive"` — host filesystem scope, no per-command approval dialogs, and recovery through automatic checkpoints and an append-only audit log. → [read this first](docs/PERMISSIVE_MODE.md) |
+- **Any model.** Ollama, LM Studio, vLLM, OpenAI, Anthropic, Gemini, OpenRouter and any
+  OpenAI-compatible server. A model with no native tool API still gets the full tool surface through
+  an in-prompt protocol. → [providers](docs/CONFIGURATION.md#providers)
+- **Adapts to the model.** Each model gets a help level from 0 to 3 — measured by
+  `maskshift model calibrate`, refined by how it actually performs, and raised mid-run if it keeps
+  stumbling. A strong model is left alone; a small local one gets a compact prompt, a short tool menu
+  and tight output budgets. → [adaptive harness](docs/ARCHITECTURE.md#adaptive-harness)
+- **Reliable tool use.** Near-miss tool names and arguments are repaired in code, edits tolerate
+  whitespace and indentation drift, tool output is cleaned and fitted to the model's window, and every
+  file edit is checked immediately. → [run guardrails](docs/CONFIGURATION.md#run-guardrails)
+- **Loaded on demand.** 173 native tools, 50 skills and any number of MCP servers are available, but
+  only what the current step needs enters the model's context.
+  → [tools](docs/TOOLS.md) · [skills](docs/SKILLS.md)
+- **Controlled by design.** Automatic checkpoints before each run, an append-only audit log, and three
+  permission modes from fully autonomous to approve-everything. → [permissions](docs/PERMISSIONS.md)
+- **Remembers and improves.** Persistent memory that notices when its sources change, reusable skills,
+  and skill upgrades promoted only after measured A/B trials.
+- **Works unattended.** Schedule agent runs, tool calls or shell commands by interval, cron
+  expression or timestamp. → [automations](docs/CONFIGURATION.md#automations)
+- **Open on both sides.** Use MCP servers, plugins and external coding agents; or run
+  `maskshift mcp serve` to expose MaskShift's own tools to Claude Desktop, an IDE or another agent.
+- **Measurable.** `maskshift bench run` scores a model on self-checking tasks — pass rate, turns,
+  tokens per solved task — and can switch individual helpers off to show what each one is worth.
 
 ## Install
 
-**Requirements**
-
-- Node.js 22 or newer
-- A terminal at least 80×24 (UTF-8 and truecolour are used when available, and degraded cleanly when not)
-- Git and ripgrep recommended
-- Any instruction-following model through Ollama or another configured provider
-
-**Install from npm**
+Requires Node.js 22 or newer and a terminal of at least 80×24 (UTF-8 and truecolor are used when
+available and degrade cleanly when not). Git and ripgrep are recommended.
 
 ```bash
 npm install -g maskshift
-cd /path/to/repository && maskshift
+cd ~/Documents && maskshift
 ```
 
-Or run it without installing anything:
+Or run it without installing: `npx maskshift --workspace ~/Documents`.
 
-```bash
-npx maskshift --workspace /path/to/repository
-```
-
-**Or run from the source directory**
+From source (there is no `npm install` step, because there is nothing to install):
 
 ```bash
 git clone https://github.com/nafeeur/MaskShift.git
 cd MaskShift
-./start.sh --workspace /path/to/repository
+./start.sh --workspace ~/Documents      # or ./install.sh to link ~/.local/bin/maskshift
 ```
 
-**Or install to your user account from source**
+## Quick start
+
+Choose a model. The default, `ollama:auto`, discovers your installed Ollama models and picks the
+strongest one it finds; cloud providers read their keys from the environment.
 
 ```bash
-./install.sh
-cd /path/to/repository && maskshift
+ollama pull qwen3:8b                    # a local model
+export ANTHROPIC_API_KEY=...            # or OPENAI_API_KEY, GEMINI_API_KEY, OPENROUTER_API_KEY
+export MASKSHIFT_MODEL=anthropic:<model-id>   # provider:model, e.g. ollama:qwen3:8b
 ```
 
-The installer copies MaskShift to `~/.local/lib/maskshift` and links `~/.local/bin/maskshift`.
-It does not run `npm install`, because there is nothing to install — MaskShift has zero runtime dependencies.
-
-## Run it with Ollama
-
-MaskShift's default model reference is `ollama:auto`: it discovers your installed Ollama models
-and prefers the strongest coding-oriented one it finds.
+Open the interface in a folder and type a request, or run one task headlessly:
 
 ```bash
-# 1. Pull a coding model
-ollama pull qwen3-coder:latest
-
-# 2. Point MaskShift at Ollama and pick the model
-export OLLAMA_BASE_URL=http://127.0.0.1:11434
-export MASKSHIFT_MODEL=ollama:qwen3-coder:latest
-
-# 3. Open the interface on a repository
-./start.sh --workspace ~/code/my-project
+maskshift --workspace ~/Documents
+maskshift run "Total the Q3 invoices in ./Invoices by vendor and write q3-by-vendor.xlsx" \
+  --workspace ~/Documents --model anthropic:<model-id>
 ```
 
-Type a task into the composer and press `↵`. To run one task headlessly instead:
-
-```bash
-./start.sh run "Map this repository, repair the highest-impact defect, add tests, and verify." \
-  --workspace ~/code/my-project \
-  --model ollama:qwen3-coder:latest
-```
-
-A remote Ollama host works the same way — set `OLLAMA_BASE_URL=http://model-host:11434`.
-
-If a model has no native tool API, MaskShift detects it on the first request and switches to an
-in-prompt text protocol, so the whole harness still works.
-→ [models without native tool calling](docs/CONFIGURATION.md#models-without-native-tool-calling)
-
-## Configure
-
-Model references are `provider:model`:
-
-```text
-ollama:auto                 openai:<model-id>            anthropic:<model-id>
-lmstudio:auto               openrouter:provider/model    gemini:<model-id>
-vllm:auto
-```
-
-Cloud providers read their keys from the environment:
-
-```bash
-export OPENAI_API_KEY=...      export ANTHROPIC_API_KEY=...
-export OPENROUTER_API_KEY=...  export GEMINI_API_KEY=...
-```
-
-Everything else lives in `~/.maskshift/config.json` — providers, MCP servers, agent bridges,
-hooks, indexing, memory ranking, automations and interface preferences. Press `f2` in the
-interface to edit the core settings without touching the file, or use `maskshift config set`.
-
-→ [full configuration reference](docs/CONFIGURATION.md) ·
-[environment variables](docs/CONFIGURATION.md#environment-variables) ·
-[data locations](docs/CONFIGURATION.md#data-locations)
+Press `ctrl+k` for the command palette and `f2` for settings. Settings live in
+`~/.maskshift/config.json`. → [configuration reference](docs/CONFIGURATION.md)
 
 ## The interface
 
-`maskshift` opens a full-screen terminal application built on a bespoke, zero-dependency
-renderer, driven equally by keyboard and mouse. Six views switch with `1`–`6`, `ctrl+b` toggles
-the right rail, and `ctrl+k` opens a fuzzy command palette over every action.
+`maskshift` opens a full-screen terminal application, driven equally by keyboard and mouse. Six views
+switch with `1`–`6`; `ctrl+b` toggles the sidebar.
 
 | View | Holds |
 |---|---|
-| **01 HEIST** | Transcript and composer — markdown, syntax-tinted code, coloured diffs, live tool calls |
-| **02 FILES** | Workspace tree with a syntax-highlighted preview — images decode and render inline |
-| **03 CAPABILITIES** | Every native tool and skill, MCP servers (bundled or pulled live from the official registry), plugins and agent bridges — one searchable catalogue, five tabs, `x` to run a tool yourself |
-| **04 RUNTIME** | The host shell, plus automations, background processes and browser instances behind a tab strip |
-| **05 BROWSER** | A live, clickable, typeable view of a running browser tab — the same CDP connection the browser tools drive |
-| **06 GIT** | Working tree changes (stage/unstage/discard/commit), commit log, branches, stash, MaskShift checkpoints and worktrees — plus push/pull/fetch from anywhere in the view |
-
-Inline images — a Files preview, a chat screenshot result, or the live BROWSER view — render
-through whatever the terminal actually supports, picked automatically: the Kitty graphics
-protocol, iTerm2's inline-image escape, or a universal Unicode half-block fallback for everything
-else, degraded further to a clear message on a terminal with no Unicode support at all. None of
-it needs a dependency: the PNG, JPEG and BMP decoders are hand-written against Node's built-in
-`zlib`.
+| **Chat** | The conversation and composer — markdown, syntax-highlighted code, coloured diffs and live tool calls |
+| **Files** | The workspace tree with a preview; images render inline |
+| **Capabilities** | Every tool, skill, MCP server, plugin and agent bridge in one searchable catalogue |
+| **Runtime** | A host shell, automations, background processes and browser instances |
+| **Browser** | A live, clickable view of a running browser tab |
+| **Git** | Changes, history, branches, stash, checkpoints and worktrees |
 
 <table>
 <tr>
-<td width="50%"><img width="100%" alt="Tools, skills and MCP catalogue" src="docs/screenshots/capabilities.svg"><br><sub><b>03 CAPABILITIES</b> — see exactly what a run can reach before it uses it</sub></td>
-<td width="50%"><img width="100%" alt="Runtime: automations, processes, browsers" src="docs/screenshots/runtime.svg"><br><sub><b>04 RUNTIME</b> — the shell, automations, processes and browser instances</sub></td>
+<td width="50%"><img width="100%" alt="Capabilities" src="docs/screenshots/capabilities.svg"><br><sub><b>Capabilities</b> — see what a run can reach before it uses it</sub></td>
+<td width="50%"><img width="100%" alt="Approving a tool call" src="docs/screenshots/approval.svg"><br><sub><b>Approvals</b> — review a command before it runs, in balanced or review mode</sub></td>
 </tr>
 <tr>
-<td width="50%"><img width="100%" alt="Command palette" src="docs/screenshots/palette.svg"><br><sub><b>ctrl+k</b> — every action, nothing buried behind a memorised key</sub></td>
-<td width="50%"><img width="100%" alt="Live loadout telemetry" src="docs/screenshots/loadout.svg"><br><sub><b>The rail</b> — plan, loadout telemetry, event bus</sub></td>
-</tr>
-<tr>
-<td width="50%"><img width="100%" alt="Git view" src="docs/screenshots/git.svg"><br><sub><b>06 GIT</b> — changes, log, branches, stash, checkpoints and worktrees, with push/pull/fetch from anywhere</sub></td>
-<td width="50%"><img width="100%" alt="Files view" src="docs/screenshots/files.svg"><br><sub><b>02 FILES</b> — workspace tree with a syntax-highlighted preview</sub></td>
+<td width="50%"><img width="100%" alt="Files" src="docs/screenshots/files.svg"><br><sub><b>Files</b> — the workspace tree with a preview</sub></td>
+<td width="50%"><img width="100%" alt="Command palette" src="docs/screenshots/palette.svg"><br><sub><b>Command palette</b> — every action, searchable</sub></td>
 </tr>
 </table>
 
-Below 108 columns the rail hides itself and the header sheds telemetry, so the same six views
-work in a narrow split pane. `MASKSHIFT_MOUSE=off` (or `f2`) hands text selection back to the
-terminal, and `NO_COLOR`, `MASKSHIFT_COLOR=off` and `MASKSHIFT_ASCII=1` each produce a clean,
-aligned fallback.
+Below 108 columns the sidebar hides itself so the same views work in a narrow split pane.
+`NO_COLOR`, `MASKSHIFT_COLOR=off` and `MASKSHIFT_ASCII=1` each produce a clean, aligned fallback, and
+`MASKSHIFT_MOUSE=off` hands text selection back to the terminal. → [keys and views](docs/TUI.md)
 
-→ [keys, views and the design system](docs/TUI.md)
+## Command line
 
-## The command line
-
-Everything the interface can do is also a subcommand, and every subcommand takes `--json`:
+Everything the interface does is also a subcommand, and every subcommand accepts `--json`:
 
 ```bash
-maskshift run "make the failing tests pass"      # one headless run, streamed
-maskshift tools run shell_exec '{"command":"npm test"}'
-maskshift mcp registry playwright && maskshift mcp install io.github.microsoft/playwright-mcp
-maskshift automation create nightly --schedule "every 6h" --prompt "Review the diff and fix regressions"
-maskshift workspace search "checkpoint restore" --json | jq -r '.[].path'
-maskshift doctor
-maskshift mcp serve --workspace ~/code/my-project    # MaskShift itself, as an MCP server
-```
-
-```text
-maskshift [tui] [PROMPT]     open the interface (the default command)
-maskshift run "PROMPT"       one headless run, streamed to stdout
-maskshift daemon             resident automation scheduler, no interface
-maskshift doctor             environment and provider diagnostics
-maskshift <workspace|session|tools|skills|mcp|plugins|automation|browser|config> ...
+maskshift run "Draft an agenda for a two-day offsite"          # one headless run, streamed
+maskshift automation create weekly --schedule "every 7d" --prompt "Summarize this week's notes"
+maskshift tools run web_search '{"query":"node 22 release notes"}'
+maskshift model calibrate --model ollama:qwen3:8b               # measure a model, then size help to it
+maskshift bench run --model ollama:qwen3:8b                     # score it on the benchmark tasks
+maskshift mcp serve                                             # MaskShift as an MCP server
+maskshift doctor                                                # environment and provider checks
 ```
 
 Global flags: `--workspace PATH`, `--model REF`, `--config PATH`, `--json`, `--no-color`.
-
 → [full command reference](docs/CLI.md)
+
+## Permissions and safety
+
+MaskShift runs with the authority of your account. The default **autonomous** mode never prompts,
+so recovery relies on automatic checkpoints, the audit log and the stop control; **balanced** asks
+before high-risk actions (shell execution, installs, destructive operations, outbound actions);
+**review** asks before anything that is not read-only. Content from files, web pages and tool results
+is treated as data, never as instructions. A container limits MaskShift to what is mounted into it.
+→ [permissions](docs/PERMISSIONS.md) · [security policy](SECURITY.md)
 
 ## Documentation
 
 | Document | Covers |
 |---|---|
-| [Configuration](docs/CONFIGURATION.md) | Every setting, provider, MCP definition, hook, automation and data location |
-| [Tools](docs/TOOLS.md) | The complete native tool inventory |
-| [Skills](docs/SKILLS.md) | Bundled skills, and where MaskShift looks for more |
-| [Interface](docs/TUI.md) | Keys, views, the design system and its rules |
+| [Configuration](docs/CONFIGURATION.md) | Settings, providers, MCP, hooks, automations and data locations |
+| [Tools](docs/TOOLS.md) · [Skills](docs/SKILLS.md) | The native tool inventory and bundled skills |
+| [Interface](docs/TUI.md) | Keys, views and the design system |
 | [Command line](docs/CLI.md) | Every subcommand and flag |
-| [Architecture](docs/ARCHITECTURE.md) | The agent loop, lazy capability fabric, persistence and extension boundary |
-| [Permissive execution](docs/PERMISSIVE_MODE.md) | What overdrive means, what stays observable, and where the limits are |
-| [Tool verification](docs/TOOL_VERIFICATION.md) | Per-tool coverage and live-integration limits |
-| [Release verification](docs/RELEASE-VERIFICATION.md) | What the automated suite covers before a release |
-
-## Contributing
-
-[`CONTRIBUTING.md`](CONTRIBUTING.md) has the expectations changes are held to — lazy capability
-loading, precise tool schemas, regression coverage, a dependency-free runtime and interface.
-[`SECURITY.md`](SECURITY.md) describes the trust boundary `overdrive` mode assumes and where to
-report a real vulnerability. [`examples/plugins/telemetry-pack`](examples/plugins/telemetry-pack)
-is a complete worked plugin to start from; the bundled `plugin-authoring` and `skill-creator`
-skills cover the rest of the extension surface.
+| [Architecture](docs/ARCHITECTURE.md) | The agent loop, the adaptive harness, persistence and extension points |
+| [Permissions](docs/PERMISSIONS.md) | The three modes, what stays observable and where the limits are |
+| [Verification](docs/TOOL_VERIFICATION.md) · [Release checks](docs/RELEASE-VERIFICATION.md) | What the automated suite covers |
 
 ## Development
 
 ```bash
-npm run check       # syntax validation across every source module
-npm test            # unit and integration suite, including renderer tests
-npm run test:tools  # all-native-tool scenarios and edge-case regressions
-npm run smoke       # end-to-end agent run plus a full interface paint
-npm run verify      # check + tests + smoke
+npm run verify      # syntax check + unit/integration tests + end-to-end smoke test
 npm run docs        # regenerate the tool and skill inventories
 npm run capture     # regenerate docs/screenshots from the real renderer
 ```
 
-The screenshots above are produced by `npm run capture` through the same code path the terminal
-uses, so they cannot drift from the product.
+[`CONTRIBUTING.md`](CONTRIBUTING.md) lists what changes are held to. The plugin in
+[`examples/plugins/telemetry-pack`](examples/plugins/telemetry-pack) is a complete worked example, and the
+bundled `plugin-authoring` and `skill-creator` skills cover the rest of the extension surface.
 
-## Deployment
-
-- **`deploy/maskshift.service`** — user-level systemd unit running `maskshift daemon` for
-  scheduled automations, with no interface.
-- **`Dockerfile` / `compose.yaml`** — `/workspace` and `/data` volumes. MaskShift is a terminal
-  application, so attach a TTY: `docker run -it`, or `docker compose run --rm maskshift`.
-
-A container limits MaskShift to the files, sockets, devices and credentials mounted into it.
-For full host authority, run the user service directly instead.
+To run the scheduler without an interface, use `deploy/maskshift.service` (a user-level systemd unit)
+or the `Dockerfile` / `compose.yaml` (`docker run -it`; mount `/workspace` and `/data`).
 
 ## License
 

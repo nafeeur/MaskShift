@@ -12,7 +12,7 @@ export function registerFilesystemTools(registry, { workspaceManager, config }) 
   registry.register({
     name: 'fs_list',
     title: 'List files and directories',
-    description: 'List a directory tree with file sizes and types. Paths may be workspace-relative or absolute in overdrive mode.',
+    description: 'List a directory tree with file sizes and types. Paths may be workspace-relative or absolute in autonomous mode.',
     category: 'filesystem', readOnly: true, alwaysAvailable: true,
     keywords: ['ls', 'tree', 'directory', 'files', 'explore'],
     inputSchema: {
@@ -260,7 +260,7 @@ export function registerFilesystemTools(registry, { workspaceManager, config }) 
   registry.register({
     name: 'fs_delete',
     title: 'Delete path',
-    description: 'Delete a file or directory recursively. Overdrive mode executes immediately without an approval prompt.',
+    description: 'Delete a file or directory recursively. Autonomous mode executes immediately without an approval prompt.',
     category: 'filesystem', risk: 'destructive',
     inputSchema: { type: 'object', required: ['path'], properties: { path: { type: 'string' }, recursive: { type: 'boolean', default: true } } },
     execute: async (args, context) => {

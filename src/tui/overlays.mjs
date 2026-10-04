@@ -6,7 +6,7 @@ import { centreOffset } from './layout.mjs';
 import { diffLines } from './diff.mjs';
 import { presence } from './motion.mjs';
 import { LAYER } from './regions.mjs';
-import { fit, repeat, truncate, underlay, visibleWidth, wrap } from './text.mjs';
+import { fit, repeat, sentence, truncate, underlay, visibleWidth, wrap } from './text.mjs';
 import { DURATION, SPACE } from './tokens.mjs';
 import { chip, columns, gutter, key as typeKey } from './type.mjs';
 import { Composer, ListView, TextField, fuzzy, highlightMatch } from './widgets.mjs';
@@ -101,7 +101,7 @@ class Overlay {
 /** Fuzzy command palette over every action MaskShift exposes. */
 export class PaletteOverlay extends Overlay {
   constructor(actions) {
-    super({ title: 'COMMAND PALETTE' });
+    super({ title: 'Command palette' });
     this.actions = actions;
     this.field = new TextField({ placeholder: 'Run a command…' });
     this.list = new ListView();
@@ -139,7 +139,7 @@ export class PaletteOverlay extends Overlay {
       ...this.list.render(theme, width - 4, listHeight, (item, selected, itemWidth) => {
         const line = gutter(theme, selected ? mark.caret : '', { tone: theme.roles.primary })
           + columns(theme, [
-            { text: item.group.toUpperCase(), width: 12, tone: theme.roles.faint },
+            { text: sentence(item.group), width: 12, tone: selected ? theme.roles.dim : theme.roles.faint },
             { text: highlightMatch(theme, truncate(item.label, 44), item.positions, theme.roles.accent, theme.roles.text) },
             { text: item.key || '', width: 10, align: 'right', tone: theme.roles.accent },
           ], Math.max(0, itemWidth - SPACE.gutter));
@@ -150,8 +150,8 @@ export class PaletteOverlay extends Overlay {
     ];
 
     const lines = panel({
-      theme, width, height: size.rows, title: 'COMMAND PALETTE',
-      stamp: `${rows.length} ACTIONS`, focused: true, body,
+      theme, width, height: size.rows, title: 'Command palette',
+      stamp: `${rows.length} ${rows.length === 1 ? 'action' : 'actions'}`, focused: true, body,
       colour: this.enter(theme, frameColour(theme, true)),
     });
     const placed = this.place(app, viewport, lines, 2 + 3 + input.cursorColumn, 1);
@@ -191,7 +191,7 @@ export class PickerOverlay extends Overlay {
     this.items = items;
     this.onSelect = onSelect;
     this.field = new TextField({ placeholder });
-    // Opening on whatever happens to sort first makes the operator hunt for their current
+    // Opening on whatever happens to sort first makes the user hunt for their current
     // choice before they can even see it; starting the cursor there instead means the list
     // opens already showing "you are here".
     const initial = selectedId === null ? 0 : Math.max(0, items.findIndex((item) => item.id === selectedId));
@@ -291,7 +291,7 @@ export class PickerOverlay extends Overlay {
  *   { name, label, type: 'text'|'textarea'|'select'|'toggle', value, options, hint }
  */
 export class FormOverlay extends Overlay {
-  constructor({ title, fields, submitLabel = 'CONFIRM', onSubmit, note = '' }) {
+  constructor({ title, fields, submitLabel = 'Confirm', onSubmit, note = '' }) {
     super({ title });
     this.fields = fields.map((field) => ({
       ...field,
@@ -381,12 +381,12 @@ export class FormOverlay extends Overlay {
       firstField = false;
       const active = index === this.index;
       spans.push({ index, field, start: body.length });
-      body.push(theme.paint(field.label.toUpperCase(), { fg: active ? theme.roles.borderActive : theme.roles.muted, bold: active })
+      body.push(theme.paint(sentence(field.label), { fg: active ? theme.roles.borderActive : theme.roles.muted, bold: active })
         + (field.hint ? theme.paint(`   e.g. ${field.hint}`, { fg: theme.roles.faint, italic: true }) : ''));
       if (field.type === 'toggle') {
         const box = field.toggled ? `[${mark.check}]` : '[ ]';
         body.push(gutter(theme, field.toggled ? mark.lamp : mark.ring, { tone: field.toggled ? theme.roles.success : theme.roles.muted })
-          + theme.paint(`${box} ${field.toggled ? 'ON' : 'OFF'}`, { fg: field.toggled ? theme.roles.success : theme.roles.muted }));
+          + theme.paint(`${box} ${field.toggled ? 'On' : 'Off'}`, { fg: field.toggled ? theme.roles.success : theme.roles.muted }));
       } else if (field.type === 'select') {
         const option = field.options[field.optionIndex];
         body.push(gutter(theme, mark.arrowRight, { tone: theme.roles.muted })
@@ -413,8 +413,8 @@ export class FormOverlay extends Overlay {
     // A modal's primary action is the one other place a filled chip is
     // correct: there is no tab strip on screen to confuse it with, and a
     // dialogue has to say plainly what pressing return will do.
-    const submitChip = chip(theme, this.pending ? `${spinLabel(theme)} WORKING` : this.submitLabel);
-    const cancelChip = theme.paint(' CANCEL ', { fg: theme.roles.muted });
+    const submitChip = chip(theme, this.pending ? `${spinLabel(theme)} Working` : this.submitLabel);
+    const cancelChip = theme.paint(' Cancel ', { fg: theme.roles.muted });
     const submitRow = body.length;
     body.push(`${submitChip}  ${cancelChip}   `
       + [['^S', 'submit'], ['tab', 'move'], ['esc', 'cancel']]
@@ -423,7 +423,7 @@ export class FormOverlay extends Overlay {
 
     const lines = panel({
       theme, width, height: Math.min(viewport.rows - 2, body.length + 2), title: this.title,
-      stamp: `${this.visibleFields().length} FIELDS`, focused: true, body,
+      stamp: `${this.visibleFields().length} fields`, focused: true, body,
       colour: this.enter(theme, frameColour(theme, true)),
     });
     const offset = centreOffset(viewport, { columns: width, rows: lines.length });
@@ -541,7 +541,7 @@ export class FormOverlay extends Overlay {
 }
 
 export class ConfirmOverlay extends Overlay {
-  constructor({ title = 'CONFIRM', message, details = [], danger = false, onConfirm }) {
+  constructor({ title = 'Confirm', message, details = [], danger = false, onConfirm }) {
     super({ title });
     this.message = message;
     // Pre-painted lines shown under the question — what, concretely, YES will do.
@@ -563,18 +563,18 @@ export class ConfirmOverlay extends Overlay {
     // The destructive answer is never the quiet one: a confirmation that puts
     // YES in the same neutral as NO is a confirmation nobody reads.
     const yes = this.choice === 0
-      ? chip(theme, ' YES ', { tone: this.danger ? theme.roles.danger : theme.roles.success })
+      ? chip(theme, ' Yes ', { tone: this.danger ? theme.roles.danger : theme.roles.success })
       : theme.paint('  YES  ', { fg: theme.roles.muted });
     const no = this.choice === 1
       ? chip(theme, ' NO ', { tone: theme.roles.accent })
-      : theme.paint('  NO  ', { fg: theme.roles.muted });
+      : theme.paint('  No  ', { fg: theme.roles.muted });
     const buttonRow = body.length;
     body.push(`${yes}   ${no}`);
     if (this.pending) body.push('', theme.paint(`${spinLabel(theme)} Working…`, { fg: theme.roles.muted }));
     if (this.error) body.push('', theme.paint(truncate(this.error, width - 4), { fg: theme.roles.danger }));
     const lines = panel({
       theme, width, height: body.length + 2, title: this.title,
-      note: this.danger ? `${mark.warn} DESTRUCTIVE` : '',
+      note: this.danger ? `${mark.warn} Destructive` : '',
       stamp: '←/→ then ↵', focused: true, body,
       colour: this.enter(theme, this.danger ? theme.roles.danger : theme.roles.accent),
     });
@@ -637,7 +637,7 @@ const SAFE_RISKS = new Set(['normal', 'write', 'state', 'local-index', 'local-sn
 
 export class ApprovalOverlay extends Overlay {
   constructor({ tool, name, preview, mode, onChoose }) {
-    super({ title: 'APPROVE TOOL CALL' });
+    super({ title: 'Approve tool call' });
     this.tool = tool || {};
     this.name = name;
     this.preview = preview;
@@ -661,7 +661,7 @@ export class ApprovalOverlay extends Overlay {
     body.push('');
     body.push(...this.preview);
     body.push('');
-    const labels = ['YES', 'NO', 'ALWAYS THIS SESSION'];
+    const labels = ['Yes', 'No', 'Always in this chat'];
     const tones = [theme.roles.success, theme.roles.accent, theme.roles.warning];
     const buttons = labels.map((label, index) => (this.choice === index
       ? chip(theme, label, { tone: tones[index] })
@@ -670,7 +670,7 @@ export class ApprovalOverlay extends Overlay {
     body.push(buttons.join('  '));
     const lines = panel({
       theme, width, height: body.length + 2, title: this.title,
-      note: `${mark.warn} ${String(this.tool.risk || 'normal').toUpperCase()} ${mark.dot} ${String(this.mode || '').toUpperCase()}`,
+      note: `${mark.warn} ${String(this.tool.risk || 'normal')} risk ${mark.dot} ${String(this.mode || '')} mode`,
       stamp: 'y · n · a  or  ←/→ ↵', focused: true, body,
       colour: this.enter(theme, theme.roles.warning),
     });
@@ -706,7 +706,7 @@ export class ApprovalOverlay extends Overlay {
 const CHANGE_MARKS = { modified: ['M', 'warning'], created: ['+', 'success'], deleted: ['-', 'danger'] };
 
 export class ChangesOverlay extends Overlay {
-  constructor({ title = 'RUN CHANGES', subtitle = '', files, loadDiff, onUndo }) {
+  constructor({ title = 'Run changes', subtitle = '', files, loadDiff, onUndo }) {
     super({ title });
     this.subtitle = subtitle;
     this.files = files;
@@ -766,7 +766,7 @@ export class ChangesOverlay extends Overlay {
     const lines = panel({
       theme, width, height, title: this.title,
       note: this.subtitle ? truncate(this.subtitle, Math.floor(width / 2)) : '',
-      stamp: `${this.files.length} FILE${this.files.length === 1 ? '' : 'S'} ${mark.dot} ↑↓ file ${mark.dot} pgup/pgdn scroll ${mark.dot} u undo`,
+      stamp: `${this.files.length} file${this.files.length === 1 ? '' : 's'} ${mark.dot} ↑↓ file ${mark.dot} pgup/pgdn scroll ${mark.dot} u undo`,
       focused: true, body, colour: this.enter(theme, frameColour(theme, true)),
     });
     const offset = centreOffset(viewport, { columns: width, rows: lines.length });
@@ -820,7 +820,7 @@ export class TextOverlay extends Overlay {
     const note = scrollable ? `${mark.arrowUp} ${Math.round((this.offset / Math.max(1, this.body.length - inner)) * 100)}%` : '';
     const lines = panel({
       theme, width, height, title: this.title,
-      stamp: this.stamp || `${this.body.length} LINES`, note, focused: true,
+      stamp: this.stamp || `${this.body.length} lines`, note, focused: true,
       body: this.body.slice(this.offset, this.offset + inner),
       colour: this.enter(theme, frameColour(theme, true)),
     });
