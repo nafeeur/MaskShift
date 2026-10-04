@@ -201,7 +201,7 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
 
   await suite.test('PDF extraction and notebook edits', async (t) => {
     const { call, optional, project } = await setup(t);
-    // Minimal real PDF fixture; pdftotext is the only required PDF dependency.
+    // Minimal real PDF fixture; the built-in parser needs no external tool (pdftotext is only a fallback).
     const stream = 'BT /F1 18 Tf 30 100 Td (MASKSHIFT_PDF_OK) Tj ET';
     const objects = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 >>', '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>', '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>', `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`];
     let pdf = '%PDF-1.4\n'; const offsets = [0];
@@ -209,7 +209,8 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
     const xref = Buffer.byteLength(pdf);
     pdf += `xref\n0 6\n0000000000 65535 f \n${offsets.slice(1).map(x => String(x).padStart(10, '0') + ' 00000 n ').join('\n')}\ntrailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
     await fsp.writeFile(path.join(project, 'fixture.pdf'), pdf);
-    await optional('pdf_read', ['pdftotext'], { path: 'fixture.pdf' }, r => { assert.match(r.text, /MASKSHIFT_PDF_OK/); assert.equal(r.totalPages, 1); });
+    await call('pdf_read', { path: 'fixture.pdf' }, r => { assert.match(r.text, /MASKSHIFT_PDF_OK/); assert.equal(r.totalPages, 1); assert.equal(r.engine, 'builtin'); });
+    await call('doc_read', { path: 'fixture.pdf' }, r => { assert.equal(r.format, 'pdf'); assert.match(r.text, /MASKSHIFT_PDF_OK/); });
     await fsp.writeFile(path.join(project, 'fixture.ipynb'), JSON.stringify({ nbformat: 4, nbformat_minor: 5, metadata: {}, cells: [{ cell_type: 'code', metadata: {}, source: ['1+1'], outputs: [], execution_count: null }] }));
     await call('notebook_read', { path: 'fixture.ipynb' }, r => assert.equal(r.cells[0].source, '1+1'));
     await call('notebook_edit', { path: 'fixture.ipynb', cellIndex: 0, source: '2+2', editMode: 'replace', cellType: 'code' });

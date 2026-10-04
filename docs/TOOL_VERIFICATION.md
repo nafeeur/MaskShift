@@ -21,7 +21,7 @@ npm run test:tools
 MASKSHIFT_TOOL_REPORT=/tmp/maskshift-tool-report.json npm run test:tools
 ```
 
-Node.js 22+ and Git are required. To execute every local integration scenario, install ripgrep, Python 3, tar, rsync, pdftotext, and at least one of ss/lsof/netstat. Optional host dependencies are explicitly skipped and labeled `SKIPPED` in the generated tool report when unavailable. Fixture tests do not need service credentials. Node 22 itself was not tested in this run.
+Node.js 22+ and Git are required. To execute every local integration scenario, install ripgrep, Python 3, tar, rsync, and at least one of ss/lsof/netstat. Optional host dependencies are explicitly skipped and labeled `SKIPPED` in the generated tool report when unavailable. Fixture tests do not need service credentials. Node 22 itself was not tested in this run.
 
 The coverage gate fails if a new native tool lacks a successful assertion or an explicit dependency skip. Results distinguish real local execution, protocol/CLI fixtures, and browser manager contracts. A passing gate with skips is not full execution coverage; inspect the report.
 

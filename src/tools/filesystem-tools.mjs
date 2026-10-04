@@ -3,6 +3,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { applyEdit, EditMatchError } from './edit-match.mjs';
 import { absolutePath, ensureDir, id, runCommand, sha256, shellQuote, truncate } from '../core/utils.mjs';
+import { isDocumentPath, readDocument } from '../documents/index.mjs';
 
 function resolveTarget(input, context) {
   return absolutePath(input || '.', context.workspacePath || process.cwd());
@@ -72,7 +73,11 @@ export function registerFilesystemTools(registry, { workspaceManager, config }) 
       const stat = await fsp.stat(target);
       if (!stat.isFile()) throw new Error(`Not a file: ${target}`);
       const maxChars = Math.min(args.maxChars || config.get().maxFileReadChars, 1_000_000);
-      const content = await fsp.readFile(target, 'utf8');
+      // PDFs, Office files and the like are binary containers; hand them to the document reader
+      // so a read returns their text instead of mojibake.
+      const content = isDocumentPath(target)
+        ? (await readDocument(target, { maxChars: 4_000_000 })).text
+        : await fsp.readFile(target, 'utf8');
       const lines = content.split('\n');
       const start = Math.max(1, args.startLine || 1);
       const end = Math.min(lines.length, args.endLine || lines.length);

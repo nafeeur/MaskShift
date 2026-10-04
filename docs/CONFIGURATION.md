@@ -178,7 +178,7 @@ band and returning plain text:
 | Step | Tool | Requires |
 |---|---|---|
 | Text extraction (OCR) | `image_read`, `pdf_read` fallback | `tesseract` on `PATH` |
-| Page rendering (scanned PDFs) | `pdf_read` fallback | `pdftoppm` (poppler-utils) on `PATH` |
+| Page rendering (scanned PDFs only; text PDFs, Word, Excel and PowerPoint need nothing) | `pdf_read` OCR fallback | `pdftoppm` (poppler-utils) on `PATH` |
 | Natural-language description | `image_read` | An Ollama vision model (`ollama pull llava`, `moondream`, `qwen2.5vl`, ...) |
 
 Each step degrades independently: without `tesseract`/`pdftoppm`, OCR is skipped with a note in
