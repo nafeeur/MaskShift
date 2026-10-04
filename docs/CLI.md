@@ -142,6 +142,16 @@ Run several coding-agent CLIs as one team. See [Agent fleet](FLEET.md).
 | `fleet show MEMBER` | A member's role, state and recent turns. |
 | `fleet stop [MEMBER]` / `reset MEMBER` / `remove MEMBER...` | Cancel a turn (or everything), clear history and inbox, or remove members. |
 
+## Disk use
+
+See [Disk use](STORAGE.md) for how the limits are derived from the machine.
+
+| Command | Description |
+|---|---|
+| `storage` / `storage status` | What MaskShift stores (database, checkpoints, browser profiles, logs), the budget for this machine, disk pressure and advice. |
+| `storage prune [--dry-run]` | Remove old checkpoints, stale search indexes, old run events and oversized logs. Never touches chats, memory or files. `--dry-run` lists what would go. |
+| `storage vacuum` | Rebuild the database so deleted space returns to the disk (needs free space about the size of the database). |
+
 ## Inventory and diagnostics
 
 | Command | Description |

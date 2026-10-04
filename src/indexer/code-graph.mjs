@@ -67,15 +67,23 @@ export class CodeGraph {
     const workspace = this.workspaceManager.get(workspaceId);
     const started = Date.now();
     this.eventBus.emit('code-graph.started', { path: workspace.path }, { workspaceId });
-    const files = await this.indexer.fileList(workspace.path);
+    // The same host-derived limits as the text index, and the same most-useful-first order.
+    await Promise.resolve(this.indexer.prepareLimits?.()).catch(() => {});
+    const limits = this.indexer.limits?.() || {};
+    const maxFiles = limits.maxFiles ?? 100_000;
+    const maxTextBytes = limits.maxTextBytes ?? Infinity;
+    const files = this.indexer.prioritise(await this.indexer.fileList(workspace.path));
     const records = [];
-    for (const relativeRaw of files.slice(0, 100_000)) {
+    let textBytes = 0;
+    for (const relativeRaw of files) {
+      if (records.length >= maxFiles || textBytes >= maxTextBytes) break;
       const relative = relativeRaw.split(path.sep).join('/');
       const full = path.join(workspace.path, relativeRaw);
       const stat = await fsp.stat(full).catch(() => null);
       if (!stat?.isFile() || !this.indexer.shouldIndex(relativeRaw, stat.size)) continue;
       const buffer = await fsp.readFile(full).catch(() => null);
       if (!buffer || buffer.includes(0)) continue;
+      textBytes += buffer.length;
       records.push({ path: relative, language: this.indexer.language(relative), content: buffer.toString('utf8') });
     }
     const knownFiles = new Set(records.map((record) => record.path));

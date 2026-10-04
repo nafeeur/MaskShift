@@ -19,6 +19,23 @@ export class Logger {
     this.auditStream = fs.createWriteStream(this.auditFile, { flags: 'a', mode: 0o600 });
   }
 
+  /** Roll a log (or audit) file over once it passes `maxBytes`, keeping the newest `keep` generations: name.1 is the latest. */
+  async rotate(which, { maxBytes, keep = 3 } = {}) {
+    const file = which === 'audit' ? this.auditFile : this.logFile;
+    let size = 0;
+    try { size = (await fsp.stat(file)).size; } catch { return false; }
+    if (size <= maxBytes) return false;
+    const key = which === 'audit' ? 'auditStream' : 'logStream';
+    const old = this[key];
+    this[key] = null; // writes during the swap are dropped rather than lost into a closed stream
+    await new Promise((resolve) => (old ? old.end(resolve) : resolve()));
+    for (let index = keep - 1; index >= 1; index -= 1) await fsp.rename(`${file}.${index}`, `${file}.${index + 1}`).catch(() => {});
+    await fsp.rename(file, `${file}.1`).catch(() => {});
+    await fsp.rm(`${file}.${keep + 1}`, { force: true });
+    this[key] = fs.createWriteStream(file, { flags: 'a', mode: 0o600 });
+    return true;
+  }
+
   write(level, message, meta = {}) {
     const record = { timestamp: nowIso(), level, message, ...redactSecrets(meta) };
     this.logStream?.write(`${JSON.stringify(record)}\n`);

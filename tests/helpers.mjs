@@ -36,6 +36,7 @@ export async function runtimeForTest(t, workspacePath, overrides = {}) {
       autoCheckpoint: false,
       commandTimeoutMs: 20_000,
       automations: { enabled: false, pollIntervalMs: 10_000, maxPerTick: 2 },
+      storage: { auto: false },
       ...overrides,
     },
   });

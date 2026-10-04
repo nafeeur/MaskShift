@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { directorySize } from '../storage/size.mjs';
 import { absolutePath, ensureDir, id, nowIso, runCommand, sha256, shellQuote, truncate } from '../core/utils.mjs';
 
 const DEFAULT_IGNORES = new Set([
@@ -15,6 +16,8 @@ export class WorkspaceManager {
     this.config = config;
     this.logger = logger;
     this.eventBus = eventBus;
+    // Set by the runtime once the storage budget exists: () => { maxBytesEach, maxFileBytes }.
+    this.checkpointLimits = null;
   }
 
   async open(workspacePath) {
@@ -166,6 +169,7 @@ export class WorkspaceManager {
   }
 
   async createCheckpoint(workspaceId, { runId = null, label = 'automatic' } = {}) {
+    await Promise.resolve(this.prepareLimits?.()).catch(() => {});
     const workspace = this.get(workspaceId);
     const gitRoot = workspace.meta?.gitRoot || await this.findGitRoot(workspace.path);
     if (gitRoot) {
@@ -186,21 +190,30 @@ export class WorkspaceManager {
       const untracked = status.stdout.split('\0').filter(Boolean)
         .filter((line) => line.startsWith('?? ')).map((line) => line.slice(3));
       const copied = [];
+      // Untracked files are copied so a restore can bring them back. How much is the host's call (storage/budget.mjs):
+      // a checkpoint of a directory full of build output and downloads is how a disk quietly fills.
+      const limits = this.checkpointLimits?.() || {};
+      const maxFileBytes = limits.maxFileBytes ?? 10 * 1024 * 1024;
+      const maxTotalBytes = limits.maxBytesEach ?? 256 * 1024 * 1024;
+      let copiedBytes = 0;
+      let skipped = 0;
       for (const relative of untracked.slice(0, 5000)) {
         const source = path.join(gitRoot, relative);
         const destination = path.join(untrackedDir, relative);
         try {
           const stat = await fsp.stat(source);
-          if (stat.isFile() && stat.size <= 20 * 1024 * 1024) {
-            await ensureDir(path.dirname(destination));
-            await fsp.copyFile(source, destination);
-            copied.push(relative);
-          }
+          if (!stat.isFile()) continue;
+          if (stat.size > maxFileBytes || copiedBytes + stat.size > maxTotalBytes) { skipped += 1; continue; }
+          await ensureDir(path.dirname(destination));
+          await fsp.copyFile(source, destination);
+          copied.push(relative);
+          copiedBytes += stat.size;
         } catch { /* best effort */ }
       }
+      if (skipped) this.logger?.warn?.(`Checkpoint left ${skipped} large untracked file(s) uncopied (limit ${Math.round(maxTotalBytes / 1048576)} MB)`, { workspaceId });
       return this.store.saveCheckpoint({
         workspaceId, runId, kind: 'git-ref', ref: commit ? refName : null,
-        manifest: { label, storageId: checkpointId, gitRoot, commit: commit || null, untracked: copied },
+        manifest: { label, storageId: checkpointId, gitRoot, commit: commit || null, untracked: copied, untrackedBytes: copiedBytes, untrackedSkipped: skipped },
       });
     }
 
@@ -210,8 +223,11 @@ export class WorkspaceManager {
     const listing = await this.listFiles(workspaceId, { depth: 100, includeHidden: true, maxEntries: 20_000 });
     const files = [];
     let totalBytes = 0;
+    const snapshotLimits = this.checkpointLimits?.() || {};
+    const snapshotFileMax = snapshotLimits.maxFileBytes ?? 10 * 1024 * 1024;
+    const snapshotTotalMax = Math.min(300 * 1024 * 1024, snapshotLimits.maxBytesEach ?? Infinity);
     for (const item of listing.entries) {
-      if (item.type !== 'file' || item.size > 10 * 1024 * 1024 || totalBytes > 300 * 1024 * 1024) continue;
+      if (item.type !== 'file' || item.size > snapshotFileMax || totalBytes + (item.size || 0) > snapshotTotalMax) continue;
       const source = path.join(workspace.path, item.path);
       const destination = path.join(snapshotDir, item.path);
       await ensureDir(path.dirname(destination));
@@ -296,6 +312,28 @@ export class WorkspaceManager {
       return result.stdout;
     }
     return '';
+  }
+
+  /** Where a checkpoint keeps its files on disk, if anywhere. */
+  checkpointStorageDir(checkpoint) {
+    if (checkpoint.kind === 'snapshot') return checkpoint.ref || null;
+    const id = checkpoint.manifest?.storageId || checkpoint.ref?.split('/').pop();
+    return id ? path.join(this.config.get().home, 'checkpoints', id) : null;
+  }
+
+  /** Delete what a checkpoint holds: its copied files and, for Git, the ref that keeps its commit alive. Returns bytes freed. */
+  async removeCheckpointArtifacts(checkpoint) {
+    const directory = this.checkpointStorageDir(checkpoint);
+    let freed = 0;
+    if (directory && directory.startsWith(path.join(this.config.get().home, 'checkpoints'))) {
+      freed = await directorySize(directory);
+      await fsp.rm(directory, { recursive: true, force: true });
+    }
+    if (checkpoint.kind === 'git-ref' && checkpoint.ref && checkpoint.manifest?.gitRoot) {
+      // Without this the commit stays reachable forever and `git gc` can never reclaim it.
+      await runCommand(`git update-ref -d ${JSON.stringify(checkpoint.ref)}`, { cwd: checkpoint.manifest.gitRoot, timeoutMs: 15_000 }).catch(() => {});
+    }
+    return freed;
   }
 
   /** Puts the workspace back to a checkpoint, including removing files created since. */

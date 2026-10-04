@@ -119,6 +119,12 @@ export function defaultConfig() {
     agentBridges: {},
     // Multi-harness fleet limits; see docs/FLEET.md. Anything left out takes the default in src/fleet/manager.mjs.
     fleet: {},
+    // Disk use. Every limit is worked out from this machine (disk size and free space, memory) unless set here; see
+    // docs/STORAGE.md. null = derive it. auto:false turns the background upkeep off (maskshift storage prune still works).
+    storage: {
+      auto: true, maxGb: null, indexMaxMb: null, indexMaxFiles: null, staleIndexDays: null,
+      keepCheckpoints: null, checkpointMaxAgeDays: null, runEventDays: null,
+    },
     automations: {
       enabled: true,
       pollIntervalMs: 1000,
@@ -255,6 +261,7 @@ function mergeConfig(base, override) {
   merged.mcpServers = { ...base.mcpServers, ...(override?.mcpServers || {}) };
   merged.agentBridges = { ...base.agentBridges, ...(override?.agentBridges || {}) };
   merged.fleet = { ...base.fleet, ...(override?.fleet || {}) };
+  merged.storage = { ...base.storage, ...(override?.storage || {}) };
   merged.automations = { ...base.automations, ...(override?.automations || {}) };
   merged.browser = { ...base.browser, ...(override?.browser || {}) };
   merged.indexing = { ...base.indexing, ...(override?.indexing || {}) };

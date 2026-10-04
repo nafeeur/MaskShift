@@ -12,11 +12,12 @@
 import { parentPort, workerData } from 'node:worker_threads';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
+import os from 'node:os';
 import { Store } from '../core/store.mjs';
 import { id, nowIso, sha256, truncate } from '../core/utils.mjs';
-import { chunkFile, fileList, language, ollamaEmbed, shouldIndex } from './scan.mjs';
+import { chunkFile, fileList, language, ollamaEmbed, prioritise, shouldIndex } from './scan.mjs';
 
-const { dbFile, workspaceId, workspacePath, indexing, ollamaBaseUrl } = workerData;
+const { dbFile, workspaceId, workspacePath, indexing, ollamaBaseUrl, limits = {} } = workerData;
 
 async function embedPending(store, pending) {
   if (indexing.embeddings === false || !pending?.length || !ollamaBaseUrl) return { embeddedChunks: 0, embedAttempted: 0 };
@@ -44,23 +45,37 @@ async function run() {
   await store.init();
   try {
     const started = Date.now();
-    const files = await fileList(workspacePath);
+    // Limits come from the host (see storage/budget.mjs). Opening a home directory or the filesystem root is the usual
+    // way an index balloons, so those get a quarter of the allowance.
+    const broad = path.resolve(workspacePath) === path.resolve(os.homedir()) || path.parse(path.resolve(workspacePath)).root === path.resolve(workspacePath);
+    const scale = broad ? 0.25 : 1;
+    const maxFiles = Math.max(1, Math.round((limits.maxFiles ?? 100_000) * scale));
+    const maxTextBytes = Math.max(1, Math.round((limits.maxTextBytes ?? Infinity) * scale));
+    const maxFileBytes = limits.maxFileBytes ?? 2 * 1024 * 1024;
+
+    // Most useful files first, so that when a limit stops the walk it is the vendored and the deeply nested that go.
+    const files = prioritise(await fileList(workspacePath));
     const chunks = [];
     let scanned = 0;
     let indexedFiles = 0;
+    let textBytes = 0;
+    let stoppedBy = null;
 
-    for (const relative of files.slice(0, 100_000)) {
+    for (const relative of files) {
+      if (indexedFiles >= maxFiles) { stoppedBy = 'file limit'; break; }
+      if (textBytes >= maxTextBytes) { stoppedBy = 'size limit'; break; }
       scanned += 1;
       const full = path.join(workspacePath, relative);
       let stat;
       try { stat = await fsp.stat(full); } catch { continue; }
-      if (!stat.isFile() || !shouldIndex(relative, stat.size)) continue;
+      if (!stat.isFile() || stat.size > maxFileBytes || !shouldIndex(relative, stat.size)) continue;
       let buffer;
       try { buffer = await fsp.readFile(full); } catch { continue; }
       if (buffer.includes(0)) continue;
       const content = buffer.toString('utf8');
       if (!content.trim()) continue;
       indexedFiles += 1;
+      textBytes += buffer.length;
       const lang = language(relative);
       for (const chunk of chunkFile(relative, content)) {
         chunks.push({
@@ -81,7 +96,11 @@ async function run() {
 
     const { pending } = store.replaceRepoChunks(workspaceId, chunks);
     const embedding = await embedPending(store, pending);
-    const stats = { scanned, indexedFiles, chunks: chunks.length, durationMs: Date.now() - started, ...embedding };
+    const stats = {
+      scanned, indexedFiles, chunks: chunks.length, textBytes, durationMs: Date.now() - started, ...embedding,
+      // Said out loud, because a partial index changes what search can find.
+      truncated: stoppedBy ? { reason: stoppedBy, skipped: Math.max(0, files.length - scanned), limit: stoppedBy === 'file limit' ? maxFiles : maxTextBytes } : null,
+    };
     parentPort.postMessage({ type: 'done', payload: stats });
   } catch (error) {
     parentPort.postMessage({ type: 'error', payload: { message: error?.message || String(error), stack: error?.stack } });

@@ -7,6 +7,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { safeJsonParse, truncate } from '../core/utils.mjs';
 import { McpServer } from '../mcp/server.mjs';
+import { formatBytes } from '../storage/budget.mjs';
 import { oneLine } from './ui.mjs';
 
 const STATUS_TONE = (theme, status) => ({
@@ -1296,6 +1297,68 @@ const fleetCommands = {
   },
 };
 
+// -------------------------------------------------------------------- storage
+
+const storageCommands = {
+  status: {
+    usage: 'storage status',
+    summary: 'What MaskShift stores on disk, the budget derived from this machine, and what to do about it',
+    async run(context) {
+      const status = await context.runtime.storageManager.status();
+      if (context.ui.emit(status)) return;
+      const { usage, budget } = status;
+      context.ui.heading('disk use');
+      context.ui.table([
+        { key: 'area', label: 'area' },
+        { key: 'size', label: 'size', align: 'right' },
+        { key: 'share', label: 'budget', align: 'right' },
+      ], [
+        { area: 'database (search index, chats, runs)', size: formatBytes(usage.database), share: formatBytes(budget.share.index + budget.share.other * 0.5) },
+        { area: 'checkpoints (undo points)', size: formatBytes(usage.checkpoints), share: formatBytes(budget.share.checkpoints) },
+        { area: 'browser profiles, logs, caches', size: formatBytes(usage.other), share: formatBytes(budget.share.other * 0.5) },
+        { area: 'total', size: formatBytes(usage.total), share: formatBytes(budget.total) },
+      ]);
+      context.ui.section('this machine');
+      context.ui.fields([
+        ['disk', `${formatBytes(budget.host.diskFree)} free of ${formatBytes(budget.host.diskTotal)}`],
+        ['pressure', status.pressure],
+        ['memory', formatBytes(budget.host.memTotal)],
+        ['index per workspace', `${formatBytes(budget.index.maxTextBytes)} of text, ${budget.index.maxFiles} files`],
+        ['checkpoints kept', `${budget.checkpoints.keepPerWorkspace} per workspace, ${budget.checkpoints.maxAgeDays} days`],
+        ['run events kept', `${budget.runEventDays} days`],
+      ]);
+      for (const line of status.advice) context.ui.warn(line);
+      if (!status.advice.length) context.ui.ok('Within budget');
+    },
+  },
+  prune: {
+    usage: 'storage prune [--dry-run]',
+    summary: 'Free space: old checkpoints, stale search indexes, old run events, oversized logs. Never touches chats, memory or your files',
+    async run(context) {
+      const result = await context.runtime.storageManager.prune({ dryRun: Boolean(context.args['dry-run'] || context.args.dryRun) });
+      if (context.ui.emit(result)) return;
+      if (!result.actions.length) { context.ui.ok('Nothing to prune'); return; }
+      context.ui.table([
+        { key: 'type', label: 'what' },
+        { key: 'reason', label: 'why', max: 52 },
+        { key: 'bytes', label: 'size', align: 'right', value: (row) => (row.bytes ? formatBytes(row.bytes) : '') },
+      ], result.actions);
+      if (result.dryRun) context.ui.info(`Would free about ${formatBytes(result.wouldFreeBytes)}. Run without --dry-run to do it.`);
+      else context.ui.ok(`Freed about ${formatBytes(result.freedBytes)}`);
+      for (const failure of result.failures) context.ui.warn(`${failure.action}: ${failure.error}`);
+    },
+  },
+  vacuum: {
+    usage: 'storage vacuum',
+    summary: 'Rebuild the database file so deleted space is returned to the disk (needs free space about the size of the database)',
+    async run(context) {
+      const result = await context.runtime.storageManager.vacuum();
+      if (context.ui.emit(result)) return;
+      context.ui.ok(`Database ${formatBytes(result.beforeBytes)} → ${formatBytes(result.afterBytes)}${result.autoVacuumNow === 2 ? ' · now returns space automatically' : ''}`);
+    },
+  },
+};
+
 export const GROUPS = {
   workspace: { title: 'Workspace', commands: workspaceCommands, defaultCommand: 'info' },
   session: { title: 'Chats', commands: sessionCommands, defaultCommand: 'list' },
@@ -1305,6 +1368,7 @@ export const GROUPS = {
   bench: { title: 'Benchmark', commands: benchCommands, defaultCommand: 'list' },
   mcp: { title: 'MCP network', commands: mcpCommands, defaultCommand: 'list' },
   fleet: { title: 'Agent fleet', commands: fleetCommands, defaultCommand: 'list' },
+  storage: { title: 'Disk use', commands: storageCommands, defaultCommand: 'status' },
   plugins: { title: 'Plugins', commands: pluginCommands, defaultCommand: 'list' },
   automation: { title: 'Automations', commands: automationCommands, defaultCommand: 'list' },
   browser: { title: 'Browser', commands: browserCommands, defaultCommand: 'list' },

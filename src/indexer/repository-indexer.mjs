@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { Worker } from 'node:worker_threads';
 import { truncate } from '../core/utils.mjs';
-import { chunkFile, fileList, language, ollamaEmbed, shouldIndex } from './scan.mjs';
+import { chunkFile, fileList, language, ollamaEmbed, prioritise, shouldIndex } from './scan.mjs';
 
 const WORKER_PATH = fileURLToPath(new URL('./index-worker.mjs', import.meta.url));
 
@@ -37,6 +37,8 @@ export class RepositoryIndexer {
     this.logger = logger;
     this.eventBus = eventBus;
     this.running = new Map();
+    // Set by the runtime once the storage budget exists: () => { maxFiles, maxTextBytes, maxFileBytes }.
+    this.limits = null;
   }
 
   // Kept as instance methods — code-graph.mjs calls these directly to reuse
@@ -47,11 +49,13 @@ export class RepositoryIndexer {
 
   fileList(root) { return fileList(root); }
 
+  prioritise(files) { return prioritise(files); }
+
   chunkFile(relative, content) { return chunkFile(relative, content); }
 
   async index(workspaceId, { force = false } = {}) {
     if (this.running.has(workspaceId)) return this.running.get(workspaceId);
-    const task = this.#runIndex(workspaceId, { force }).finally(() => this.running.delete(workspaceId));
+    const task = Promise.resolve(this.prepareLimits?.()).catch(() => {}).then(() => this.#runIndex(workspaceId, { force })).finally(() => this.running.delete(workspaceId));
     this.running.set(workspaceId, task);
     return task;
   }
@@ -70,6 +74,7 @@ export class RepositoryIndexer {
           workspacePath: workspace.path,
           indexing: this.config.get().indexing || {},
           ollamaBaseUrl: this.ollamaBaseUrl(),
+          limits: this.limits?.() || {},
         },
       });
       worker.on('message', (message) => {
@@ -79,6 +84,7 @@ export class RepositoryIndexer {
         }
         if (message.type === 'done') {
           this.logger.info('Repository index completed', { workspaceId, ...message.payload });
+          if (message.payload.truncated) this.logger.warn(`Repository index stopped at its ${message.payload.truncated.reason}; ${message.payload.truncated.skipped} files were not indexed`, { workspaceId });
           this.eventBus.emit('index.completed', message.payload, { workspaceId });
           resolve(message.payload);
         } else if (message.type === 'error') {

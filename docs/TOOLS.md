@@ -1,6 +1,6 @@
 # Native Tool Inventory
 
-Generated from the MaskShift 1.4.1 runtime. **191 native tools** are available before plugins or MCP servers add more capabilities.
+Generated from the MaskShift 1.4.1 runtime. **193 native tools** are available before plugins or MCP servers add more capabilities.
 
 Only activated descriptors enter a model request; this document is the complete local catalog.
 
@@ -294,6 +294,13 @@ Only activated descriptors enter a model request; this document is the complete 
 | `skill_promote_validated` | write | write | Apply a skill improvement only when recorded A/B trials meet minimum evidence and improve success without regressions. |
 | `skill_read_reference` | read | normal | Read a file referenced by a skill while preventing path escape from the skill directory. |
 | `skill_search` | read | normal | Search all bundled, project, Claude, Codex, Copilot, and user skill catalogs. Skill bodies are loaded only when selected. |
+
+## storage (2)
+
+| Tool | Access | Risk | Description |
+|---|---|---|---|
+| `storage_prune` | write | state | Delete old checkpoints, stale search indexes, old run events and oversized logs according to the host-derived retention. Never deletes chats, memory or workspace files. Defaults to a dry run that only lists what would go. |
+| `storage_status` | read | normal | Report how much disk MaskShift uses (database, checkpoints, browser profiles, logs), the budget derived from this machine's disk and memory, and advice when it is over budget. |
 
 ## system (7)
 
