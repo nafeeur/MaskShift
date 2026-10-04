@@ -240,3 +240,63 @@ export const curatedMcpCatalog = [
     source: 'curated',
   },
 ];
+
+// More public servers, each checked against its npm/PyPI package or live endpoint. They are catalogue entries only:
+// nothing starts or connects until a run (or you) activates one. Servers that need a credential are disabled and say
+// which environment variable to set; OAuth-only hosted servers go through `mcp-remote`, which opens a browser to sign in.
+const remote = (name, title, url, description, keywords, extra = {}) => ({
+  name, title, description, transport: 'http', url, keywords, enabled: extra.requires || extra.oauth ? false : true, lazy: true, source: 'curated', ...extra,
+});
+const stdio = (name, title, command, args, description, keywords, extra = {}) => ({
+  name, title, description, transport: 'stdio', command, args, keywords, enabled: extra.requires ? false : true, lazy: true, source: 'curated', ...extra,
+});
+const bearer = (variable) => ({ Authorization: `Bearer \${${variable}}` });
+const needs = (variables) => `Needs ${variables.join(', ')} in your environment.`;
+const viaRemote = (name, title, url, description, keywords) => stdio(
+  name, title, 'npx', ['-y', 'mcp-remote', url], `${description} Signs in through your browser on first connect.`, keywords, { enabled: false, oauth: true },
+);
+
+export const publicMcpCatalog = [
+  // Public, no sign-in.
+  remote('deepwiki', 'DeepWiki', 'https://mcp.deepwiki.com/mcp', 'Ask questions about any public GitHub repository and read its generated documentation.', ['github', 'repository', 'wiki', 'code', 'docs', 'open source']),
+  remote('microsoft-learn', 'Microsoft Learn', 'https://learn.microsoft.com/api/mcp', 'Search and read official Microsoft, Azure and .NET documentation.', ['microsoft', 'azure', 'dotnet', 'windows', 'docs', 'powershell']),
+  remote('huggingface', 'Hugging Face', 'https://huggingface.co/mcp', 'Search models, datasets, Spaces and papers on the Hugging Face Hub.', ['models', 'datasets', 'ml', 'ai', 'papers', 'spaces']),
+  remote('cloudflare-docs', 'Cloudflare Docs', 'https://docs.mcp.cloudflare.com/mcp', 'Search the Cloudflare developer documentation.', ['cloudflare', 'workers', 'dns', 'cdn', 'docs']),
+  remote('exa', 'Exa Search', 'https://mcp.exa.ai/mcp', 'Web and code search built for language models.', ['search', 'web', 'research', 'code search']),
+  remote('gitmcp', 'GitMCP', 'https://gitmcp.io/docs', 'Read the docs and code of any GitHub project as context (change the URL to gitmcp.io/OWNER/REPO to pin one).', ['github', 'docs', 'repository', 'readme']),
+  stdio('time-mcp', 'MCP Time', 'uvx', ['mcp-server-time'], 'Current time and timezone conversion.', ['time', 'timezone', 'date', 'clock']),
+  stdio('chrome-devtools', 'Chrome DevTools', 'npx', ['-y', 'chrome-devtools-mcp@latest', '--headless'], 'Drive and debug Chrome: performance traces, network, console, DOM and screenshots.', ['chrome', 'devtools', 'performance', 'browser', 'debug', 'lighthouse']),
+  stdio('markitdown', 'MarkItDown', 'uvx', ['markitdown-mcp'], 'Convert PDF, Word, Excel, PowerPoint, HTML and images to Markdown.', ['pdf', 'docx', 'xlsx', 'convert', 'markdown', 'documents']),
+  stdio('duckduckgo', 'DuckDuckGo Search', 'uvx', ['duckduckgo-mcp-server'], 'Keyless web search and page fetching.', ['search', 'web', 'duckduckgo']),
+  stdio('svelte', 'Svelte', 'npx', ['-y', '@sveltejs/mcp'], 'Svelte and SvelteKit documentation and code checking.', ['svelte', 'sveltekit', 'frontend', 'docs']),
+  stdio('everything-mcp', 'MCP Everything (test server)', 'npx', ['-y', '@modelcontextprotocol/server-everything'], 'Reference server that exercises every MCP feature, for testing clients.', ['test', 'reference', 'compatibility'], { enabled: false }),
+  stdio('docker-mcp', 'Docker', 'uvx', ['mcp-server-docker'], 'Manage Docker containers, images, volumes and networks.', ['docker', 'container', 'image', 'compose'], { enabled: false }),
+  stdio('sqlite-mcp', 'SQLite', 'uvx', ['mcp-server-sqlite', '--db-path', './data.db'], 'Query and modify a SQLite database (edit the path in the definition).', ['sqlite', 'sql', 'database'], { enabled: false }),
+
+  // Token in the environment.
+  remote('github', 'GitHub', 'https://api.githubcopilot.com/mcp/', `Repositories, issues, pull requests, code search and Actions. ${needs(['GITHUB_TOKEN'])}`, ['github', 'issues', 'pull request', 'repo', 'actions', 'code review'], { headers: bearer('GITHUB_TOKEN'), requires: ['GITHUB_TOKEN'] }),
+  remote('linear', 'Linear', 'https://mcp.linear.app/mcp', `Issues, projects and cycles. ${needs(['LINEAR_API_KEY'])}`, ['linear', 'issues', 'tickets', 'project management'], { headers: bearer('LINEAR_API_KEY'), requires: ['LINEAR_API_KEY'] }),
+  remote('stripe', 'Stripe', 'https://mcp.stripe.com', `Customers, payments, subscriptions and docs. ${needs(['STRIPE_API_KEY'])} Use a restricted key.`, ['stripe', 'payments', 'billing', 'subscriptions'], { headers: bearer('STRIPE_API_KEY'), requires: ['STRIPE_API_KEY'] }),
+  remote('supabase', 'Supabase', 'https://mcp.supabase.com/mcp', `Projects, tables, SQL, migrations and logs. ${needs(['SUPABASE_ACCESS_TOKEN'])}`, ['supabase', 'postgres', 'database', 'backend'], { headers: bearer('SUPABASE_ACCESS_TOKEN'), requires: ['SUPABASE_ACCESS_TOKEN'] }),
+  remote('apify', 'Apify', 'https://mcp.apify.com', `Run thousands of web scraping and automation Actors. ${needs(['APIFY_TOKEN'])}`, ['scraping', 'apify', 'crawl', 'automation', 'web data'], { headers: bearer('APIFY_TOKEN'), requires: ['APIFY_TOKEN'] }),
+  stdio('brave-search', 'Brave Search', 'npx', ['-y', '@modelcontextprotocol/server-brave-search'], `Web and local search. ${needs(['BRAVE_API_KEY'])}`, ['search', 'web', 'brave'], { env: { BRAVE_API_KEY: '${BRAVE_API_KEY}' }, requires: ['BRAVE_API_KEY'] }),
+  stdio('tavily', 'Tavily', 'npx', ['-y', 'tavily-mcp@latest'], `Search, extract and crawl the web for research. ${needs(['TAVILY_API_KEY'])}`, ['search', 'research', 'crawl', 'extract'], { env: { TAVILY_API_KEY: '${TAVILY_API_KEY}' }, requires: ['TAVILY_API_KEY'] }),
+  stdio('firecrawl', 'Firecrawl', 'npx', ['-y', 'firecrawl-mcp'], `Scrape, crawl and extract structured data from websites. ${needs(['FIRECRAWL_API_KEY'])}`, ['scrape', 'crawl', 'web', 'extract'], { env: { FIRECRAWL_API_KEY: '${FIRECRAWL_API_KEY}' }, requires: ['FIRECRAWL_API_KEY'] }),
+  stdio('notion-api', 'Notion (integration token)', 'npx', ['-y', '@notionhq/notion-mcp-server'], `Pages, databases and comments through a Notion integration. ${needs(['NOTION_TOKEN'])}`, ['notion', 'notes', 'wiki', 'database'], { env: { NOTION_TOKEN: '${NOTION_TOKEN}' }, requires: ['NOTION_TOKEN'] }),
+  stdio('figma-api', 'Figma (access token)', 'npx', ['-y', 'figma-developer-mcp', '--stdio'], `Read Figma files, frames and styles to build UI from designs. ${needs(['FIGMA_API_KEY'])}`, ['figma', 'design', 'ui', 'frames'], { env: { FIGMA_API_KEY: '${FIGMA_API_KEY}' }, requires: ['FIGMA_API_KEY'] }),
+  stdio('mapbox', 'Mapbox', 'npx', ['-y', '@mapbox/mcp-server'], `Geocoding, directions, isochrones and static maps. ${needs(['MAPBOX_ACCESS_TOKEN'])}`, ['maps', 'geocoding', 'directions', 'places'], { env: { MAPBOX_ACCESS_TOKEN: '${MAPBOX_ACCESS_TOKEN}' }, requires: ['MAPBOX_ACCESS_TOKEN'] }),
+
+  // Hosted, OAuth sign-in in the browser.
+  viaRemote('notion', 'Notion', 'https://mcp.notion.com/mcp', 'Search and edit your Notion workspace.', ['notion', 'notes', 'wiki', 'docs']),
+  viaRemote('sentry', 'Sentry', 'https://mcp.sentry.dev/mcp', 'Errors, issues, releases and traces.', ['sentry', 'errors', 'monitoring', 'crash', 'traces']),
+  viaRemote('atlassian', 'Atlassian (Jira & Confluence)', 'https://mcp.atlassian.com/v1/mcp', 'Jira issues and Confluence pages.', ['jira', 'confluence', 'atlassian', 'tickets', 'wiki']),
+  viaRemote('asana', 'Asana', 'https://mcp.asana.com/v2/mcp', 'Tasks, projects and goals.', ['asana', 'tasks', 'projects', 'planning']),
+  viaRemote('vercel', 'Vercel', 'https://mcp.vercel.com', 'Projects, deployments and logs.', ['vercel', 'deploy', 'hosting', 'logs']),
+  viaRemote('figma', 'Figma', 'https://mcp.figma.com/mcp', 'Designs, components and variables.', ['figma', 'design', 'ui', 'components']),
+  viaRemote('neon', 'Neon', 'https://mcp.neon.tech/mcp', 'Serverless Postgres projects, branches and SQL.', ['neon', 'postgres', 'database', 'sql']),
+  viaRemote('hubspot', 'HubSpot', 'https://mcp.hubspot.com', 'CRM contacts, companies and deals.', ['hubspot', 'crm', 'sales', 'contacts']),
+  viaRemote('paypal', 'PayPal', 'https://mcp.paypal.com/mcp', 'Invoices, orders and transactions.', ['paypal', 'payments', 'invoices']),
+  viaRemote('canva', 'Canva', 'https://mcp.canva.com/mcp', 'Create and edit Canva designs.', ['canva', 'design', 'graphics', 'presentations']),
+];
+
+curatedMcpCatalog.push(...publicMcpCatalog);
