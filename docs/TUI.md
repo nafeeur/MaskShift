@@ -61,7 +61,7 @@ decoration; each animation answers a question:
 ### Status
 
 `src/tui/status.mjs` collapses every subsystem's state string — runs, plan
-steps, MCP servers, automations, bridges, processes, tool results — onto seven
+steps, MCP servers, automations, fleet members, processes, tool results — onto seven
 kinds, each fixing a tone and a glyph. A failed run, a failed plan step and a
 failed tool are now the same red and the same mark.
 
@@ -108,7 +108,7 @@ usable at 80×24.
 |---|---|
 | **Chat** | The conversation and composer. Markdown, syntax-tinted code fences, coloured diffs, collapsed tool calls, and a live indicator for in-flight tools. |
 | **Files** | Workspace tree with fold state and a syntax-highlighted preview. `a` attaches the selected file to the composer. |
-| **Capabilities** | Every native tool and skill, MCP servers (installed and the official registry), plugins and agent bridges — one catalogue behind five tabs, fuzzy-searchable, with a details pane per kind. `x` runs a tool directly. |
+| **Capabilities** | Every native tool and skill, MCP servers (installed and the official registry), plugins — one catalogue behind four tabs, fuzzy-searchable, with a details pane per kind. `x` runs a tool directly. |
 | **Runtime** | The host shell, running with your full account permissions, plus automations, background processes and browser instances behind a secondary tab strip. |
 | **Browser** | A live, clickable, typeable view of a running browser tab — the same CDP connection the browser tools drive — with its own instance strip to pick which tab it watches. When the agent needs you for a step (a CAPTCHA, a bank prompt) the view opens with a "Your turn" banner; `ctrl+e` hands the browser back, `ctrl+x` cancels. |
 | **Git** | Working tree changes, commit log, branches, stash, MaskShift checkpoints and worktrees, each with their own actions — plus push/pull/fetch from any tab. |
@@ -300,7 +300,7 @@ prompts.
 | Key | Action |
 |---|---|
 | `/` | Filter |
-| `tab` / `shift+tab` | Cycle the section (tools/skills/mcp/plugins/bridges in Capabilities; shell/automations/processes/browsers in Runtime) |
+| `tab` / `shift+tab` | Cycle the section (tools/skills/mcp/plugins in Capabilities; shell/automations/processes/browsers in Runtime) |
 | `g` | Toggle installed/registry (CAPABILITIES, MCP tab) |
 | `→` | Focus the details pane |
 | `enter` | The primary action: open, connect, load, run now, toggle |

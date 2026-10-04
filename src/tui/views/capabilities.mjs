@@ -1,5 +1,5 @@
 // 03 CAPABILITIES — every native tool and skill, MCP servers (installed and
-// the official registry), plugins and agent bridges: one catalogue, five
+// the official registry), and plugins: one catalogue, four
 // tabs. Used to be three separate views (tools, MCP, plugins) built
 // on the same list+detail chrome with tabs bolted on for each; this merges
 // them into the one shared tab switcher catalog.mjs already provides.
@@ -20,7 +20,6 @@ const TABS = [
   { id: 'skills', label: 'Skills' },
   { id: 'mcp', label: 'MCP' },
   { id: 'plugins', label: 'Plugins' },
-  { id: 'bridges', label: 'Bridges' },
 ];
 
 const NAME_WIDTH = 28;
@@ -61,19 +60,10 @@ function pluginItems(app) {
   }));
 }
 
-function bridgeItems(app) {
-  return app.bridges.map((bridge) => ({
-    id: `bridge:${bridge.name}`, kind: 'bridge', name: bridge.title || bridge.name,
-    status: bridge.available ? 'available' : 'missing',
-    description: bridge.command + (bridge.version ? ` · ${oneLine(bridge.version, 40)}` : ''),
-    raw: bridge,
-  }));
-}
-
 export function items(app) {
   const query = app.capabilitiesFilter.value.trim();
   const source = {
-    tools: toolItems, skills: skillItems, mcp: mcpItems, plugins: pluginItems, bridges: bridgeItems,
+    tools: toolItems, skills: skillItems, mcp: mcpItems, plugins: pluginItems,
   }[app.capabilitiesTab](app);
   // The registry is server-side search (see searchRegistry) rather than a local filter.
   if (!query || (app.capabilitiesTab === 'mcp' && app.mcpMode === 'registry')) return source;
@@ -243,17 +233,6 @@ function pluginDetail(app, item, width) {
   ]);
 }
 
-function bridgeDetail(app, item, width) {
-  const raw = item.raw || {};
-  return detailBlock(app, width, [
-    item.description || '',
-    { field: 'command', value: raw.command },
-    { field: 'resolved', value: raw.executable || 'not found' },
-    { field: 'args', value: (raw.args || []).join(' ') },
-    { field: 'version', value: oneLine(raw.version || '', 200) },
-  ]);
-}
-
 export function detail(app, width) {
   const item = app.capabilitiesList.current;
   if (!item) return null;
@@ -261,7 +240,6 @@ export function detail(app, width) {
   if (item.kind === 'skill') return skillDetail(app, item, width);
   if (item.kind === 'server' || item.kind === 'registry') return mcpDetail(app, item, width);
   if (item.kind === 'plugin') return pluginDetail(app, item, width);
-  if (item.kind === 'bridge') return bridgeDetail(app, item, width);
   return null;
 }
 
@@ -277,7 +255,6 @@ const EMPTY_HINTS = (app) => {
     tools: { title: 'No tools registered', hint: '' },
     skills: { title: 'No skills found', hint: '' },
     plugins: { title: 'No plugins installed', hint: 'n scaffolds one' },
-    bridges: { title: 'No coding-agent CLIs found on this machine', hint: 'r rescans' },
   }[app.capabilitiesTab];
 };
 
@@ -286,14 +263,13 @@ export function render(app, region) {
   app.capabilitiesList.setItems(list);
   const counts = {
     tools: app.tools.length, skills: app.skills.length, mcp: app.mcpServers.length,
-    plugins: app.plugins.length, bridges: app.bridges.length,
+    plugins: app.plugins.length,
   };
   const stamps = {
     tools: `${list.length} OF ${counts.tools}`,
     skills: `${list.length} OF ${counts.skills}`,
     mcp: app.mcpMode === 'registry' ? `${app.registryResults.length} found` : `${app.mcpServers.filter((s) => s.status === 'connected').length} connected`,
     plugins: `${list.length} OF ${counts.plugins}`,
-    bridges: `${list.length} OF ${counts.bridges}`,
   };
   const placeholder = app.capabilitiesTab === 'mcp'
     ? (app.mcpMode === 'registry' ? 'Search the official registry, then ↵' : 'Filter installed servers')
@@ -309,7 +285,7 @@ export function render(app, region) {
     empty: EMPTY_HINTS(app),
     detail: detail(app, Math.max(30, Math.floor(region.width * 0.4) - 4)),
     detailTitle: app.capabilitiesList.current?.name ? truncate(app.capabilitiesList.current.name, 30) : 'Details',
-    detailStamp: { tool: 'Tool', skill: 'Skill', server: 'MCP', registry: 'Registry', plugin: 'Plugin', bridge: 'Bridge' }[app.capabilitiesList.current?.kind] || '',
+    detailStamp: { tool: 'Tool', skill: 'Skill', server: 'MCP', registry: 'Registry', plugin: 'Plugin' }[app.capabilitiesList.current?.kind] || '',
     onTab: (target, id) => { target.capabilitiesTab = id; target.capabilitiesFilter.clear(); target.capabilitiesList.first(); },
     onActivate: (target, item) => activate(target, item),
   });
@@ -322,7 +298,6 @@ function activate(app, item) {
   else if (item?.kind === 'server') void (item.status === 'connected' ? app.disconnectMcp(item.name) : app.connectMcp(item.name));
   else if (item?.kind === 'registry') void app.installRegistryServer(item.raw);
   else if (item?.kind === 'plugin') void (item.status === 'active' ? app.deactivatePlugin(item.name) : app.activatePlugin(item.name));
-  else if (item?.kind === 'bridge') app.openBridgeRunner(item.raw);
 }
 
 export function handle(app, event) {
@@ -346,7 +321,6 @@ export function handle(app, event) {
       case event.name === 'r' && !event.ctrl && app.capabilitiesTab === 'mcp': void app.refreshMcp(); return true;
       case event.name === 'delete' && item?.kind === 'server': app.confirmRemoveMcp(item.name); return true;
       case event.name === 'n' && app.capabilitiesTab === 'plugins': app.openPluginDialog(); return true;
-      case event.name === 'r' && !event.ctrl && app.capabilitiesTab === 'bridges': void app.refreshCapabilitiesExtras({ force: true }); return true;
       case event.name === 'l' && item?.kind === 'plugin': void app.reloadPlugin(item.name); return true;
       default: break;
     }
@@ -381,7 +355,7 @@ export const meta = { id: 'capabilities', index: '3', title: 'Capabilities', sho
 // called it, its error rate, and when it last ran. Only a tool's calls
 // actually go through the tool registry (see src/tools/registry.mjs's
 // tool.started/completed/failed events, which land in app.events like any
-// other event) — a skill, plugin or bridge has no equivalent per-call
+// other event) — a skill or plugin has no equivalent per-call
 // telemetry yet, so those tabs say so rather than showing invented numbers.
 export function rail(app, width) {
   const { theme } = app;

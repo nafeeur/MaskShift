@@ -223,8 +223,8 @@ export class MaskShiftTui {
     this.toolExpansionVersion = 0;
     this.autoLoad = runtime.config.get().autoLoadCapabilities !== false;
 
-    // 03 CAPABILITIES — tools, skills, MCP, plugins and bridges: one catalogue,
-    // five tabs, all sharing a single filter/list the way each used to have
+    // 03 CAPABILITIES — tools, skills, MCP and plugins: one catalogue,
+    // four tabs, all sharing a single filter/list the way each used to have
     // its own (the tools, MCP and plugins views before they were merged into capabilities.mjs).
     this.tools = [];
     this.skills = [];
@@ -239,7 +239,6 @@ export class MaskShiftTui {
     this.registryResults = [];
 
     this.plugins = [];
-    this.bridges = [];
 
     // 04 RUNTIME — the host shell (default) plus automations, processes and
     // browser instances behind a secondary tab strip.
@@ -2025,13 +2024,9 @@ export class MaskShiftTui {
 
   // ------------------------------------------------------- 03 capabilities
 
-  /** Plugins and bridges — the two 03 CAPABILITIES tabs that don't already
-   *  have their own refresh (tools/skills: refreshCatalogs; mcp: refreshMcp). */
-  async refreshCapabilitiesExtras({ force = false } = {}) {
+  /** Plugins — the one 03 CAPABILITIES tab without its own refresh (tools/skills: refreshCatalogs; mcp: refreshMcp). */
+  async refreshCapabilitiesExtras() {
     this.plugins = this.runtime.pluginManager.list();
-    if (force || !this.bridges.length) {
-      try { this.bridges = await this.runtime.bridgeManager.discover({ force }); } catch { /* optional */ }
-    }
     this.requestRender();
   }
 
@@ -2120,25 +2115,6 @@ export class MaskShiftTui {
         await this.runtime.browserManager.launch(values);
         this.toast('Browser launched', 'success');
         await this.refreshRuntimeExtras();
-      },
-    });
-  }
-
-  openBridgeRunner(bridge) {
-    this.overlay = new FormOverlay({
-      title: `Delegate to ${String(bridge.title || bridge.name)}`, submitLabel: 'Delegate',
-      note: bridge.available ? `Runs ${bridge.executable}` : 'This bridge is not installed on your PATH.',
-      fields: [{ name: 'prompt', label: 'prompt', type: 'textarea', value: '' }],
-      onSubmit: async (values) => {
-        if (!values.prompt) throw new Error('A prompt is required');
-        this.toast(`Delegating to ${bridge.name}…`, 'info');
-        const result = await this.runtime.bridgeManager.run(bridge.name, {
-          prompt: values.prompt, workspaceId: this.workspaceId, wait: true,
-        });
-        this.overlay = new TextOverlay({
-          title: `${String(bridge.name)} result`,
-          lines: wrap(result.stdout || result.stderr || 'No output', 90),
-        });
       },
     });
   }
@@ -2526,9 +2502,9 @@ export class MaskShiftTui {
       ['h', 'toggle hidden files'],
       ['', ''],
       ['03 CAPABILITIES', ''],
-      ['tab', 'section: tools, skills, mcp, plugins, bridges'],
+      ['tab', 'section: tools, skills, mcp, plugins'],
       ['x', 'run a tool directly with JSON arguments'],
-      ['enter', 'load a skill body · connect/install a server · toggle a plugin · delegate to a bridge'],
+      ['enter', 'load a skill body · connect/install a server · toggle a plugin'],
       ['a', 'add an MCP server by hand'],
       ['g', 'toggle installed/registry (mcp tab)'],
       ['', ''],
@@ -2866,7 +2842,7 @@ export class MaskShiftTui {
       action('mcp.connectAll', 'capabilities', 'Connect every configured MCP server'),
       action('mcp.refresh', 'capabilities', 'Refresh MCP servers'),
       action('capabilities.plugin', 'capabilities', 'Install a plugin'),
-      action('capabilities.refresh', 'capabilities', 'Refresh plugins and bridges'),
+      action('capabilities.refresh', 'capabilities', 'Refresh plugins'),
       action('tools.search', 'capabilities', 'Search tools'),
       action('skills.search', 'capabilities', 'Search skills'),
       action('capabilities.toggleTools', 'capabilities', 'Expand or collapse tool output', 't'),
@@ -2936,7 +2912,7 @@ export class MaskShiftTui {
       case 'mcp.connectAll': await this.connectAllMcp(); break;
       case 'mcp.refresh': await this.refreshMcp(); this.toast('MCP refreshed', 'success'); break;
       case 'capabilities.plugin': this.switchView(2); this.capabilitiesTab = 'plugins'; this.openPluginDialog(); break;
-      case 'capabilities.refresh': await this.refreshCapabilitiesExtras({ force: true }); this.toast('Plugins and bridges refreshed', 'success'); break;
+      case 'capabilities.refresh': await this.refreshCapabilitiesExtras({ force: true }); this.toast('Plugins refreshed', 'success'); break;
       case 'tools.search': this.switchView(2); this.capabilitiesTab = 'tools'; this.focus = 'capabilities-filter'; break;
       case 'skills.search': this.switchView(2); this.capabilitiesTab = 'skills'; this.focus = 'capabilities-filter'; break;
       case 'capabilities.toggleTools': this.expandTools = !this.expandTools; break;

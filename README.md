@@ -132,7 +132,7 @@ switch with `1`–`7`; `ctrl+b` toggles the sidebar.
 |---|---|
 | **Chat** | The conversation and composer — markdown, syntax-highlighted code, coloured diffs and live tool calls |
 | **Files** | The workspace tree with a preview; images render inline |
-| **Capabilities** | Every tool, skill, MCP server, plugin and agent bridge in one searchable catalogue |
+| **Capabilities** | Every tool, skill, MCP server, plugin in one searchable catalogue |
 | **Runtime** | A host shell, automations, background processes and browser instances |
 | **Browser** | A live, clickable view of a running browser tab |
 | **Git** | Changes, history, branches, stash, checkpoints and worktrees |

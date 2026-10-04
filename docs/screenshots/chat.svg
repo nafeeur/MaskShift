@@ -16,10 +16,10 @@
 <text x="654.40" y="30.00" fill="#f7c948" textLength="84.00" lengthAdjust="spacingAndGlyphs" font-weight="700">Autonomous</text>
 <text x="746.80" y="30.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
 <text x="763.60" y="30.00" fill="#7a8494" textLength="42.00" lengthAdjust="spacingAndGlyphs">Tools</text>
-<text x="814.00" y="30.00" fill="#2bd9c0" textLength="25.20" lengthAdjust="spacingAndGlyphs" font-weight="700">183</text>
+<text x="814.00" y="30.00" fill="#2bd9c0" textLength="25.20" lengthAdjust="spacingAndGlyphs" font-weight="700">191</text>
 <text x="847.60" y="30.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
 <text x="864.40" y="30.00" fill="#7a8494" textLength="50.40" lengthAdjust="spacingAndGlyphs">Skills</text>
-<text x="923.20" y="30.00" fill="#a78bfa" textLength="16.80" lengthAdjust="spacingAndGlyphs" font-weight="700">59</text>
+<text x="923.20" y="30.00" fill="#a78bfa" textLength="16.80" lengthAdjust="spacingAndGlyphs" font-weight="700">58</text>
 <text x="948.40" y="30.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
 <text x="965.20" y="30.00" fill="#7a8494" textLength="25.20" lengthAdjust="spacingAndGlyphs">MCP</text>
 <text x="998.80" y="30.00" fill="#3d8bf5" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">8</text>
@@ -46,6 +46,9 @@
 <text x="528.40" y="48.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="545.20" y="48.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">6</text>
 <text x="562.00" y="48.00" fill="#7a8494" textLength="25.20" lengthAdjust="spacingAndGlyphs">Git</text>
+<text x="595.60" y="48.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="612.40" y="48.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">7</text>
+<text x="629.20" y="48.00" fill="#7a8494" textLength="42.00" lengthAdjust="spacingAndGlyphs">Fleet</text>
 <text x="1007.20" y="48.00" fill="#7a8494" textLength="58.80" lengthAdjust="spacingAndGlyphs">Sidebar</text>
 <text x="1074.40" y="48.00" fill="#b8c0cb" textLength="33.60" lengthAdjust="spacingAndGlyphs" font-weight="700">Plan</text>
 <text x="24.40" y="84.00" fill="#67202d" textLength="16.80" lengthAdjust="spacingAndGlyphs">┏━</text>
@@ -66,7 +69,7 @@
 <text x="24.40" y="102.00" fill="#67202d" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
 <text x="41.20" y="102.00" fill="#e9a227" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
 <text x="58.00" y="102.00" fill="#e9a227" textLength="25.20" lengthAdjust="spacingAndGlyphs" font-weight="700">You</text>
-<text x="763.60" y="102.00" fill="#3f4653" textLength="42.00" lengthAdjust="spacingAndGlyphs">04:28</text>
+<text x="763.60" y="102.00" fill="#3f4653" textLength="42.00" lengthAdjust="spacingAndGlyphs">12:36</text>
 <text x="839.20" y="102.00" fill="#67202d" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
 <text x="872.80" y="102.00" fill="#929baa" textLength="42.00" lengthAdjust="spacingAndGlyphs">Total</text>
 <text x="923.20" y="102.00" fill="#929baa" textLength="16.80" lengthAdjust="spacingAndGlyphs">Q3</text>
@@ -114,7 +117,7 @@
 <text x="58.00" y="174.00" fill="#e32c40" textLength="75.60" lengthAdjust="spacingAndGlyphs" font-weight="700">MaskShift</text>
 <text x="142.00" y="174.00" fill="#7a8494" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
 <text x="158.80" y="174.00" fill="#7a8494" textLength="210.00" lengthAdjust="spacingAndGlyphs">anthropic:claude-sonnet-5</text>
-<text x="763.60" y="174.00" fill="#3f4653" textLength="42.00" lengthAdjust="spacingAndGlyphs">04:28</text>
+<text x="763.60" y="174.00" fill="#3f4653" textLength="42.00" lengthAdjust="spacingAndGlyphs">12:36</text>
 <text x="839.20" y="174.00" fill="#67202d" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
 <text x="856.00" y="174.00" fill="#35cf8b" textLength="8.40" lengthAdjust="spacingAndGlyphs">✓</text>
 <text x="872.80" y="174.00" fill="#ece8e0" textLength="33.60" lengthAdjust="spacingAndGlyphs">Read</text>
@@ -305,7 +308,7 @@
 <text x="24.40" y="534.00" fill="#67202d" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
 <text x="41.20" y="534.00" fill="#e32c40" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
 <text x="58.00" y="534.00" fill="#e32c40" textLength="75.60" lengthAdjust="spacingAndGlyphs" font-weight="700">MaskShift</text>
-<text x="763.60" y="534.00" fill="#3f4653" textLength="42.00" lengthAdjust="spacingAndGlyphs">04:28</text>
+<text x="763.60" y="534.00" fill="#3f4653" textLength="42.00" lengthAdjust="spacingAndGlyphs">12:36</text>
 <text x="839.20" y="534.00" fill="#67202d" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
 <text x="24.40" y="552.00" fill="#67202d" textLength="8.40" lengthAdjust="spacingAndGlyphs">┃</text>
 <text x="41.20" y="552.00" fill="#c6293b" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
