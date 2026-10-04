@@ -14,7 +14,7 @@ const STATUS_TONE = (theme, status) => ({
   disconnected: theme.roles.warning, active: theme.roles.success, inactive: theme.roles.muted,
   failed: theme.roles.danger, error: theme.roles.danger, running: theme.roles.success,
   completed: theme.roles.success, cancelled: theme.roles.muted, queued: theme.roles.warning,
-  max_steps: theme.roles.warning, online: theme.roles.success, offline: theme.roles.muted,
+  max_steps: theme.roles.warning, stagnated: theme.roles.warning, online: theme.roles.success, offline: theme.roles.muted,
   interrupted: theme.roles.warning,
 }[status] || theme.roles.text);
 

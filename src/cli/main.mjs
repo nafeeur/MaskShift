@@ -153,7 +153,7 @@ async function headlessRun(runtime, ui, args, positional) {
     ui.rule();
     if (final?.content) ui.markdown(final.content);
     ui.line();
-    const tone = completed.status === 'completed' ? 'ok' : completed.status === 'cancelled' ? 'warn' : 'fail';
+    const tone = completed.status === 'completed' ? 'ok' : ['cancelled', 'stagnated', 'max_steps'].includes(completed.status) ? 'warn' : 'fail';
     ui.status(tone, `run ${completed.status}${completed.error ? `: ${completed.error}` : ''}`);
   }
   return completed.status === 'completed' ? 0 : 1;
