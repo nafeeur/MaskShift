@@ -34,15 +34,16 @@ import * as capabilitiesView from './views/capabilities.mjs';
 import * as runtimeView from './views/runtime.mjs';
 import * as browserView from './views/browser.mjs';
 import * as gitView from './views/git.mjs';
+import * as fleetView from './views/fleet.mjs';
 import {
   expandGitChanges, parseGitBranches, parseGitLog, parseGitStash, parseGitStatus, parseGitWorktrees,
 } from './views/git.mjs';
 
-const VIEWS = [chatView, filesView, capabilitiesView, runtimeView, browserView, gitView];
+const VIEWS = [chatView, filesView, capabilitiesView, runtimeView, browserView, gitView, fleetView];
 // One-line rail titles for every non-chat view's own `rail()` export (see
 // paint() below) — the chat view's rail carries its own titles per tab.
 const PANE_RAIL_TITLES = {
-  files: 'Code graph', capabilities: 'Usage', runtime: 'Job history', browser: 'Console and network', git: 'History',
+  files: 'Code graph', capabilities: 'Usage', runtime: 'Job history', browser: 'Console and network', git: 'History', fleet: 'Team chatter',
 };
 const EVENT_LIMIT = 400;
 const TERMINAL_LIMIT = 2000;
@@ -89,6 +90,7 @@ const SLASH_COMMANDS = [
   { name: 'terminal', hint: 'open terminal' },
   { name: 'browser', hint: 'watch and control a browser tab' },
   { name: 'git', hint: 'open the git view' },
+  { name: 'fleet', hint: 'run Claude Code, Codex, Hermes, OpenCode… as one team' },
   { name: 'doctor', hint: 'run diagnostics' },
   { name: 'logs', hint: 'view logs' },
   { name: 'settings', hint: 'open settings' },
@@ -173,6 +175,11 @@ export class MaskShiftTui {
 
     // 06 GIT.
     this.gitTab = 'changes';
+    // 07 FLEET — members, their mail, relays and the harnesses available (see views/fleet.mjs).
+    this.fleet = fleetView.createState();
+    this.fleetTab = 'members';
+    this.fleetFilter = new TextField({ placeholder: 'Filter' });
+    this.fleetList = new ListView();
     this.gitFilter = new TextField({ placeholder: 'Filter' });
     this.gitList = new ListView();
     this.gitChanges = [];
@@ -891,7 +898,7 @@ export class MaskShiftTui {
     // Typing into a live page (see views/browser.mjs) owns the keyboard the
     // same way the composer does — a digit meant for a form field shouldn't
     // switch views instead.
-    const typing = ['composer', 'terminal', 'file-filter', 'capabilities-filter', 'runtime-filter', 'git-filter'].includes(this.focus) || this.browserTyping;
+    const typing = ['composer', 'terminal', 'file-filter', 'capabilities-filter', 'runtime-filter', 'git-filter', 'fleet-filter'].includes(this.focus) || this.browserTyping;
 
     if (event.ctrl && event.name === 'c') {
       if (this.busy) { this.cancelRun(); return true; }
@@ -919,8 +926,8 @@ export class MaskShiftTui {
     if (event.name === 'f2') { this.openSettings(); return true; }
     if (event.name === 'f5') { this.refreshAll(); return true; }
 
-    if (event.alt && /^[1-6]$/.test(event.name)) { this.switchView(Number(event.name) - 1); return true; }
-    if (!typing && /^[1-6]$/.test(event.name)) { this.switchView(Number(event.name) - 1); return true; }
+    if (event.alt && /^[1-7]$/.test(event.name)) { this.switchView(Number(event.name) - 1); return true; }
+    if (!typing && /^[1-7]$/.test(event.name)) { this.switchView(Number(event.name) - 1); return true; }
     if (!typing && event.name === '?') { this.openHelp(); return true; }
 
     if (event.name === 'escape') {
@@ -949,7 +956,7 @@ export class MaskShiftTui {
   defaultFocus() {
     return {
       chat: 'composer', files: 'files', capabilities: 'capabilities',
-      runtime: 'terminal', browser: 'browser', git: 'git',
+      runtime: 'terminal', browser: 'browser', git: 'git', fleet: 'fleet',
     }[this.view];
   }
 
@@ -964,6 +971,7 @@ export class MaskShiftTui {
     if (target.id === 'capabilities') void this.refreshCapabilitiesExtras();
     if (target.id === 'runtime') void this.refreshRuntimeExtras();
     if (target.id === 'git') void this.refreshGitView();
+    if (target.id === 'fleet') void fleetView.refresh(this);
     if (target.id === 'browser') this.startBrowserPolling();
     else if (leavingBrowser) this.stopBrowserPolling();
   }
@@ -1265,6 +1273,7 @@ export class MaskShiftTui {
     }
     if (event.type === 'model.context-window.learned') void this.refreshModelProfile();
     if (event.type.startsWith('plugin.')) this.plugins = this.runtime.pluginManager.list();
+    if (event.type.startsWith('fleet.')) fleetView.onEvent(this, event);
     if (event.type.startsWith('automation.')) this.automations = this.runtime.automationScheduler.list({ limit: 200 });
     if (event.type.startsWith('tool.registered') || event.type.startsWith('plugin.activated')) this.refreshCatalogs();
     this.requestRender();
@@ -2539,6 +2548,13 @@ export class MaskShiftTui {
       ['p', 'pop a stash'],
       ['del', 'delete a branch, drop a stash, or remove a worktree'],
       ['P / L / F', 'push / pull / fetch'],
+      ['', ''],
+      ['07 FLEET', ''],
+      ['tab', 'section: members, messages, relays, harnesses'],
+      ['n / t', 'add one agent / start a team (Claude Code, Codex, Hermes, OpenCode…)'],
+      ['↵ / a / m', 'ask a member · queue a message between members'],
+      ['g', 'relay a task: members talk to each other until done'],
+      ['s / x / del', 'stop · reset · remove a member'],
     ];
     const lines = rows.map(([key, description]) => {
       if (!key && !description) return '';
@@ -2836,6 +2852,10 @@ export class MaskShiftTui {
       action('view.runtime', 'view', 'Go to 04 RUNTIME', '4'),
       action('view.browser', 'view', 'Go to 05 BROWSER', '5'),
       action('view.git', 'view', 'Go to 06 GIT', '6'),
+      action('view.fleet', 'view', 'Go to 07 FLEET', '7'),
+      action('fleet.spawn', 'fleet', 'Add an agent to the fleet'),
+      action('fleet.team', 'fleet', 'Start a multi-agent team'),
+      action('fleet.relay', 'fleet', 'Run the fleet on a task'),
       action('browser.pick', 'view', 'Pick a browser tab to watch'),
       action('rail.toggle', 'sidebar', 'Show or hide the sidebar', 'ctrl+b'),
       action('rail.plan', 'sidebar', 'Sidebar: plan'),
@@ -2902,6 +2922,10 @@ export class MaskShiftTui {
       case 'view.runtime': this.switchView(3); break;
       case 'view.browser': this.switchView(4); break;
       case 'view.git': this.switchView(5); break;
+      case 'view.fleet': this.switchView(6); break;
+      case 'fleet.spawn': this.switchView(6); fleetView.openSpawn(this); break;
+      case 'fleet.team': this.switchView(6); fleetView.openTeam(this); break;
+      case 'fleet.relay': this.switchView(6); fleetView.openRelay(this); break;
       case 'browser.pick': this.openBrowserTargetPicker(); break;
       case 'rail.toggle': this.railVisible = !this.railVisible; this.screen.invalidate(); break;
       case 'rail.plan': this.railTab = 'plan'; this.railVisible = true; break;
@@ -3324,6 +3348,7 @@ export class MaskShiftTui {
       case 'terminal': this.switchView(3); break;
       case 'browser': this.switchView(4); this.openBrowserTargetPicker(); break;
       case 'git': this.switchView(5); break;
+      case 'fleet': case 'team': case 'agents': this.switchView(6); break;
       case 'doctor': await this.showDoctor(); break;
       case 'logs': await this.showLogs(); break;
       case 'settings': this.openSettings(); break;

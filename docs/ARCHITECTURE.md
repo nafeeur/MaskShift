@@ -59,7 +59,7 @@ In-process runtime ───── event bus ───── audit + telemetry
         │     ├── capability controller
         │     └── plan / tool / subagent loop
         │
-        ├── Native tool registry (183 tools)
+        ├── Native tool registry (191 tools)
         ├── Skill manager (metadata eager, body lazy)
         ├── MCP manager (definition eager, connection/schema lazy)
         ├── Workspace + index + checkpoint managers
@@ -224,6 +224,13 @@ MaskShift also detects compatible local agent CLIs — Claude Code, Codex, OpenC
 Copilot CLI, Nous Hermes, Aider, plus any custom `agentBridges` entry — and can delegate scoped
 work to them while retaining the parent run, telemetry and repository context. These CLIs are
 not vendored; a bridge activates when the executable is on `PATH`.
+
+The fleet (`src/fleet/`, [docs](FLEET.md)) builds on the bridges: `FleetManager` keeps named, persistent members
+(any harness, several per harness), a mailbox with de-duplication and hop limits, and a bounded relay loop that
+delivers mail and takes turns until the team says it is done. Members talk through `[[send]]` blocks in their replies
+(`protocol.mjs`), which is the one channel every CLI shares; MaskShift's own engine can be a member too, with a
+persistent session. Turns retry, fall back to declared alternatives, time out and cancel cleanly. The Fleet view,
+`maskshift fleet` and the `fleet_*` tools are three front ends to the same manager.
 
 The MCP fabric runs in both directions. MaskShift is an MCP client to the servers configured in
 `docs/CONFIGURATION.md#mcp-definitions`, and `maskshift mcp serve` makes it an MCP server too,

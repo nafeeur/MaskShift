@@ -126,6 +126,22 @@ message. With `--json` it emits a single object:
 | `bench run` | Run the tasks against a model and report pass rate, turns, tokens per solved task and how often the harness stepped in. `--model REF`, `--tasks a,b`, `--repeat N`, `--steps N`, `--out FILE`, and `--without callRepair,fuzzyEdits,observation,editFeedback` to measure what a helper is worth. |
 | `bench compare BEFORE.json AFTER.json` | Pass-rate and token deltas, regressions and fixes between two reports. |
 
+## Fleet
+
+Run several coding-agent CLIs as one team. See [Agent fleet](FLEET.md).
+
+| Command | Description |
+|---|---|
+| `fleet harnesses [--force]` | Harnesses a member can run on (MaskShift, Claude Code, Codex, OpenCode, Hermes, Copilot, Aider, custom) and which are installed. |
+| `fleet list` | Members, their status, unread mail and role. |
+| `fleet spawn HARNESS[:NAME]...` | Add members. `--role TEXT`, `--mode inspect\|edit`, `--model REF`, `--isolated` (own worktree), `--fallback a,b`, `--cwd DIR`. |
+| `fleet ask MEMBER MESSAGE...` | Give one member a task and wait for its reply. |
+| `fleet send TO MESSAGE...` | Queue a message for a member (`*` for everyone). `--from NAME`. |
+| `fleet relay TASK...` | Let the members work a task out between themselves. `--lead NAME`, `--with claude,codex:reviewer` to create the team for this task, `--rounds N`, `--timeout MS`. `ctrl+c` cancels. |
+| `fleet log [MEMBER]` | Messages passed between members. `--limit N`. |
+| `fleet show MEMBER` | A member's role, state and recent turns. |
+| `fleet stop [MEMBER]` / `reset MEMBER` / `remove MEMBER...` | Cancel a turn (or everything), clear history and inbox, or remove members. |
+
 ## Inventory and diagnostics
 
 | Command | Description |

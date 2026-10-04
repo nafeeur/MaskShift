@@ -463,7 +463,7 @@ test('every view renders exactly to size across the full range of real terminals
   const project = await createProject(t);
   const runtime = await runtimeForTest(t, project);
   const sizes = [[1, 1], [8, 3], [20, 8], [40, 12], [60, 20], [107, 30], [108, 30], [300, 12], [40, 200]];
-  const views = ['chat', 'files', 'capabilities', 'runtime', 'browser', 'git'];
+  const views = ['chat', 'files', 'capabilities', 'runtime', 'browser', 'git', 'fleet'];
   for (const [columns, rows] of sizes) {
     const output = new FakeTerminal(columns, rows);
     const app = new MaskShiftTui(runtime, { workspacePath: project, output, headless: true, theme });
@@ -668,7 +668,7 @@ test('the interface paints every view and overlay at the terminal size', async (
 
   await app.refreshGitView({ force: false });
 
-  for (const view of ['chat', 'files', 'capabilities', 'runtime', 'browser', 'git']) {
+  for (const view of ['chat', 'files', 'capabilities', 'runtime', 'browser', 'git', 'fleet']) {
     app.view = view;
     app.focus = app.defaultFocus();
     app.screen.invalidate();

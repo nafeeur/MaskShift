@@ -460,6 +460,10 @@ Add `"--read-only"` to `args` for a client that should only ever inspect the wor
 
 Use `agent_bridge_discover` and `agent_bridge_help` to inspect the effective command template before delegation.
 
+A bridge may also set `modelArgs` (appended with the model when one is chosen) and `editArgs` (appended when the
+fleet runs it as an editing member). Every bridge, built in or configured, can be a member of the [agent fleet](FLEET.md#configuration),
+whose limits live under `fleet`.
+
 ## Automations
 
 Schedules accept an ISO timestamp, an interval such as `every 15m`, or a five-field cron

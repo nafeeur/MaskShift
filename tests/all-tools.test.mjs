@@ -382,6 +382,25 @@ test('all native tools have executable verification', { timeout: 180_000 }, asyn
     await call('external_agent_run', { command: 'node', args: ['-e', 'console.log(process.argv[1])', '{prompt}'], prompt: 'CUSTOM_OK' }, r => { assert.equal(r.code, 0); assert.equal(r.stdout.trim(), 'CUSTOM_OK'); }, 'local CLI fixture');
   });
 
+  await suite.test('fleet tools run members, pass messages and relay a task over a local CLI', async (t) => {
+    const script = "console.log(process.argv[1].includes('Messages for you') ? 'got mail' : '[[done]] FLEET_OK [[/done]]')";
+    const disabled = Object.fromEntries(['claude', 'codex', 'opencode', 'copilot', 'hermes', 'aider'].map(name => [name, { enabled: false }]));
+    const { call } = await setup(t, { agentBridges: { ...disabled, fixture: { command: 'node', args: ['-e', script, '{prompt}'] } } });
+    await call('fleet_harnesses', {}, r => { assert.ok(r.some(h => h.name === 'maskshift')); assert.ok(r.some(h => h.name === 'fixture' && h.available)); }, 'local CLI fixture');
+    await call('fleet_spawn', { harness: 'fixture', name: 'one', role: 'first' }, r => assert.equal(r.name, 'one'), 'local CLI fixture');
+    await call('fleet_spawn', { harness: 'fixture', name: 'two' }, r => assert.equal(r.name, 'two'), 'local CLI fixture');
+    await call('fleet_list', {}, r => assert.deepEqual(r.map(m => m.name), ['one', 'two']), 'local CLI fixture');
+    await call('fleet_list', { name: 'one' }, r => assert.equal(r.role, 'first'), 'local CLI fixture');
+    await call('fleet_send', { from: 'one', to: 'two', message: 'hello two' }, r => assert.equal(r.status, 'queued'), 'local CLI fixture');
+    await call('fleet_ask', { to: 'two', message: 'what arrived?' }, r => { assert.equal(r.ok, true); assert.equal(r.reply, 'got mail'); }, 'local CLI fixture');
+    await call('fleet_messages', { member: 'two' }, r => assert.ok(r.some(m => m.from === 'one' && m.to === 'two')), 'local CLI fixture');
+    // 'two' answered one's message, so its reply is waiting in one's inbox: the lead's first turn sees mail and the relay ends quietly.
+    await call('fleet_relay', { task: 'finish', lead: 'one' }, r => { assert.equal(r.status, 'completed'); assert.equal(r.reason, 'quiet'); assert.equal(r.final, 'got mail'); }, 'local CLI fixture');
+    await call('fleet_relay', { task: 'finish again', lead: 'one' }, r => { assert.equal(r.status, 'completed'); assert.equal(r.final, 'FLEET_OK'); assert.match(r.reason, /done by one/); }, 'local CLI fixture');
+    await call('fleet_stop', { name: 'two', remove: true }, r => assert.equal(r.removed, 'two'), 'local CLI fixture');
+    await call('fleet_stop', {}, r => assert.ok(Array.isArray(r)), 'local CLI fixture');
+  });
+
   await suite.test('container, SSH, database CLI and service command adapters', async (t) => {
     const { call, optional, project } = await setup(t);
     const bin = path.join(project, 'fixture-bin'); await fsp.mkdir(bin);

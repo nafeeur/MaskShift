@@ -6,18 +6,23 @@ const DEFAULT_BRIDGES = {
     title: 'Claude Code',
     command: 'claude',
     args: ['-p', '{prompt}'],
+    modelArgs: ['--model', '{model}'],
+    editArgs: ['--permission-mode', 'acceptEdits'],
     description: 'Delegate a task to an installed Claude Code CLI in non-interactive print mode.',
   },
   codex: {
     title: 'OpenAI Codex CLI',
     command: 'codex',
     args: ['exec', '{prompt}'],
+    modelArgs: ['--model', '{model}'],
+    editArgs: ['--full-auto'],
     description: 'Delegate a task to an installed Codex CLI execution session.',
   },
   opencode: {
     title: 'OpenCode',
     command: 'opencode',
     args: ['run', '{prompt}'],
+    modelArgs: ['--model', '{model}'],
     description: 'Delegate a task to an installed OpenCode CLI.',
   },
   copilot: {
@@ -36,6 +41,7 @@ const DEFAULT_BRIDGES = {
     title: 'Aider',
     command: 'aider',
     args: ['--message', '{prompt}'],
+    modelArgs: ['--model', '{model}'],
     description: 'Delegate repository editing to an installed Aider CLI.',
   },
 };
@@ -111,6 +117,9 @@ export class BridgeManager {
     model = null,
     sessionId = null,
     runId = null,
+    signal = null,
+    edit = false,
+    onOutput = null,
   } = {}) {
     if (!prompt) throw new Error('Bridge prompt is required');
     const bridge = (await this.discover()).find((item) => item.name === name);
@@ -118,7 +127,7 @@ export class BridgeManager {
     if (!bridge.available) throw new Error(`${bridge.title || name} is not installed (${bridge.command})`);
     const workingDirectory = this.resolveWorkspace(workspaceId, cwd);
     const variables = { prompt, cwd: workingDirectory, model: model || '', workspace: workingDirectory };
-    const args = [...(bridge.args || []), ...(extraArgs || [])]
+    const args = [...(bridge.args || []), ...(edit ? (bridge.editArgs || []) : []), ...(extraArgs || [])]
       .map((arg) => interpolate(arg, variables))
       .filter((arg) => arg !== '');
     if (model && bridge.modelArgs && !args.some((arg) => String(arg).includes(model))) {
@@ -135,6 +144,8 @@ export class BridgeManager {
       cwd: workingDirectory,
       env,
       timeoutMs,
+      signal: signal || undefined,
+      onStdout: onOutput || undefined,
       maxOutputChars: this.config.get().maxToolOutputChars * 2,
     });
     const response = { bridge: name, async: false, ...result };

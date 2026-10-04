@@ -117,6 +117,8 @@ export function defaultConfig() {
     autoConnectMcp: true,
     pluginDirs: [path.join(home, 'plugins')],
     agentBridges: {},
+    // Multi-harness fleet limits; see docs/FLEET.md. Anything left out takes the default in src/fleet/manager.mjs.
+    fleet: {},
     automations: {
       enabled: true,
       pollIntervalMs: 1000,
@@ -252,6 +254,7 @@ function mergeConfig(base, override) {
   merged.hooks = { ...base.hooks, ...(override?.hooks || {}) };
   merged.mcpServers = { ...base.mcpServers, ...(override?.mcpServers || {}) };
   merged.agentBridges = { ...base.agentBridges, ...(override?.agentBridges || {}) };
+  merged.fleet = { ...base.fleet, ...(override?.fleet || {}) };
   merged.automations = { ...base.automations, ...(override?.automations || {}) };
   merged.browser = { ...base.browser, ...(override?.browser || {}) };
   merged.indexing = { ...base.indexing, ...(override?.indexing || {}) };
