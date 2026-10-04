@@ -39,11 +39,14 @@ recurring report. The model is a line of configuration; the tools are the same w
 - **Reliable tool use.** Near-miss tool names and arguments are repaired in code, edits tolerate
   whitespace and indentation drift, tool output is cleaned and fitted to the model's window, and every
   file edit is checked immediately. → [run guardrails](docs/CONFIGURATION.md#run-guardrails)
-- **Loaded on demand.** 173 native tools, 50 skills and any number of MCP servers are available, but
+- **Loaded on demand.** 183 native tools, 50 skills and any number of MCP servers are available, but
   only what the current step needs enters the model's context.
   → [tools](docs/TOOLS.md) · [skills](docs/SKILLS.md)
 - **Controlled by design.** Automatic checkpoints before each run, an append-only audit log, and three
   permission modes from fully autonomous to approve-everything. → [permissions](docs/PERMISSIONS.md)
+- **Web tasks from the terminal.** A browser runs in the background while options (restaurants,
+  products, results) are put to you as a picker, sign-ins are typed in the terminal without the model
+  ever seeing them, and CAPTCHAs are handed to you in the live Browser view. → [web tasks](docs/WEB_TASKS.md)
 - **Remembers and improves.** Persistent memory that notices when its sources change, reusable skills,
   and skill upgrades promoted only after measured A/B trials.
 - **Works unattended.** Schedule agent runs, tool calls or shell commands by interval, cron
@@ -180,6 +183,7 @@ is treated as data, never as instructions. A container limits MaskShift to what 
 | [Interface](docs/TUI.md) | Keys, views and the design system |
 | [Command line](docs/CLI.md) | Every subcommand and flag |
 | [Architecture](docs/ARCHITECTURE.md) | The agent loop, the adaptive harness, persistence and extension points |
+| [Web tasks](docs/WEB_TASKS.md) | Page options, pickers, terminal sign-in, hand-offs and what stays private |
 | [Permissions](docs/PERMISSIONS.md) | The three modes, what stays observable and where the limits are |
 | [Verification](docs/TOOL_VERIFICATION.md) · [Release checks](docs/RELEASE-VERIFICATION.md) | What the automated suite covers |
 

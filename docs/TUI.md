@@ -74,7 +74,7 @@ monochrome; `MASKSHIFT_ASCII=1` swaps every box-drawing glyph for ASCII.
 ## Layout
 
 ```
- MaskShift · Workspace Documents · main · Model ollama:auto   Mode Autonomous · Tools 173 · Skills 59 · ● Online
+ MaskShift · Workspace Documents · main · Model ollama:auto   Mode Autonomous · Tools 183 · Skills 59 · ● Online
   1 Chat │ 2 Files │ 3 Capabilities │ 4 Runtime │ 5 Browser │ 6 Git                                  Sidebar Plan
 ┏━ Q3 invoice summary ──────────────────────────────── 6 messages ━┓ Plan · Active · Events
 ┃ ▌ You                                                      14:22 ┃   Total Q3 invoices by vendor.
@@ -110,7 +110,7 @@ usable at 80×24.
 | **Files** | Workspace tree with fold state and a syntax-highlighted preview. `a` attaches the selected file to the composer. |
 | **Capabilities** | Every native tool and skill, MCP servers (installed and the official registry), plugins and agent bridges — one catalogue behind five tabs, fuzzy-searchable, with a details pane per kind. `x` runs a tool directly. |
 | **Runtime** | The host shell, running with your full account permissions, plus automations, background processes and browser instances behind a secondary tab strip. |
-| **Browser** | A live, clickable, typeable view of a running browser tab — the same CDP connection the browser tools drive — with its own instance strip to pick which tab it watches. |
+| **Browser** | A live, clickable, typeable view of a running browser tab — the same CDP connection the browser tools drive — with its own instance strip to pick which tab it watches. When the agent needs you for a step (a CAPTCHA, a bank prompt) the view opens with a "Your turn" banner; `ctrl+e` hands the browser back, `ctrl+x` cancels. |
 | **Git** | Working tree changes, commit log, branches, stash, MaskShift checkpoints and worktrees, each with their own actions — plus push/pull/fetch from any tab. |
 
 ![Chat](screenshots/chat.svg)

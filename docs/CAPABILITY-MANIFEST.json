@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-10-04T03:34:08.720Z",
+  "generatedAt": "2026-10-04T04:07:39.230Z",
   "version": "1.4.1",
-  "nativeToolCount": 173,
+  "nativeToolCount": 183,
   "bundledSkillCount": 50,
   "curatedMcpCount": 8,
   "tools": [
@@ -159,6 +159,24 @@
       "alwaysAvailable": false
     },
     {
+      "name": "browser_act",
+      "title": "Act on a page element",
+      "description": "Click, fill, select, check or press a key on an element by its ref from browser_extract. Waits for the page to settle and returns the new URL. Refuses to click purchase-style buttons (\"Place order\", \"Pay now\") unless the person confirms; refuses to type into password fields (use browser_login).",
+      "category": "browser",
+      "readOnly": false,
+      "risk": "external-action",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "browser_choose",
+      "title": "Let the person choose from the page",
+      "description": "Extract the options on the current page, show them to the person as a picker and return what they chose. With open:true the chosen option is opened. Use this when a decision is theirs: which restaurant, product, flight or result.",
+      "category": "browser",
+      "readOnly": false,
+      "risk": "external-action",
+      "alwaysAvailable": false
+    },
+    {
       "name": "browser_click",
       "title": "Click browser element",
       "description": "Click a CSS selector or page coordinate through the Chrome input pipeline.",
@@ -213,6 +231,24 @@
       "alwaysAvailable": false
     },
     {
+      "name": "browser_extract",
+      "title": "Extract page options",
+      "description": "Describe the current page as selectable options (restaurants, products, results), forms, blockers (login wall, CAPTCHA, cookie notice) and actions, each with a short ref such as e12 for browser_act. Far smaller than the raw page; prefer it to browser_snapshot for web tasks.",
+      "category": "browser",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "browser_handoff",
+      "title": "Hand the browser to the person",
+      "description": "Ask the person to do something in the live browser view that you should not (solve a CAPTCHA, approve a bank prompt, enter payment details) and wait until they say they are done.",
+      "category": "browser",
+      "readOnly": false,
+      "risk": "external-action",
+      "alwaysAvailable": false
+    },
+    {
       "name": "browser_instances",
       "title": "List browser instances",
       "description": "List browser processes launched by MaskShift.",
@@ -228,6 +264,15 @@
       "category": "browser",
       "readOnly": false,
       "risk": "process",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "browser_login",
+      "title": "Sign in through the terminal",
+      "description": "Sign in to the site open in the browser. The person is asked for their username, password and any verification code in the terminal; the values are typed into the page directly and never shown to you. CAPTCHAs are handed to the person in the live browser view. Returns only the outcome.",
+      "category": "browser",
+      "readOnly": false,
+      "risk": "external-action",
       "alwaysAvailable": false
     },
     {
@@ -777,6 +822,51 @@
       "category": "git",
       "readOnly": false,
       "risk": "write",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "credentials_forget",
+      "title": "Forget a saved sign-in",
+      "description": "Remove the remembered sign-in for a site (from memory and the keychain).",
+      "category": "interaction",
+      "readOnly": false,
+      "risk": "write",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "credentials_list",
+      "title": "List saved sign-ins",
+      "description": "List which sites have a sign-in remembered, and where (this session or the system keychain). Never returns passwords or usernames.",
+      "category": "interaction",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "user_ask",
+      "title": "Ask the person a question",
+      "description": "Ask the person for a short piece of free text (a delivery address, a date, a preference) and return it. Never use it for passwords or codes; browser_login handles those.",
+      "category": "interaction",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "user_choose",
+      "title": "Ask the person to choose",
+      "description": "Show a short list of options and return the person's choice. Use it instead of guessing when a decision belongs to them.",
+      "category": "interaction",
+      "readOnly": true,
+      "risk": "normal",
+      "alwaysAvailable": false
+    },
+    {
+      "name": "user_confirm",
+      "title": "Ask the person to confirm",
+      "description": "Ask a yes/no question before something irreversible, such as paying or sending, and return the answer. Include the facts they need to decide (item, total, address).",
+      "category": "interaction",
+      "readOnly": true,
+      "risk": "normal",
       "alwaysAvailable": false
     },
     {

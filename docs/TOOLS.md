@@ -1,6 +1,6 @@
 # Native Tool Inventory
 
-Generated from the MaskShift 1.4.1 runtime. **173 native tools** are available before plugins or MCP servers add more capabilities.
+Generated from the MaskShift 1.4.1 runtime. **183 native tools** are available before plugins or MCP servers add more capabilities.
 
 Only activated descriptors enter a model request; this document is the complete local catalog.
 
@@ -35,19 +35,24 @@ Only activated descriptors enter a model request; this document is the complete 
 | `automation_run_now` | write | host-exec | Immediately execute an automation regardless of its next scheduled time. |
 | `automation_update` | write | persistent-exec | Edit an automation schedule, action, name, metadata, or enabled state. |
 
-## browser (18)
+## browser (23)
 
 | Tool | Access | Risk | Description |
 |---|---|---|---|
 | `browser_accessibility` | read | normal | Return the Chrome accessibility tree for semantic page understanding. |
+| `browser_act` | write | external-action | Click, fill, select, check or press a key on an element by its ref from browser_extract. Waits for the page to settle and returns the new URL. Refuses to click purchase-style buttons ("Place order", "Pay now") unless the person confirms; refuses to type into password fields (use browser_login). |
+| `browser_choose` | write | external-action | Extract the options on the current page, show them to the person as a picker and return what they chose. With open:true the chosen option is opened. Use this when a decision is theirs: which restaurant, product, flight or result. |
 | `browser_click` | write | external-action | Click a CSS selector or page coordinate through the Chrome input pipeline. |
 | `browser_close` | write | process | Terminate a MaskShift browser instance and its CDP connections. |
 | `browser_close_tab` | write | process | Close one browser page target. |
 | `browser_console` | read | normal | Read recent console messages, exceptions, and browser log entries from the page. |
 | `browser_discover` | read | normal | Detect an installed Chromium, Chrome, or Edge executable for dependency-free CDP automation. |
 | `browser_evaluate` | write | external-action | Execute arbitrary JavaScript in the active page and return a serializable value. |
+| `browser_extract` | read | normal | Describe the current page as selectable options (restaurants, products, results), forms, blockers (login wall, CAPTCHA, cookie notice) and actions, each with a short ref such as e12 for browser_act. Far smaller than the raw page; prefer it to browser_snapshot for web tasks. |
+| `browser_handoff` | write | external-action | Ask the person to do something in the live browser view that you should not (solve a CAPTCHA, approve a bank prompt, enter payment details) and wait until they say they are done. |
 | `browser_instances` | read | normal | List browser processes launched by MaskShift. |
 | `browser_launch` | write | process | Launch a persistent-profile Chromium browser with DevTools automation. Headless by default; visible mode supports interactive logins. |
+| `browser_login` | write | external-action | Sign in to the site open in the browser. The person is asked for their username, password and any verification code in the terminal; the values are typed into the page directly and never shown to you. CAPTCHAs are handed to the person in the live browser view. Returns only the outcome. |
 | `browser_navigate` | write | network | Navigate a browser tab and wait for the document to load. |
 | `browser_network` | read | normal | Read recent Chrome DevTools Network events for the page. |
 | `browser_new_tab` | write | network | Create a new browser tab at a URL. |
@@ -139,6 +144,16 @@ Only activated descriptors enter a model request; this document is the complete 
 | `git_show` | read | normal | Show a commit, tag, tree, or file at a revision. |
 | `git_status` | read | normal | Inspect branch, upstream, staged, modified, deleted, renamed, conflicted, and untracked files. |
 | `git_worktree_create` | write | write | Create a branch-backed Git worktree for isolated subagent or experimental work. |
+
+## interaction (5)
+
+| Tool | Access | Risk | Description |
+|---|---|---|---|
+| `credentials_forget` | write | write | Remove the remembered sign-in for a site (from memory and the keychain). |
+| `credentials_list` | read | normal | List which sites have a sign-in remembered, and where (this session or the system keychain). Never returns passwords or usernames. |
+| `user_ask` | read | normal | Ask the person for a short piece of free text (a delivery address, a date, a preference) and return it. Never use it for passwords or codes; browser_login handles those. |
+| `user_choose` | read | normal | Show a short list of options and return the person's choice. Use it instead of guessing when a decision belongs to them. |
+| `user_confirm` | read | normal | Ask a yes/no question before something irreversible, such as paying or sending, and return the answer. Include the facts they need to decide (item, total, address). |
 
 ## mcp (11)
 

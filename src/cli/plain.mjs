@@ -105,6 +105,61 @@ export async function plainSession(runtime, ui, args) {
     return answer === 'y' || answer === 'yes';
   };
 
+  // Questions from tools: numbered choices, text, masked secrets, yes/no, and a visible-browser hand-off.
+  let muted = false;
+  const writeOut = rl._writeToOutput?.bind(rl);
+  if (writeOut) rl._writeToOutput = (text) => { if (!muted || text.includes('\n')) writeOut(text); };
+  let interactionQueue = Promise.resolve();
+  const serialized = (fn) => { const run = () => fn(); interactionQueue = interactionQueue.then(run, run); return interactionQueue; };
+  const interactionHandler = {
+    choose: (request) => serialized(async () => {
+      ui.line();
+      ui.line(ui.theme.paint(request.question || request.title, { bold: true }));
+      request.options.forEach((option, index) => {
+        const extra = [option.price, option.rating ? `${option.rating}★` : '', option.detail].filter(Boolean).join(' · ');
+        ui.line(`  ${String(index + 1).padStart(2)}. ${option.label}${extra ? `  — ${extra.slice(0, 90)}` : ''}`);
+      });
+      if (request.allowOther) ui.line(`   0. ${request.otherLabel}`);
+      const answer = String(await ask(request.multi ? 'Numbers separated by commas (blank to cancel):' : 'Number (blank to cancel):')).trim();
+      if (!answer) return { cancelled: true };
+      if (answer === '0' && request.allowOther) {
+        const typed = String(await ask('Your answer:')).trim();
+        return typed ? { ids: [], other: typed } : { cancelled: true };
+      }
+      const ids = answer.split(/[\s,]+/).map((part) => request.options[Number(part) - 1]?.id).filter(Boolean);
+      return ids.length ? { ids: request.multi ? ids : ids.slice(0, 1) } : { cancelled: true };
+    }),
+    text: (request) => serialized(async () => {
+      const value = String(await ask(request.question || request.title)).trim();
+      return value ? { value } : { cancelled: true };
+    }),
+    secret: (request) => serialized(async () => {
+      ui.line(`${request.question || request.title} (input is hidden; it is not shown to the model or logged)`);
+      muted = true;
+      let value;
+      try { value = await ask(''); } finally { muted = false; ui.line(); }
+      return value ? { value: String(value) } : { cancelled: true };
+    }),
+    confirm: (request) => serialized(async () => {
+      ui.line();
+      ui.line(ui.theme.paint(request.message, { fg: request.danger ? ui.theme.roles.danger : ui.theme.roles.warning, bold: true }));
+      for (const detail of request.details || []) ui.line(`  ${detail}`);
+      const answer = String(await ask(request.defaultYes ? 'Proceed? [Y/n]:' : 'Proceed? [y/N]:')).trim().toLowerCase();
+      return answer ? answer.startsWith('y') : Boolean(request.defaultYes);
+    }),
+    handoff: (request) => serialized(async () => {
+      const instance = runtime.browserManager.list().find((item) => !request.instanceId || item.id === request.instanceId);
+      if (!instance || instance.headless) {
+        ui.line('This step needs you in the browser, but the browser is running headless. Open the full-screen interface (maskshift) and use the Browser view, or relaunch the browser with headless:false.');
+        return { done: false };
+      }
+      ui.line(`${request.message} Finish it in the browser window.`);
+      const answer = String(await ask('Press Enter when done, or type n to cancel:')).trim().toLowerCase();
+      return { done: !answer.startsWith('n') };
+    }),
+  };
+  const detachInteraction = runtime.interaction.attach(interactionHandler);
+
   ui.line(`MaskShift plain mode in ${workspace.path}.`);
   ui.line('Type a request and press Enter. While a run is working, what you type steers it. Commands: /new, /quit.');
   rl.prompt();
@@ -139,6 +194,7 @@ export async function plainSession(runtime, ui, args) {
   }
   rl.close();
   runtime.toolRegistry.confirmHandler = null;
+  detachInteraction();
   if (activeRunId) await runtime.engine.cancel(activeRunId).catch(() => {});
   return 0;
 }

@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { CdpConnection } from './cdp.mjs';
+import { pageModelExpression } from '../web/page-model.mjs';
 import { absolutePath, commandExists, ensureDir, id, nowIso, truncate } from '../core/utils.mjs';
 
 const BROWSER_COMMANDS = process.platform === 'darwin'
@@ -63,6 +64,29 @@ const SPECIAL_KEYS = {
   pageup: { key: 'PageUp', code: 'PageUp', vk: 33 },
   pagedown: { key: 'PageDown', code: 'PageDown', vk: 34 },
 };
+
+// Controls whose click spends money or can't be undone; `act` refuses them without explicit approval.
+const RISKY_CLICK = /\b(place (your )?order|pay now|pay \$?[\d.]+|buy now|purchase|complete (order|purchase|payment)|confirm (order|purchase|payment)|submit order|checkout now|subscribe now|start (free )?trial|send money|transfer now)\b/i;
+
+// Network events can carry request bodies, cookies and auth headers; none of that belongs in a
+// transcript the model (and the logs) will see.
+const SECRET_HEADERS = /^(authorization|cookie|set-cookie|proxy-authorization|x-csrf-token|x-xsrf-token)$/i;
+function redactNetworkEvent(event) {
+  const params = event?.params;
+  if (!params) return event;
+  const copy = { ...event, params: { ...params } };
+  const scrub = (headers) => Object.fromEntries(Object.entries(headers || {}).map(([key, value]) => [key, SECRET_HEADERS.test(key) ? '[redacted]' : value]));
+  if (copy.params.request) {
+    copy.params.request = { ...copy.params.request, headers: scrub(copy.params.request.headers) };
+    if (copy.params.request.postData !== undefined) copy.params.request.postData = '[redacted]';
+    delete copy.params.request.postDataEntries;
+  }
+  if (copy.params.response?.headers) copy.params.response = { ...copy.params.response, headers: scrub(copy.params.response.headers) };
+  if (copy.params.headers) copy.params.headers = scrub(copy.params.headers);
+  if (copy.params.associatedCookies) copy.params.associatedCookies = '[redacted]';
+  if (copy.params.blockedCookies) copy.params.blockedCookies = '[redacted]';
+  return copy;
+}
 
 export class BrowserManager {
   constructor({ config, logger, eventBus, workspaceManager }) {
@@ -307,6 +331,113 @@ export class BrowserManager {
     throw new Error(`Timed out waiting for ${selector} to be ${state}`);
   }
 
+  /** Waits until the page stops changing: loaded, and the URL and amount of text stable for two polls. */
+  async settle({ instanceId = null, tabId = null, timeoutMs = 6_000, quietMs = 250 } = {}) {
+    const deadline = Date.now() + timeoutMs;
+    let last = null;
+    let stable = 0;
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    while (Date.now() < deadline) {
+      const result = await this.evaluate({ instanceId, tabId, expression: "`${location.href}|${document.readyState}|${document.body ? document.body.innerText.length : 0}|${document.querySelectorAll('*').length}`" }).catch(() => null);
+      const signature = result?.value;
+      if (signature && signature.includes('|complete|') && signature === last) {
+        stable += 1;
+        if (stable >= 2) return { settled: true };
+      } else stable = 0;
+      last = signature;
+      await new Promise((resolve) => setTimeout(resolve, quietMs / 2));
+    }
+    return { settled: false };
+  }
+
+  /** Describes the page as options, forms, blockers and actions, each with a short ref `act` understands. */
+  async extract({ instanceId = null, tabId = null, maxOptions = 40, maxActions = 80, settle = true } = {}) {
+    if (settle) await this.settle({ instanceId, tabId, timeoutMs: 4_000 });
+    const result = await this.evaluate({ instanceId, tabId, expression: pageModelExpression({ maxOptions, maxActions }) });
+    return { instanceId: result.instanceId, tabId: result.tabId, model: result.value };
+  }
+
+  async #refPoint(target, ref) {
+    const encoded = JSON.stringify(String(ref));
+    const result = await this.evaluate({
+      instanceId: target.instance.id,
+      tabId: target.tab.id,
+      expression: `(() => { const el = document.querySelector('[data-ms-ref=' + JSON.stringify(${encoded}) + ']'); if (!el) return { missing: true };
+        el.scrollIntoView({ block: 'center', inline: 'center' }); const r = el.getBoundingClientRect();
+        const label = (el.getAttribute('aria-label') || el.innerText || el.value || el.getAttribute('title') || '').replace(/\\s+/g, ' ').trim().slice(0, 120);
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2, label, tag: el.tagName, type: (el.getAttribute('type') || '').toLowerCase() }; })()`,
+    });
+    if (result.value?.missing) throw new Error(`Element ${ref} is gone — the page changed. Extract the page again to get fresh references.`);
+    return result.value;
+  }
+
+  /**
+   * Acts on an element by the ref `extract` gave it: click, fill (typing text), select (a <select>
+   * option), check or press. Text typed by `fill` is sent straight to the page and never echoed back
+   * or logged, so credentials can pass through it. Clicks on controls that spend money are refused
+   * unless the caller says the user approved them.
+   */
+  async act({ instanceId = null, tabId = null, ref, action = 'click', value = '', submit = false, allowRisky = false, allowPassword = false, settle = true }) {
+    if (!ref) throw new Error('ref is required');
+    const target = await this.target(instanceId, tabId);
+    const point = await this.#refPoint(target, ref);
+    const base = { instanceId: target.instance.id, tabId: target.tab.id, ref, action, label: point.label };
+    if (action === 'fill' && point.type === 'password' && !allowPassword) {
+      throw new Error('Passwords are not typed through browser_act, because tool arguments are logged. Use browser_login, which asks the person and types the password without it entering the conversation.');
+    }
+    const risky = RISKY_CLICK.test(point.label || '');
+    if (action === 'click' && risky && !allowRisky) {
+      const error = new Error(`"${point.label}" looks like a purchase or irreversible action. Ask the user to confirm first.`);
+      error.code = 'RISKY_ACTION';
+      error.label = point.label;
+      throw error;
+    }
+    const expression = (body) => `(() => { const el = document.querySelector('[data-ms-ref=' + JSON.stringify(${JSON.stringify(String(ref))}) + ']'); if (!el) throw new Error('Element is gone'); ${body} })()`;
+    if (action === 'click') {
+      const params = { x: point.x, y: point.y, button: 'left', clickCount: 1 };
+      await target.connection.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: point.x, y: point.y });
+      await target.connection.send('Input.dispatchMouseEvent', { type: 'mousePressed', ...params });
+      await target.connection.send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...params });
+    } else if (action === 'fill') {
+      await this.evaluate({ instanceId: target.instance.id, tabId: target.tab.id, expression: expression("el.focus(); if (typeof el.select === 'function') el.select(); else window.getSelection().selectAllChildren(el); return true;") });
+      await target.connection.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Backspace', code: 'Backspace', windowsVirtualKeyCode: 8, nativeVirtualKeyCode: 8 });
+      await target.connection.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Backspace', code: 'Backspace', windowsVirtualKeyCode: 8, nativeVirtualKeyCode: 8 });
+      if (String(value)) await target.connection.send('Input.insertText', { text: String(value) });
+      base.characters = String(value).length;
+    } else if (action === 'select') {
+      const wanted = JSON.stringify(String(value));
+      const chosen = await this.evaluate({ instanceId: target.instance.id, tabId: target.tab.id, expression: expression(`if (el.tagName !== 'SELECT') throw new Error('Not a select element'); const want = ${wanted}.toLowerCase();
+        const option = [...el.options].find((o) => o.value.toLowerCase() === want) || [...el.options].find((o) => o.textContent.trim().toLowerCase() === want) || [...el.options].find((o) => o.textContent.toLowerCase().includes(want));
+        if (!option) throw new Error('No option matches: ' + ${wanted}); el.value = option.value; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); return option.textContent.trim();`) });
+      base.selected = chosen.value;
+    } else if (action === 'check') {
+      const want = value === false || value === 'false' ? false : true;
+      if (point.tag === 'LABEL' || point.type === 'checkbox' || point.type === 'radio') {
+        const state = await this.evaluate({ instanceId: target.instance.id, tabId: target.tab.id, expression: expression("const box = el.matches('input') ? el : (el.querySelector('input') || (el.htmlFor && document.getElementById(el.htmlFor))); return box ? box.checked : null;") });
+        if (state.value === null || state.value !== want) {
+          const params = { x: point.x, y: point.y, button: 'left', clickCount: 1 };
+          await target.connection.send('Input.dispatchMouseEvent', { type: 'mousePressed', ...params });
+          await target.connection.send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...params });
+        }
+      } else throw new Error('Element is not a checkbox or radio button');
+    } else if (action === 'press') {
+      await this.evaluate({ instanceId: target.instance.id, tabId: target.tab.id, expression: expression('el.focus(); return true;') });
+      const key = String(value || 'Enter');
+      const codes = { Enter: 13, Escape: 27, Tab: 9, ArrowDown: 40, ArrowUp: 38, Backspace: 8, Space: 32 };
+      const event = { key: key === 'Space' ? ' ' : key, code: key, windowsVirtualKeyCode: codes[key] || 0, nativeVirtualKeyCode: codes[key] || 0 };
+      await target.connection.send('Input.dispatchKeyEvent', { type: 'keyDown', ...event });
+      await target.connection.send('Input.dispatchKeyEvent', { type: 'keyUp', ...event });
+    } else throw new Error(`Unknown action "${action}". Use click, fill, select, check or press.`);
+    if (submit) {
+      await target.connection.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 });
+      await target.connection.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 });
+      base.submitted = true;
+    }
+    if (settle) base.settled = (await this.settle({ instanceId: target.instance.id, tabId: target.tab.id })).settled;
+    const after = await this.evaluate({ instanceId: target.instance.id, tabId: target.tab.id, expression: '({ url: location.href, title: document.title })' }).catch(() => null);
+    return { ...base, ...(after?.value || {}) };
+  }
+
   // A relative artifact path belongs to the workspace, not to whatever directory the
   // MaskShift process happens to run from.
   artifactBase(workspaceId) {
@@ -439,7 +570,8 @@ export class BrowserManager {
 
   async network({ instanceId = null, tabId = null, limit = 300 } = {}) {
     const { instance, tab, connection } = await this.target(instanceId, tabId);
-    return { instanceId: instance.id, tabId: tab.id, events: connection.recent(null, limit * 5).filter((event) => event.method.startsWith('Network.')).slice(-limit) };
+    const events = connection.recent(null, limit * 5).filter((event) => event.method.startsWith('Network.')).slice(-limit).map(redactNetworkEvent);
+    return { instanceId: instance.id, tabId: tab.id, events };
   }
 
   async closeTab(instanceId = null, tabId) {

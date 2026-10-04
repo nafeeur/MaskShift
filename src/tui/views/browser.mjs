@@ -28,7 +28,7 @@ export function render(app, region) {
   const { width, height } = region;
   const inner = width - 4; // panel frame + padding, both sides
   const showStrip = app.browsers.length > 1;
-  const bodyHeight = Math.max(1, height - 2 - 1 - (showStrip ? 1 : 0)); // frame rows + status (+ instance strip)
+  const bodyHeight = Math.max(1, height - 2 - 1 - (showStrip ? 1 : 0) - (app.handoff ? 1 : 0)); // frame rows + status (+ instance strip)
 
   const body = [];
   let imageOverlay = null;
@@ -56,7 +56,7 @@ export function render(app, region) {
       app.browserFrame.rows = built.rows;
       if (built.overlay) {
         imageOverlay = {
-          row: region.row + 2 + (showStrip ? 1 : 0), // panel top rail (1) + instance strip + this view's own status row (1)
+          row: region.row + 2 + (showStrip ? 1 : 0) + (app.handoff ? 1 : 0), // panel top rail (1) + instance strip + this view's own status row (1)
           column: region.column + SPACE.frame + SPACE.pad,
           escape: built.overlay.escape,
           key: built.overlay.key,
@@ -78,6 +78,12 @@ export function render(app, region) {
     : theme.paint(' i to type · click to focus ', { fg: theme.roles.muted });
   const status = fit(`${gutter(theme)}${theme.paint(statusLeft, { fg: theme.roles.label })}`, Math.max(0, inner - 30)) + mode;
 
+  const banner = app.handoff
+    ? fit(gutter(theme) + theme.paint(' Your turn ', { fg: theme.roles.onPrimary, bg: theme.roles.accent, bold: true })
+      + theme.paint(` ${truncate(app.handoff.message, Math.max(10, inner - 40))}  `, { fg: theme.roles.text })
+      + theme.paint('ctrl+e done · ctrl+x cancel', { fg: theme.roles.muted }), inner)
+    : null;
+
   const strip = showStrip
     ? tabRow(app, app.browsers.map((instance) => ({ id: instance.id, label: truncate(instance.profile || instance.id, 18) })), app.browserTarget?.instanceId, inner, {
       origin: { row: region.row + 1, column: region.column + SPACE.frame },
@@ -90,7 +96,7 @@ export function render(app, region) {
     note: app.browserPollBusy ? 'Live' : '',
     busy: false,
     focused: app.focus === 'browser',
-    body: showStrip ? [strip, status, ...body] : [status, ...body],
+    body: [...(showStrip ? [strip] : []), ...(banner ? [banner] : []), status, ...body],
   });
 
   registerRegions(app, region, { width, height, bodyHeight, inner, showStrip });
@@ -105,7 +111,7 @@ function registerRegions(app, region, { bodyHeight, inner, showStrip }) {
   // (see app.mjs's browserPointToPage) rather than being routed like a
   // normal MaskShift list/button.
   app.regions.add({
-    row: region.row + 2 + (showStrip ? 1 : 0), column: region.column + SPACE.frame + SPACE.pad,
+    row: region.row + 2 + (showStrip ? 1 : 0) + (app.handoff ? 1 : 0), column: region.column + SPACE.frame + SPACE.pad,
     width: Math.max(0, inner), height: Math.max(0, bodyHeight),
     id: 'browser:surface', layer: LAYER.body,
     onPress: (target, event, zone) => target.browserClick(event, zone),
@@ -127,7 +133,9 @@ export function handle(app, event) {
   return false;
 }
 
-export const hints = (app) => app.browserTyping
+export const hints = (app) => app.handoff
+  ? [['i', 'type into the page'], ['click', 'click the page'], ['ctrl+e', 'done — hand back'], ['ctrl+x', 'cancel']]
+  : app.browserTyping
   ? [['esc', 'stop typing into the page']]
   : [['↵', 'pick a tab'], ['i', 'type into the page'], ['click', 'click the page'], ['scroll', 'scroll the page'], ['r', 'refresh now']];
 

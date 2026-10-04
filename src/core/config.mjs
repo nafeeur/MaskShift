@@ -122,6 +122,9 @@ export function defaultConfig() {
       pollIntervalMs: 1000,
       maxPerTick: 10,
     },
+    secrets: {
+      backend: 'session',
+    },
     browser: {
       executable: null,
       profilesDir: path.join(home, 'browser', 'profiles'),
@@ -269,6 +272,7 @@ function mergeConfig(base, override) {
     ...base.guardrails, ...(override?.guardrails || {}),
     ...Object.fromEntries(['stagnation', 'verification', 'handoff', 'feedback', 'features'].map((group) => [group, { ...(base.guardrails?.[group] || {}), ...(override?.guardrails?.[group] || {}) }])),
   };
+  merged.secrets = { ...base.secrets, ...(override?.secrets || {}) };
   merged.memory = { ...base.memory, ...(override?.memory || {}) };
   merged.voice = { ...base.voice, ...(override?.voice || {}) };
   merged.pricing = {
