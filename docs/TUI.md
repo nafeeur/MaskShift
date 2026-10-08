@@ -16,13 +16,22 @@ wire.
 
 ### Rules of use
 
-| Token | Means | Never |
+The palette is a green-phosphor terminal: one hue, seven brightness levels, no
+other colour. Meaning is carried by brightness and weight, never by hue.
+
+| Role | Means | Drawn as |
 |---|---|---|
-| **crimson** `#E32C40` | Identity and focus: the wordmark, the active view tab, the pane holding the keyboard | A data value, or a severity |
-| **gold** `#E9A227` | The user: their turn, their keys, their pending input | A status |
-| **danger** `#FF6B4A` | Failure and destruction, and nothing else | Confused with crimson |
-| **tool / skill / mcp** | Capability classes, constant across every view | Reused for state |
-| **neutrals** | Everything else | — |
+| **heading / user** `#C8FFC8` | Headings and the user's turn | Brightest green |
+| **danger** | Failure and destruction, and nothing else | Inverse bar: dark text on bright green |
+| **warning** `#9DFF9D` | Finished with something to say | Bold, high green |
+| **text / primary / success** `#4DFF4D` | Body text, identity and focus, success | Normal green |
+| **info / dim** `#33C433` | Secondary text and information | Mid green |
+| **muted** `#2EAF2E` | Hints and placeholders | Low green (still 4.5:1 or better) |
+| **tool / skill / mcp** | Capability classes, constant across every view | Told apart by brightness and the glyph before them |
+
+Status never relies on colour alone: every state also has its own glyph (see
+`status.mjs`), so the interface reads the same with `NO_COLOR` or on a
+monochrome display. There is one theme and no `/theme` command.
 
 Two consequences are worth stating outright, because breaking either is what
 made earlier revisions read as noise:
@@ -337,7 +346,7 @@ it does not go through the agent-facing tool registry.
 Typed into the composer:
 
 `/new` `/clear` `/model [REF]` `/sessions` `/search TEXT` `/workspace`
-`/tools [QUERY]` `/skills [QUERY]` `/mcp [QUERY]` `/runtime` `/themes` `/files`
+`/tools [QUERY]` `/skills [QUERY]` `/mcp [QUERY]` `/runtime` `/files`
 `/terminal` `/browser` `/git` `/doctor` `/logs` `/settings` `/help` `/quit`
 
 `/tools`, `/skills` and `/mcp` all open **Capabilities** on the matching tab;

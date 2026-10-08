@@ -1,6 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" role="img" aria-label="MaskShift — a general-purpose agent harness">
-  <rect width="1280" height="640" fill="#0E1117"/>
-  <text x="640" y="304" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="150" font-weight="700" letter-spacing="-6" fill="#F4EFE6">mask<tspan fill="#E42A3C">shift</tspan></text>
-  <text x="640" y="382" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="38" fill="#B8C0CB">A general-purpose agent harness for any model</text>
-  <text x="640" y="470" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="26" fill="#6B7684">Local or hosted models  ·  Zero runtime dependencies  ·  Runs in your terminal</text>
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="45%" r="70%">
+      <stop offset="0" stop-color="#0a1f0a"/>
+      <stop offset="1" stop-color="#010a01"/>
+    </radialGradient>
+    <pattern id="scan" width="4" height="4" patternUnits="userSpaceOnUse">
+      <rect width="4" height="1" y="3" fill="#000600" opacity="0.55"/>
+    </pattern>
+    <filter id="bloom" x="-10%" y="-40%" width="120%" height="180%">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="1280" height="640" rx="0" fill="url(#glow)"/>
+  <text x="640.0" y="304" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="128" font-weight="700" letter-spacing="-2" fill="#4dff4d" filter="url(#bloom)"><tspan fill="#c8ffc8">&gt;</tspan> mask<tspan fill="#9dff9d">shift</tspan><tspan fill="#4dff4d">_</tspan></text>
+  <text x="640.0" y="382" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="38" fill="#33c433">A general-purpose agent harness for any model</text>
+  <text x="640" y="470" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="26" fill="#2eaf2e">Local or hosted models  ·  Zero runtime dependencies  ·  Runs in your terminal</text>
+  <rect width="1280" height="640" rx="0" fill="url(#scan)"/>
 </svg>

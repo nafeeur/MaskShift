@@ -1,5 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 220" role="img" aria-label="MaskShift — a general-purpose agent harness">
-  <rect width="1200" height="220" rx="28" fill="#161A20"/>
-  <text x="600" y="116" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="84" font-weight="700" letter-spacing="-3" fill="#F4EFE6">mask<tspan fill="#E42A3C">shift</tspan></text>
-  <text x="600" y="164" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="23" letter-spacing="0.5" fill="#8891A0">A general-purpose agent harness for any model</text>
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="45%" r="70%">
+      <stop offset="0" stop-color="#0a1f0a"/>
+      <stop offset="1" stop-color="#010a01"/>
+    </radialGradient>
+    <pattern id="scan" width="4" height="4" patternUnits="userSpaceOnUse">
+      <rect width="4" height="1" y="3" fill="#000600" opacity="0.55"/>
+    </pattern>
+    <filter id="bloom" x="-10%" y="-40%" width="120%" height="180%">
+      <feGaussianBlur stdDeviation="4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="1200" height="220" rx="28" fill="url(#glow)"/>
+  <text x="600.0" y="112" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="76" font-weight="700" letter-spacing="-2" fill="#4dff4d" filter="url(#bloom)"><tspan fill="#c8ffc8">&gt;</tspan> mask<tspan fill="#9dff9d">shift</tspan><tspan fill="#4dff4d">_</tspan></text>
+  <text x="600.0" y="164" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="23" fill="#33c433">A general-purpose agent harness for any model</text>
+  <rect width="1200" height="220" rx="28" fill="url(#scan)"/>
 </svg>

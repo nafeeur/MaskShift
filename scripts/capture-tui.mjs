@@ -61,16 +61,18 @@ class FakeTerminal extends Writable {
 
 // ---------------------------------------------------------------- ANSI parser
 
+// 16-colour codes only appear when a depth below truecolor is forced; map them onto the
+// same green ramp so a capture can never contain another hue.
 const BASIC = {
-  30: '#0a090d', 31: '#c0102f', 32: '#4fe08b', 33: '#ffb648',
-  34: '#5cc8ff', 35: '#b184ff', 36: '#2ee6c5', 37: '#9d97ad',
-  90: '#3a3648', 91: '#ff2d55', 92: '#4fe08b', 93: '#ffb648',
-  94: '#5cc8ff', 95: '#b184ff', 96: '#2ee6c5', 97: '#ffffff',
+  30: '#010a01', 31: '#c8ffc8', 32: '#4dff4d', 33: '#9dff9d',
+  34: '#33c433', 35: '#9dff9d', 36: '#3ee03e', 37: '#33c433',
+  90: '#176017', 91: '#c8ffc8', 92: '#4dff4d', 93: '#9dff9d',
+  94: '#33c433', 95: '#9dff9d', 96: '#3ee03e', 97: '#c8ffc8',
 };
 
 function parseLine(line) {
   const runs = [];
-  let style = { fg: PALETTE.bone, bg: null, bold: false, italic: false, underline: false };
+  let style = { fg: PALETTE.normal, bg: null, bold: false, italic: false, underline: false };
   let current = null;
   let column = 0;
   let index = 0;
@@ -110,9 +112,9 @@ function applyCodes(style, codes) {
   const next = { ...style };
   for (let index = 0; index < codes.length; index += 1) {
     const code = codes[index];
-    if (code === 0) { next.fg = PALETTE.bone; next.bg = null; next.bold = false; next.italic = false; next.underline = false; continue; }
+    if (code === 0) { next.fg = PALETTE.normal; next.bg = null; next.bold = false; next.italic = false; next.underline = false; continue; }
     if (code === 1) { next.bold = true; continue; }
-    if (code === 2) { next.fg = PALETTE.ash; continue; }
+    if (code === 2) { next.fg = PALETTE.low; continue; }
     if (code === 3) { next.italic = true; continue; }
     if (code === 4) { next.underline = true; continue; }
     if (code === 7) { const swap = next.fg; next.fg = next.bg || PALETTE.ink; next.bg = swap; continue; }

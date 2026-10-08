@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Theme } from '../src/tui/theme.mjs';
-import { DEFAULT_THEME_ID, THEMES } from '../src/tui/themes.mjs';
+import { ROLES } from '../src/tui/tokens.mjs';
 import { statusLine } from '../src/tui/status.mjs';
 
-const retro = THEMES.retro.roles;
+const retro = ROLES;
 
 function channels(hex) {
   const n = Number.parseInt(hex.slice(1), 16);
@@ -24,12 +24,13 @@ function contrast(a, b) {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-test('retro is the default theme', () => {
-  assert.equal(DEFAULT_THEME_ID, 'retro');
-  assert.equal(new Theme({ depth: 24 }).themeId, 'retro');
+test('the theme is the green-phosphor palette', () => {
+  const theme = new Theme({ depth: 24 });
+  assert.equal(theme.roles, ROLES);
+  assert.equal(theme.themeId, undefined);
 });
 
-test('retro uses only green: every role is a pure green hue (red === blue, green dominant)', () => {
+test('palette uses only green: every role is a pure green hue (red === blue, green dominant)', () => {
   for (const [role, hex] of Object.entries(retro)) {
     const [r, g, b] = channels(hex);
     assert.equal(r, b, `${role} ${hex} is not a pure green`);
@@ -37,7 +38,7 @@ test('retro uses only green: every role is a pure green hue (red === blue, green
   }
 });
 
-test('retro text roles stay readable on every surface they are drawn on', () => {
+test('palette text roles stay readable on every surface they are drawn on', () => {
   const surfaces = ['background', 'surface', 'surfaceRaised', 'surfaceSunken', 'selection'];
   const text = ['heading', 'text', 'label', 'dim', 'muted', 'success', 'warning', 'danger', 'info', 'tool', 'skill', 'user'];
   for (const surface of surfaces) {
@@ -47,7 +48,7 @@ test('retro text roles stay readable on every surface they are drawn on', () => 
   }
 });
 
-test('retro severity is carried by brightness order, not hue', () => {
+test('palette severity is carried by brightness order, not hue', () => {
   const l = (role) => luminance(retro[role]);
   assert.ok(l('danger') >= l('warning'));
   assert.ok(l('warning') > l('success'));
@@ -55,8 +56,8 @@ test('retro severity is carried by brightness order, not hue', () => {
   assert.ok(l('info') > l('muted'));
 });
 
-test('retro draws failure inverse and warning bold', () => {
-  const theme = new Theme({ depth: 24, themeId: 'retro' });
+test('palette draws failure inverse and warning bold', () => {
+  const theme = new Theme({ depth: 24 });
   const fail = theme.signal('danger');
   assert.equal(fail.inverse, undefined);
   assert.equal(fail.bg, retro.danger);
@@ -64,9 +65,4 @@ test('retro draws failure inverse and warning bold', () => {
   assert.equal(theme.signal('warning').bold, true);
   assert.notEqual(statusLine(theme, 'failed'), statusLine(theme, 'completed'));
   assert.ok(statusLine(theme, 'failed').includes('\u001b[48;2;'), 'failed status should paint a background bar');
-});
-
-test('themes without a signal style fall back to a plain foreground', () => {
-  const theme = new Theme({ depth: 24, themeId: 'maskshift' });
-  assert.deepEqual(theme.signal('danger'), { fg: theme.roles.danger });
 });
