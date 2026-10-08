@@ -6,147 +6,113 @@
 // single token moves.
 //
 // ---------------------------------------------------------------------------
-// RULES OF USE — the reason the old interface read as noise was that one
-// colour meant six things at once. These are enforced by convention:
+// THE PALETTE — a green-phosphor terminal. There is exactly one hue (120deg, so
+// red === blue in every swatch) and the only thing that varies is brightness,
+// the way a monochrome CRT has no colour to spend. Seven levels:
 //
-//   crimson   Identity and focus. The active view, the pane holding the
-//             keyboard, the wordmark. Never a data value, never a severity.
-//   gold      The user: their turn, their keys, their pending input.
-//   danger    Failure and destruction only — a distinct red so a failed run
-//             never reads as "this pane is focused".
-//   tool /    Capability classes. Constant across every view so a cyan token
-//   skill /   always means "tool" wherever it appears.
-//   mcp
-//   neutrals  Everything else. Hierarchy is carried by the neutral ramp and
-//             by weight, not by hue.
+//   bright   #c8ffc8  headings, user turns, and the inverse bar that marks a failure
+//   high     #9dff9d  warnings, accents
+//   normal   #4dff4d  body text, primary, success
+//   mid      #33c433  secondary text, info
+//   low      #2eaf2e  hints and placeholders (still >= 4.5:1 on every surface)
+//   rule     #176017  borders and other non-text structure
+//   (void)   #010a01  the screen itself, plus three slightly lifted surfaces
+//
+// RULES OF USE
+//
+//   Severity is carried by brightness order (failure > warning > success > info
+//   > muted) and by *weight*: a failure is drawn inverse (dark text on a bright
+//   green bar) and a warning is bold. See SIGNAL_STYLE and Theme.signal().
+//   Glyph shape (status.mjs) says the same thing again for terminals without
+//   bold or inverse, so no state is ever carried by colour alone.
+//
+//   tool / skill / mcp are capability classes. They are constant across every
+//   view; with one hue they are told apart by brightness and by the glyph that
+//   precedes them.
 //
 // Exactly one solid-filled chip is allowed per screen region: the active tab.
 // Every other label is drawn as text on the surface it belongs to.
 //
-// Hue budget: eight hues total. Warm half carries identity, user and
-// severity; cool half carries capability classes. info and mcp share the blue
-// family on purpose and are separated by weight, not hue — info is the lighter
-// of the two.
+// Contrast: every text role is at least 4.5:1 on every surface (enforced by
+// tests/retro-theme.test.mjs).
 // ---------------------------------------------------------------------------
 
-/**
- * The neutral ramp. Twelve steps, cool graphite, ordered light-ascending.
- * `bone` is deliberately warm: body text is the one place the interface
- * borrows the wordmark's cream, which keeps long reading passages from
- * feeling like cold chrome.
- */
-export const NEUTRAL = {
-  ink: '#08090C', // application background
-  well: '#0D0F13', // sunken wells, code blocks
-  panel: '#12151B', // default panel surface
-  raised: '#1A1E26', // raised surface, inline chips
-  line: '#222731', // default border
-  edge: '#2E343F', // strong border, divider between panes
-  hairline: '#3F4653', // scrollbar thumb, rules
-  muted: '#7A8494', // hints, placeholders, stamps  (5.2:1 on ink)
-  smoke: '#929BAA', // dim text, unfocused labels
-  silver: '#B8C0CB', // labels
-  bone: '#ECE8E0', // body text
-  chalk: '#FFFFFF', // headings only
-};
-
-/** Brand hues. Crimson is the identity; gold is the user. */
-export const BRAND = {
-  crimson: '#E32C40', // the badge red, straight from the mark
-  blood: '#A01A2A', // filled tracks, pressed states
-  deep: '#530E19', // empty track behind a crimson fill
-  rose: '#FF7186', // hover, "touched by the brand", crimson-as-text
-  gold: '#E9A227',
-  brass: '#8A5F14',
-};
-
-/** Semantic hues. Distinct from the brand hues above. */
-export const SIGNAL = {
-  success: '#35CF8B',
-  warning: '#F7C948', // yellower than gold, so a warning is not the user
-  danger: '#FF6B4A', // orange-red, never mistaken for crimson
-  info: '#7FB8FF',
-  tool: '#2BD9C0',
-  skill: '#A78BFA',
-  mcp: '#3D8BF5',
-};
-
+/** The raw swatches. Views never import these; they read ROLES through the Theme. */
 export const PALETTE = {
-  ...NEUTRAL,
-  ...BRAND,
-  ...SIGNAL,
-  // Retained aliases so older call sites keep resolving to a sane colour.
-  ash: NEUTRAL.muted,
-  azure: SIGNAL.info,
-  violet: SIGNAL.skill,
-  cyanide: SIGNAL.tool,
-  toxic: SIGNAL.success,
-  surface: NEUTRAL.panel,
-  // Removed: `ember`. It sat between gold and danger and gave the warm half a
-  // fourth meaning. Anything that used it wants `gold` or `danger`.
-  ember: BRAND.gold,
+  void: '#000600', // sunken wells, code blocks
+  ink: '#010a01', // application background
+  panel: '#041204', // default panel surface
+  raised: '#0a1f0a', // raised surface, inline chips
+  select: '#0e300e', // selected row
+  line: '#124012', // default border
+  rule: '#176017', // strong border, divider between panes
+  hairline: '#1a6a1a', // scrollbar thumb, rules
+  low: '#2eaf2e',
+  mid: '#33c433',
+  soft: '#3ee03e',
+  normal: '#4dff4d',
+  high: '#9dff9d',
+  bright: '#c8ffc8',
+  deep: '#1f8f1f', // filled tracks, pressed states
 };
 
 export const ROLES = {
   // Text ramp — five steps, and only five.
-  heading: NEUTRAL.chalk,
-  text: NEUTRAL.bone,
-  label: NEUTRAL.silver,
-  dim: NEUTRAL.smoke,
-  muted: NEUTRAL.muted,
-  faint: NEUTRAL.hairline,
+  heading: PALETTE.bright,
+  text: PALETTE.normal,
+  label: PALETTE.soft,
+  dim: PALETTE.mid,
+  muted: PALETTE.low,
+  faint: PALETTE.rule,
   // A structural line weight (a scrollbar thumb, anything that needs to read as "present" next
-  // to `border` rather than as a sixth text-ramp step) — distinct from `faint` above despite
-  // sharing its hex value, since the two are drawn from the same neutral swatch by coincidence,
-  // not because they mean the same thing.
-  hairline: NEUTRAL.hairline,
+  // to `border` rather than as a sixth text-ramp step).
+  hairline: PALETTE.hairline,
 
   // Surfaces.
-  background: NEUTRAL.ink,
-  surface: NEUTRAL.panel,
-  surfaceRaised: NEUTRAL.raised,
-  surfaceSunken: NEUTRAL.well,
-  // A full-row highlight (the selected row in a list) needs more separation
-  // from `background` than surfaceRaised gives it — that value reads fine
-  // behind a short inline-code chip, where the eye is judging it against the
-  // text sitting on it, but nearly vanishes as a wide band against the void.
-  // edge mixed ~28% toward crimson: a selected row reads as a dose of the
-  // identity colour rather than a grey band that could belong to any app.
-  selection: '#5E3040',
+  background: PALETTE.ink,
+  surface: PALETTE.panel,
+  surfaceRaised: PALETTE.raised,
+  surfaceSunken: PALETTE.void,
+  selection: PALETTE.select,
 
   // Structure.
-  border: NEUTRAL.line,
-  borderStrong: NEUTRAL.edge,
-  borderActive: BRAND.crimson,
+  border: PALETTE.line,
+  borderStrong: PALETTE.rule,
+  borderActive: PALETTE.normal,
 
   // Identity and focus.
-  primary: BRAND.crimson,
-  // Crimson as small text falls to ~4.1:1 against the background; rose keeps
-  // the same family without dropping below the ramp's contrast floor.
-  primaryText: BRAND.rose,
-  primaryDeep: BRAND.blood,
-  primaryTrack: BRAND.deep,
-  accent: BRAND.gold,
-  // A darker sibling of `accent`, the same relationship `primaryDeep` has to `primary` — added
-  // so the wordmark's two-tone gradient (see brand.mjs) can read entirely from roles instead of
-  // reaching for brand-specific palette names that only make sense for this one theme.
-  accentDeep: BRAND.brass,
-  onPrimary: NEUTRAL.ink,
+  primary: PALETTE.normal,
+  primaryDeep: PALETTE.deep,
+  primaryTrack: PALETTE.select,
+  accent: PALETTE.high,
+  // A darker sibling of `accent`, so the wordmark's two-tone gradient (see brand.mjs) reads
+  // entirely from roles.
+  accentDeep: PALETTE.mid,
+  onPrimary: PALETTE.ink,
 
   // Signals.
-  success: SIGNAL.success,
-  warning: SIGNAL.warning,
-  danger: SIGNAL.danger,
-  info: SIGNAL.info,
+  success: PALETTE.normal,
+  warning: PALETTE.high,
+  danger: PALETTE.bright,
+  info: PALETTE.mid,
 
   // Capability classes.
-  tool: SIGNAL.tool,
-  skill: SIGNAL.skill,
-  mcp: SIGNAL.mcp,
+  tool: PALETTE.soft,
+  skill: PALETTE.high,
+  mcp: PALETTE.mid,
 
   // Participants.
-  user: BRAND.gold,
-  assistant: NEUTRAL.bone,
+  user: PALETTE.bright,
+  assistant: PALETTE.normal,
+};
+
+/**
+ * Weight for a role used as a signal. With one hue there is no colour to spend, so a failure is
+ * drawn inverse (the background colour on a bar of the role's colour) and a warning is bold.
+ */
+export const SIGNAL_STYLE = {
+  danger: { inverse: true, bold: true },
+  warning: { bold: true },
 };
 
 /**

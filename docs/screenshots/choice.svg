@@ -1,483 +1,482 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1141" height="716" viewBox="0 0 1141 716" role="img" aria-label="MaskShift — choosing from a list">
 <title>MaskShift — choosing from a list</title>
-<rect width="100%" height="100%" rx="10" fill="#08090C"/>
+<rect width="100%" height="100%" rx="10" fill="#010a01"/>
 <g font-family="SFMono-Regular, Menlo, Consolas, DejaVu Sans Mono, monospace" font-size="14" xml:space="preserve">
-<text x="32.80" y="30.00" fill="#e32c40" textLength="33.60" lengthAdjust="spacingAndGlyphs" font-weight="700">Mask</text>
-<text x="66.40" y="30.00" fill="#ece8e0" textLength="42.00" lengthAdjust="spacingAndGlyphs" font-weight="700">Shift</text>
-<text x="116.80" y="30.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="133.60" y="30.00" fill="#7a8494" textLength="75.60" lengthAdjust="spacingAndGlyphs">Workspace</text>
-<text x="217.60" y="30.00" fill="#ece8e0" textLength="75.60" lengthAdjust="spacingAndGlyphs" font-weight="700">Documents</text>
-<text x="301.60" y="30.00" fill="#ece8e0" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">·</text>
-<text x="318.40" y="30.00" fill="#ece8e0" textLength="33.60" lengthAdjust="spacingAndGlyphs" font-weight="700">main</text>
-<text x="360.40" y="30.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="377.20" y="30.00" fill="#7a8494" textLength="42.00" lengthAdjust="spacingAndGlyphs">Model</text>
-<text x="427.60" y="30.00" fill="#ece8e0" textLength="92.40" lengthAdjust="spacingAndGlyphs" font-weight="700">ollama:auto</text>
-<text x="612.40" y="30.00" fill="#7a8494" textLength="33.60" lengthAdjust="spacingAndGlyphs">Mode</text>
-<text x="654.40" y="30.00" fill="#f7c948" textLength="84.00" lengthAdjust="spacingAndGlyphs" font-weight="700">Autonomous</text>
-<text x="746.80" y="30.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="763.60" y="30.00" fill="#7a8494" textLength="42.00" lengthAdjust="spacingAndGlyphs">Tools</text>
-<text x="814.00" y="30.00" fill="#2bd9c0" textLength="25.20" lengthAdjust="spacingAndGlyphs" font-weight="700">191</text>
-<text x="847.60" y="30.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="864.40" y="30.00" fill="#7a8494" textLength="50.40" lengthAdjust="spacingAndGlyphs">Skills</text>
-<text x="923.20" y="30.00" fill="#a78bfa" textLength="16.80" lengthAdjust="spacingAndGlyphs" font-weight="700">58</text>
-<text x="948.40" y="30.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="965.20" y="30.00" fill="#7a8494" textLength="25.20" lengthAdjust="spacingAndGlyphs">MCP</text>
-<text x="998.80" y="30.00" fill="#3d8bf5" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">8</text>
-<text x="1015.60" y="30.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="1032.40" y="30.00" fill="#7a8494" textLength="8.40" lengthAdjust="spacingAndGlyphs">●</text>
-<text x="1049.20" y="30.00" fill="#7a8494" textLength="58.80" lengthAdjust="spacingAndGlyphs" font-weight="700">Offline</text>
-<rect x="32.80" y="34.00" width="8.40" height="18" fill="#e32c40"/>
-<rect x="41.20" y="34.00" width="8.40" height="18" fill="#e32c40"/>
-<text x="41.20" y="48.00" fill="#6b1923" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">1</text>
-<rect x="49.60" y="34.00" width="50.40" height="18" fill="#e32c40"/>
-<text x="58.00" y="48.00" fill="#08090c" textLength="33.60" lengthAdjust="spacingAndGlyphs" font-weight="700">Chat</text>
-<text x="100.00" y="48.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="116.80" y="48.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">2</text>
-<text x="133.60" y="48.00" fill="#7a8494" textLength="42.00" lengthAdjust="spacingAndGlyphs">Files</text>
-<text x="184.00" y="48.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="200.80" y="48.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">3</text>
-<text x="217.60" y="48.00" fill="#7a8494" textLength="100.80" lengthAdjust="spacingAndGlyphs">Capabilities</text>
-<text x="326.80" y="48.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="343.60" y="48.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">4</text>
-<text x="360.40" y="48.00" fill="#7a8494" textLength="58.80" lengthAdjust="spacingAndGlyphs">Runtime</text>
-<text x="427.60" y="48.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="444.40" y="48.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">5</text>
-<text x="461.20" y="48.00" fill="#7a8494" textLength="58.80" lengthAdjust="spacingAndGlyphs">Browser</text>
-<text x="528.40" y="48.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="545.20" y="48.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">6</text>
-<text x="562.00" y="48.00" fill="#7a8494" textLength="25.20" lengthAdjust="spacingAndGlyphs">Git</text>
-<text x="595.60" y="48.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="612.40" y="48.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">7</text>
-<text x="629.20" y="48.00" fill="#7a8494" textLength="42.00" lengthAdjust="spacingAndGlyphs">Fleet</text>
-<text x="990.40" y="48.00" fill="#7a8494" textLength="58.80" lengthAdjust="spacingAndGlyphs">Sidebar</text>
-<text x="1057.60" y="48.00" fill="#b8c0cb" textLength="50.40" lengthAdjust="spacingAndGlyphs" font-weight="700">Active</text>
-<text x="24.40" y="84.00" fill="#222731" textLength="16.80" lengthAdjust="spacingAndGlyphs">╭─</text>
-<text x="49.60" y="84.00" fill="#7a8494" textLength="16.80" lengthAdjust="spacingAndGlyphs">Q3</text>
-<text x="74.80" y="84.00" fill="#7a8494" textLength="58.80" lengthAdjust="spacingAndGlyphs">invoice</text>
-<text x="142.00" y="84.00" fill="#7a8494" textLength="58.80" lengthAdjust="spacingAndGlyphs">summary</text>
-<text x="209.20" y="84.00" fill="#222731" textLength="520.80" lengthAdjust="spacingAndGlyphs">──────────────────────────────────────────────────────────────</text>
-<text x="738.40" y="84.00" fill="#7a8494" textLength="8.40" lengthAdjust="spacingAndGlyphs">6</text>
-<text x="755.20" y="84.00" fill="#7a8494" textLength="67.20" lengthAdjust="spacingAndGlyphs">messages</text>
-<text x="830.80" y="84.00" fill="#222731" textLength="16.80" lengthAdjust="spacingAndGlyphs">─╮</text>
-<text x="856.00" y="84.00" fill="#7a8494" textLength="33.60" lengthAdjust="spacingAndGlyphs">Plan</text>
-<text x="898.00" y="84.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="914.80" y="84.00" fill="#ffffff" textLength="50.40" lengthAdjust="spacingAndGlyphs" font-weight="700" text-decoration="underline">Active</text>
-<text x="973.60" y="84.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="990.40" y="84.00" fill="#7a8494" textLength="50.40" lengthAdjust="spacingAndGlyphs">Events</text>
-<text x="24.40" y="102.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="41.20" y="102.00" fill="#c6293b" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="58.00" y="102.00" fill="#ECE8E0" textLength="42.00" lengthAdjust="spacingAndGlyphs">There</text>
-<text x="108.40" y="102.00" fill="#ECE8E0" textLength="25.20" lengthAdjust="spacingAndGlyphs">are</text>
-<text x="142.00" y="102.00" fill="#ECE8E0" textLength="16.80" lengthAdjust="spacingAndGlyphs">23</text>
-<text x="167.20" y="102.00" fill="#ECE8E0" textLength="42.00" lengthAdjust="spacingAndGlyphs">PDFs.</text>
-<text x="217.60" y="102.00" fill="#ECE8E0" textLength="8.40" lengthAdjust="spacingAndGlyphs">I</text>
-<text x="234.40" y="102.00" fill="#ECE8E0" textLength="33.60" lengthAdjust="spacingAndGlyphs">will</text>
-<text x="276.40" y="102.00" fill="#ECE8E0" textLength="58.80" lengthAdjust="spacingAndGlyphs">extract</text>
-<text x="343.60" y="102.00" fill="#ECE8E0" textLength="25.20" lengthAdjust="spacingAndGlyphs">the</text>
-<text x="377.20" y="102.00" fill="#ECE8E0" textLength="50.40" lengthAdjust="spacingAndGlyphs">vendor</text>
-<text x="436.00" y="102.00" fill="#ECE8E0" textLength="25.20" lengthAdjust="spacingAndGlyphs">and</text>
-<text x="469.60" y="102.00" fill="#ECE8E0" textLength="50.40" lengthAdjust="spacingAndGlyphs">amount</text>
-<text x="528.40" y="102.00" fill="#ECE8E0" textLength="33.60" lengthAdjust="spacingAndGlyphs">from</text>
-<text x="570.40" y="102.00" fill="#ECE8E0" textLength="33.60" lengthAdjust="spacingAndGlyphs">each</text>
-<text x="612.40" y="102.00" fill="#ECE8E0" textLength="33.60" lengthAdjust="spacingAndGlyphs">one,</text>
-<text x="654.40" y="102.00" fill="#ECE8E0" textLength="42.00" lengthAdjust="spacingAndGlyphs">check</text>
-<text x="704.80" y="102.00" fill="#ECE8E0" textLength="33.60" lengthAdjust="spacingAndGlyphs">that</text>
-<text x="746.80" y="102.00" fill="#ECE8E0" textLength="25.20" lengthAdjust="spacingAndGlyphs">the</text>
-<text x="822.40" y="102.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="839.20" y="102.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="856.00" y="102.00" fill="#b8c0cb" textLength="58.80" lengthAdjust="spacingAndGlyphs">Context</text>
-<text x="1066.00" y="102.00" fill="#3f4653" textLength="42.00" lengthAdjust="spacingAndGlyphs">large</text>
-<text x="24.40" y="120.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="41.20" y="120.00" fill="#c6293b" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="58.00" y="120.00" fill="#ECE8E0" textLength="50.40" lengthAdjust="spacingAndGlyphs">totals</text>
-<text x="116.80" y="120.00" fill="#ECE8E0" textLength="25.20" lengthAdjust="spacingAndGlyphs">add</text>
-<text x="150.40" y="120.00" fill="#ECE8E0" textLength="25.20" lengthAdjust="spacingAndGlyphs">up,</text>
-<text x="184.00" y="120.00" fill="#ECE8E0" textLength="25.20" lengthAdjust="spacingAndGlyphs">and</text>
-<text x="217.60" y="120.00" fill="#ECE8E0" textLength="42.00" lengthAdjust="spacingAndGlyphs">write</text>
-<text x="268.00" y="120.00" fill="#ECE8E0" textLength="25.20" lengthAdjust="spacingAndGlyphs">one</text>
-<text x="301.60" y="120.00" fill="#ECE8E0" textLength="25.20" lengthAdjust="spacingAndGlyphs">row</text>
-<text x="335.20" y="120.00" fill="#ECE8E0" textLength="25.20" lengthAdjust="spacingAndGlyphs">per</text>
-<text x="368.80" y="120.00" fill="#ECE8E0" textLength="58.80" lengthAdjust="spacingAndGlyphs">vendor.</text>
-<text x="822.40" y="120.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="839.20" y="120.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="872.80" y="120.00" fill="#35cf8b" textLength="25.20" lengthAdjust="spacingAndGlyphs" font-weight="700">21%</text>
-<text x="1024.00" y="120.00" fill="#ece8e0" textLength="84.00" lengthAdjust="spacingAndGlyphs">41.2k/200k</text>
-<text x="24.40" y="138.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="41.20" y="138.00" fill="#c6293b" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="822.40" y="138.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="839.20" y="138.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="872.80" y="138.00" fill="#35cf8b" textLength="50.40" lengthAdjust="spacingAndGlyphs">━━━━━━</text>
-<text x="923.20" y="138.00" fill="#2e343f" textLength="184.80" lengthAdjust="spacingAndGlyphs">──────────────────────</text>
-<text x="24.40" y="156.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="41.20" y="156.00" fill="#c6293b" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="58.00" y="156.00" fill="#7a8494" textLength="8.40" lengthAdjust="spacingAndGlyphs">•</text>
-<text x="74.80" y="156.00" fill="#ECE8E0" textLength="33.60" lengthAdjust="spacingAndGlyphs">list</text>
-<text x="116.80" y="156.00" fill="#ECE8E0" textLength="25.20" lengthAdjust="spacingAndGlyphs">the</text>
-<text x="150.40" y="156.00" fill="#ECE8E0" textLength="50.40" lengthAdjust="spacingAndGlyphs">folder</text>
-<text x="209.20" y="156.00" fill="#ECE8E0" textLength="25.20" lengthAdjust="spacingAndGlyphs">and</text>
-<text x="242.80" y="156.00" fill="#ECE8E0" textLength="33.60" lengthAdjust="spacingAndGlyphs">read</text>
-<text x="284.80" y="156.00" fill="#ECE8E0" textLength="33.60" lengthAdjust="spacingAndGlyphs">each</text>
-<text x="326.80" y="156.00" fill="#ECE8E0" textLength="58.80" lengthAdjust="spacingAndGlyphs">invoice</text>
-<text x="822.40" y="156.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="839.20" y="156.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="872.80" y="156.00" fill="#7a8494" textLength="50.40" lengthAdjust="spacingAndGlyphs">Window</text>
-<text x="931.60" y="156.00" fill="#7a8494" textLength="67.20" lengthAdjust="spacingAndGlyphs">reported</text>
-<text x="1007.20" y="156.00" fill="#7a8494" textLength="16.80" lengthAdjust="spacingAndGlyphs">by</text>
-<text x="1032.40" y="156.00" fill="#7a8494" textLength="25.20" lengthAdjust="spacingAndGlyphs">the</text>
-<text x="24.40" y="174.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="41.20" y="174.00" fill="#c6293b" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="58.00" y="174.00" fill="#7a8494" textLength="8.40" lengthAdjust="spacingAndGlyphs">•</text>
-<text x="74.80" y="174.00" fill="#ECE8E0" textLength="42.00" lengthAdjust="spacingAndGlyphs">group</text>
-<text x="125.20" y="174.00" fill="#ECE8E0" textLength="25.20" lengthAdjust="spacingAndGlyphs">the</text>
-<text x="158.80" y="174.00" fill="#ECE8E0" textLength="58.80" lengthAdjust="spacingAndGlyphs">amounts</text>
-<text x="226.00" y="174.00" fill="#ECE8E0" textLength="16.80" lengthAdjust="spacingAndGlyphs">by</text>
-<text x="251.20" y="174.00" fill="#ECE8E0" textLength="50.40" lengthAdjust="spacingAndGlyphs">vendor</text>
-<text x="822.40" y="174.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="839.20" y="174.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="872.80" y="174.00" fill="#7a8494" textLength="75.60" lengthAdjust="spacingAndGlyphs">provider.</text>
-<text x="956.80" y="174.00" fill="#7a8494" textLength="58.80" lengthAdjust="spacingAndGlyphs">Replies</text>
-<text x="1024.00" y="174.00" fill="#7a8494" textLength="16.80" lengthAdjust="spacingAndGlyphs">up</text>
-<text x="1049.20" y="174.00" fill="#7a8494" textLength="16.80" lengthAdjust="spacingAndGlyphs">to</text>
-<text x="24.40" y="192.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="41.20" y="192.00" fill="#c6293b" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="58.00" y="192.00" fill="#7a8494" textLength="8.40" lengthAdjust="spacingAndGlyphs">•</text>
-<text x="74.80" y="192.00" fill="#ECE8E0" textLength="42.00" lengthAdjust="spacingAndGlyphs">write</text>
-<rect x="125.20" y="178.00" width="159.60" height="18" fill="#1a1e26"/>
-<text x="133.60" y="192.00" fill="#ece8e0" textLength="142.80" lengthAdjust="spacingAndGlyphs">q3-by-vendor.xlsx</text>
-<text x="293.20" y="192.00" fill="#ECE8E0" textLength="25.20" lengthAdjust="spacingAndGlyphs">and</text>
-<text x="326.80" y="192.00" fill="#ECE8E0" textLength="50.40" lengthAdjust="spacingAndGlyphs">verify</text>
-<text x="385.60" y="192.00" fill="#ECE8E0" textLength="16.80" lengthAdjust="spacingAndGlyphs">it</text>
-<text x="410.80" y="192.00" fill="#ECE8E0" textLength="16.80" lengthAdjust="spacingAndGlyphs">by</text>
-<text x="436.00" y="192.00" fill="#ECE8E0" textLength="58.80" lengthAdjust="spacingAndGlyphs">reading</text>
-<text x="503.20" y="192.00" fill="#ECE8E0" textLength="16.80" lengthAdjust="spacingAndGlyphs">it</text>
-<text x="528.40" y="192.00" fill="#ECE8E0" textLength="33.60" lengthAdjust="spacingAndGlyphs">back</text>
-<text x="822.40" y="192.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
-<text x="839.20" y="192.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="872.80" y="192.00" fill="#7a8494" textLength="42.00" lengthAdjust="spacingAndGlyphs">16.4k</text>
-<text x="923.20" y="192.00" fill="#7a8494" textLength="58.80" lengthAdjust="spacingAndGlyphs">tokens.</text>
-<text x="24.40" y="210.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="41.20" y="210.00" fill="#c6293b" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="822.40" y="210.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
-<text x="839.20" y="210.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="24.40" y="228.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="41.20" y="228.00" fill="#c6293b" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="58.00" y="228.00" fill="#7a8494" textLength="50.40" lengthAdjust="spacingAndGlyphs">python</text>
-<text x="116.80" y="228.00" fill="#222731" textLength="697.20" lengthAdjust="spacingAndGlyphs">───────────────────────────────────────────────────────────────────────────────────</text>
-<text x="822.40" y="228.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
-<text x="839.20" y="228.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="872.80" y="228.00" fill="#7a8494" textLength="42.00" lengthAdjust="spacingAndGlyphs">Tools</text>
-<text x="1049.20" y="228.00" fill="#2bd9c0" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">4</text>
-<text x="1066.00" y="228.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">/</text>
-<text x="1082.80" y="228.00" fill="#3f4653" textLength="25.20" lengthAdjust="spacingAndGlyphs">191</text>
-<text x="24.40" y="246.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="41.20" y="246.00" fill="#c6293b" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="58.00" y="246.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">1</text>
-<text x="74.80" y="246.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="91.60" y="246.00" fill="#ece8e0" textLength="50.40" lengthAdjust="spacingAndGlyphs">totals</text>
-<text x="150.40" y="246.00" fill="#929baa" textLength="8.40" lengthAdjust="spacingAndGlyphs">=</text>
-<text x="167.20" y="246.00" fill="#ece8e0" textLength="92.40" lengthAdjust="spacingAndGlyphs">defaultdict</text>
-<text x="259.60" y="246.00" fill="#929baa" textLength="8.40" lengthAdjust="spacingAndGlyphs">(</text>
-<text x="268.00" y="246.00" fill="#ece8e0" textLength="42.00" lengthAdjust="spacingAndGlyphs">float</text>
-<text x="310.00" y="246.00" fill="#929baa" textLength="8.40" lengthAdjust="spacingAndGlyphs">)</text>
-<text x="822.40" y="246.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
-<text x="839.20" y="246.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="872.80" y="246.00" fill="#2bd9c0" textLength="8.40" lengthAdjust="spacingAndGlyphs">━</text>
-<text x="881.20" y="246.00" fill="#2e343f" textLength="226.80" lengthAdjust="spacingAndGlyphs">───────────────────────────</text>
-<text x="24.40" y="264.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="41.20" y="264.00" fill="#c6293b" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="58.00" y="264.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">2</text>
-<text x="74.80" y="264.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="91.60" y="264.00" fill="#a78bfa" textLength="25.20" lengthAdjust="spacingAndGlyphs" font-weight="700">for</text>
-<text x="125.20" y="264.00" fill="#ece8e0" textLength="58.80" lengthAdjust="spacingAndGlyphs">invoice</text>
-<text x="192.40" y="264.00" fill="#a78bfa" textLength="16.80" lengthAdjust="spacingAndGlyphs" font-weight="700">in</text>
-<text x="217.60" y="264.00" fill="#ece8e0" textLength="67.20" lengthAdjust="spacingAndGlyphs">invoices</text>
-<text x="284.80" y="264.00" fill="#929baa" textLength="8.40" lengthAdjust="spacingAndGlyphs">:</text>
-<text x="822.40" y="264.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
-<text x="839.20" y="264.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="24.40" y="282.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="41.20" y="282.00" fill="#c6293b" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="58.00" y="282.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">3</text>
-<text x="74.80" y="282.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="125.20" y="282.00" fill="#ece8e0" textLength="50.40" lengthAdjust="spacingAndGlyphs">totals</text>
-<text x="175.60" y="282.00" fill="#929baa" textLength="8.40" lengthAdjust="spacingAndGlyphs">[</text>
-<text x="184.00" y="282.00" fill="#ece8e0" textLength="58.80" lengthAdjust="spacingAndGlyphs">invoice</text>
-<text x="242.80" y="282.00" fill="#929baa" textLength="8.40" lengthAdjust="spacingAndGlyphs">.</text>
-<text x="251.20" y="282.00" fill="#ece8e0" textLength="50.40" lengthAdjust="spacingAndGlyphs">vendor</text>
-<text x="301.60" y="282.00" fill="#929baa" textLength="8.40" lengthAdjust="spacingAndGlyphs">]</text>
-<text x="318.40" y="282.00" fill="#929baa" textLength="16.80" lengthAdjust="spacingAndGlyphs">+=</text>
-<text x="343.60" y="282.00" fill="#ece8e0" textLength="58.80" lengthAdjust="spacingAndGlyphs">invoice</text>
-<text x="402.40" y="282.00" fill="#929baa" textLength="8.40" lengthAdjust="spacingAndGlyphs">.</text>
-<text x="410.80" y="282.00" fill="#ece8e0" textLength="50.40" lengthAdjust="spacingAndGlyphs">amount</text>
-<text x="822.40" y="282.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
-<text x="839.20" y="282.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="872.80" y="282.00" fill="#7a8494" textLength="50.40" lengthAdjust="spacingAndGlyphs">Skills</text>
-<text x="1057.60" y="282.00" fill="#a78bfa" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">2</text>
-<text x="1074.40" y="282.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">/</text>
-<text x="1091.20" y="282.00" fill="#3f4653" textLength="16.80" lengthAdjust="spacingAndGlyphs">58</text>
-<text x="24.40" y="300.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="41.20" y="300.00" fill="#c6293b" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="58.00" y="300.00" fill="#222731" textLength="756.00" lengthAdjust="spacingAndGlyphs">──────────────────────────────────────────────────────────────────────────────────────────</text>
-<text x="822.40" y="300.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
-<text x="839.20" y="300.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="872.80" y="300.00" fill="#a78bfa" textLength="8.40" lengthAdjust="spacingAndGlyphs">━</text>
-<text x="881.20" y="300.00" fill="#2e343f" textLength="226.80" lengthAdjust="spacingAndGlyphs">───────────────────────────</text>
-<text x="24.40" y="318.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="822.40" y="318.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
-<text x="839.20" y="318.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="24.40" y="336.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="41.20" y="336.00" fill="#35cf8b" textLength="8.40" lengthAdjust="spacingAndGlyphs">✓</text>
-<text x="58.00" y="336.00" fill="#2bd9c0" textLength="58.80" lengthAdjust="spacingAndGlyphs" font-weight="700">fs_list</text>
-<text x="226.00" y="336.00" fill="#929baa" textLength="168.00" lengthAdjust="spacingAndGlyphs">~/Documents/Invoices</text>
-<text x="402.40" y="336.00" fill="#929baa" textLength="8.40" lengthAdjust="spacingAndGlyphs">—</text>
-<text x="419.20" y="336.00" fill="#929baa" textLength="16.80" lengthAdjust="spacingAndGlyphs">23</text>
-<text x="444.40" y="336.00" fill="#929baa" textLength="42.00" lengthAdjust="spacingAndGlyphs">files</text>
-<text x="822.40" y="336.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
-<text x="839.20" y="336.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="872.80" y="336.00" fill="#7a8494" textLength="25.20" lengthAdjust="spacingAndGlyphs">MCP</text>
-<text x="1066.00" y="336.00" fill="#3d8bf5" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">0</text>
-<text x="1082.80" y="336.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">/</text>
-<text x="1099.60" y="336.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">8</text>
-<text x="24.40" y="354.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="41.20" y="354.00" fill="#35cf8b" textLength="8.40" lengthAdjust="spacingAndGlyphs">✓</text>
-<text x="58.00" y="354.00" fill="#2bd9c0" textLength="67.20" lengthAdjust="spacingAndGlyphs" font-weight="700">pdf_read</text>
-<text x="226.00" y="354.00" fill="#929baa" textLength="16.80" lengthAdjust="spacingAndGlyphs">23</text>
-<text x="251.20" y="354.00" fill="#929baa" textLength="67.20" lengthAdjust="spacingAndGlyphs">invoices</text>
-<text x="326.80" y="354.00" fill="#929baa" textLength="33.60" lengthAdjust="spacingAndGlyphs">read</text>
-<text x="368.80" y="354.00" fill="#929baa" textLength="8.40" lengthAdjust="spacingAndGlyphs">—</text>
-<text x="385.60" y="354.00" fill="#929baa" textLength="8.40" lengthAdjust="spacingAndGlyphs">2</text>
-<text x="402.40" y="354.00" fill="#929baa" textLength="50.40" lengthAdjust="spacingAndGlyphs">needed</text>
-<text x="461.20" y="354.00" fill="#929baa" textLength="25.20" lengthAdjust="spacingAndGlyphs">OCR</text>
-<text x="822.40" y="354.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
-<text x="839.20" y="354.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="872.80" y="354.00" fill="#2e343f" textLength="235.20" lengthAdjust="spacingAndGlyphs">────────────────────────────</text>
-<text x="24.40" y="372.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="41.20" y="372.00" fill="#35cf8b" textLength="8.40" lengthAdjust="spacingAndGlyphs">✓</text>
-<text x="58.00" y="372.00" fill="#2bd9c0" textLength="92.40" lengthAdjust="spacingAndGlyphs" font-weight="700">python_cell</text>
-<text x="226.00" y="372.00" fill="#929baa" textLength="8.40" lengthAdjust="spacingAndGlyphs">9</text>
-<text x="242.80" y="372.00" fill="#929baa" textLength="67.20" lengthAdjust="spacingAndGlyphs">vendors,</text>
-<text x="318.40" y="372.00" fill="#929baa" textLength="42.00" lengthAdjust="spacingAndGlyphs">total</text>
-<text x="368.80" y="372.00" fill="#929baa" textLength="84.00" lengthAdjust="spacingAndGlyphs">$48,215.60</text>
-<text x="461.20" y="372.00" fill="#929baa" textLength="8.40" lengthAdjust="spacingAndGlyphs">—</text>
-<text x="478.00" y="372.00" fill="#929baa" textLength="58.80" lengthAdjust="spacingAndGlyphs">matches</text>
-<text x="545.20" y="372.00" fill="#929baa" textLength="25.20" lengthAdjust="spacingAndGlyphs">the</text>
-<text x="578.80" y="372.00" fill="#929baa" textLength="25.20" lengthAdjust="spacingAndGlyphs">sum</text>
-<text x="612.40" y="372.00" fill="#929baa" textLength="16.80" lengthAdjust="spacingAndGlyphs">of</text>
-<text x="637.60" y="372.00" fill="#929baa" textLength="25.20" lengthAdjust="spacingAndGlyphs">the</text>
-<text x="671.20" y="372.00" fill="#929baa" textLength="67.20" lengthAdjust="spacingAndGlyphs">invoices</text>
-<text x="822.40" y="372.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
-<text x="839.20" y="372.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="24.40" y="390.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="822.40" y="390.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
-<text x="839.20" y="390.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="872.80" y="390.00" fill="#7a8494" textLength="75.60" lengthAdjust="spacingAndGlyphs">Subagents</text>
-<text x="1066.00" y="390.00" fill="#e9a227" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">0</text>
-<text x="1082.80" y="390.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">/</text>
-<text x="1099.60" y="390.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">6</text>
-<text x="24.40" y="408.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="41.20" y="408.00" fill="#e32c40" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
-<text x="58.00" y="408.00" fill="#e32c40" textLength="75.60" lengthAdjust="spacingAndGlyphs" font-weight="700">MaskShift</text>
-<text x="763.60" y="408.00" fill="#3f4653" textLength="42.00" lengthAdjust="spacingAndGlyphs">12:36</text>
-<text x="822.40" y="408.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
-<text x="839.20" y="408.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="872.80" y="408.00" fill="#2e343f" textLength="235.20" lengthAdjust="spacingAndGlyphs">────────────────────────────</text>
-<text x="24.40" y="426.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="41.20" y="426.00" fill="#c6293b" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="58.00" y="426.00" fill="#ECE8E0" textLength="42.00" lengthAdjust="spacingAndGlyphs">Done.</text>
-<rect x="108.40" y="412.00" width="159.60" height="18" fill="#1a1e26"/>
-<text x="116.80" y="426.00" fill="#ece8e0" textLength="142.80" lengthAdjust="spacingAndGlyphs">q3-by-vendor.xlsx</text>
-<text x="276.40" y="426.00" fill="#ECE8E0" textLength="25.20" lengthAdjust="spacingAndGlyphs">has</text>
-<text x="310.00" y="426.00" fill="#ECE8E0" textLength="25.20" lengthAdjust="spacingAndGlyphs">one</text>
-<text x="343.60" y="426.00" fill="#ECE8E0" textLength="25.20" lengthAdjust="spacingAndGlyphs">row</text>
-<text x="377.20" y="426.00" fill="#ECE8E0" textLength="25.20" lengthAdjust="spacingAndGlyphs">per</text>
-<text x="410.80" y="426.00" fill="#ECE8E0" textLength="50.40" lengthAdjust="spacingAndGlyphs">vendor</text>
-<text x="469.60" y="426.00" fill="#ECE8E0" textLength="16.80" lengthAdjust="spacingAndGlyphs">(9</text>
-<text x="494.80" y="426.00" fill="#ECE8E0" textLength="16.80" lengthAdjust="spacingAndGlyphs">in</text>
-<text x="520.00" y="426.00" fill="#ECE8E0" textLength="50.40" lengthAdjust="spacingAndGlyphs">total)</text>
-<text x="578.80" y="426.00" fill="#ECE8E0" textLength="25.20" lengthAdjust="spacingAndGlyphs">and</text>
-<text x="612.40" y="426.00" fill="#ECE8E0" textLength="8.40" lengthAdjust="spacingAndGlyphs">a</text>
-<text x="629.20" y="426.00" fill="#ECE8E0" textLength="42.00" lengthAdjust="spacingAndGlyphs">total</text>
-<text x="679.60" y="426.00" fill="#ECE8E0" textLength="16.80" lengthAdjust="spacingAndGlyphs">of</text>
-<text x="704.80" y="426.00" fill="#ECE8E0" textLength="92.40" lengthAdjust="spacingAndGlyphs">$48,215.60.</text>
-<text x="805.60" y="426.00" fill="#ECE8E0" textLength="8.40" lengthAdjust="spacingAndGlyphs">I</text>
-<text x="822.40" y="426.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
-<text x="839.20" y="426.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="24.40" y="444.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="41.20" y="444.00" fill="#c6293b" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="58.00" y="444.00" fill="#ECE8E0" textLength="75.60" lengthAdjust="spacingAndGlyphs">re-opened</text>
-<text x="142.00" y="444.00" fill="#ECE8E0" textLength="25.20" lengthAdjust="spacingAndGlyphs">the</text>
-<text x="175.60" y="444.00" fill="#ECE8E0" textLength="33.60" lengthAdjust="spacingAndGlyphs">file</text>
-<text x="217.60" y="444.00" fill="#ECE8E0" textLength="16.80" lengthAdjust="spacingAndGlyphs">to</text>
-<text x="242.80" y="444.00" fill="#ECE8E0" textLength="58.80" lengthAdjust="spacingAndGlyphs">confirm</text>
-<text x="310.00" y="444.00" fill="#ECE8E0" textLength="25.20" lengthAdjust="spacingAndGlyphs">the</text>
-<text x="343.60" y="444.00" fill="#ECE8E0" textLength="50.40" lengthAdjust="spacingAndGlyphs">totals</text>
-<text x="402.40" y="444.00" fill="#ECE8E0" textLength="42.00" lengthAdjust="spacingAndGlyphs">match</text>
-<text x="452.80" y="444.00" fill="#ECE8E0" textLength="25.20" lengthAdjust="spacingAndGlyphs">the</text>
-<text x="486.40" y="444.00" fill="#ECE8E0" textLength="75.60" lengthAdjust="spacingAndGlyphs">invoices.</text>
-<text x="570.40" y="444.00" fill="#ECE8E0" textLength="25.20" lengthAdjust="spacingAndGlyphs">Two</text>
-<text x="604.00" y="444.00" fill="#ECE8E0" textLength="42.00" lengthAdjust="spacingAndGlyphs">scans</text>
-<text x="654.40" y="444.00" fill="#ECE8E0" textLength="33.60" lengthAdjust="spacingAndGlyphs">were</text>
-<text x="696.40" y="444.00" fill="#ECE8E0" textLength="25.20" lengthAdjust="spacingAndGlyphs">low</text>
-<text x="730.00" y="444.00" fill="#ECE8E0" textLength="67.20" lengthAdjust="spacingAndGlyphs">quality,</text>
-<text x="822.40" y="444.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
-<text x="839.20" y="444.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="856.00" y="444.00" fill="#b8c0cb" textLength="42.00" lengthAdjust="spacingAndGlyphs">Token</text>
-<text x="906.40" y="444.00" fill="#b8c0cb" textLength="33.60" lengthAdjust="spacingAndGlyphs">flow</text>
-<text x="24.40" y="462.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="41.20" y="462.00" fill="#c6293b" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="58.00" y="462.00" fill="#ECE8E0" textLength="16.80" lengthAdjust="spacingAndGlyphs">so</text>
-<text x="83.20" y="462.00" fill="#ECE8E0" textLength="8.40" lengthAdjust="spacingAndGlyphs">I</text>
-<text x="100.00" y="462.00" fill="#ECE8E0" textLength="50.40" lengthAdjust="spacingAndGlyphs">listed</text>
-<text x="158.80" y="462.00" fill="#ECE8E0" textLength="33.60" lengthAdjust="spacingAndGlyphs">them</text>
-<text x="200.80" y="462.00" fill="#ECE8E0" textLength="16.80" lengthAdjust="spacingAndGlyphs">on</text>
-<text x="226.00" y="462.00" fill="#ECE8E0" textLength="8.40" lengthAdjust="spacingAndGlyphs">a</text>
-<text x="242.80" y="462.00" fill="#ECE8E0" textLength="50.40" lengthAdjust="spacingAndGlyphs">second</text>
-<text x="301.60" y="462.00" fill="#ECE8E0" textLength="42.00" lengthAdjust="spacingAndGlyphs">sheet</text>
-<text x="352.00" y="462.00" fill="#ECE8E0" textLength="25.20" lengthAdjust="spacingAndGlyphs">for</text>
-<text x="385.60" y="462.00" fill="#ECE8E0" textLength="25.20" lengthAdjust="spacingAndGlyphs">you</text>
-<text x="419.20" y="462.00" fill="#ECE8E0" textLength="16.80" lengthAdjust="spacingAndGlyphs">to</text>
-<text x="444.40" y="462.00" fill="#ECE8E0" textLength="109.20" lengthAdjust="spacingAndGlyphs">double-check.</text>
-<text x="822.40" y="462.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
-<text x="839.20" y="462.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="872.80" y="462.00" fill="#e9a227" textLength="84.00" lengthAdjust="spacingAndGlyphs">▁▄▂▇▄█▃▆▄▇</text>
-<text x="24.40" y="480.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<rect x="58.00" y="466.00" width="126.00" height="18" fill="#e9a227"/>
-<text x="74.80" y="480.00" fill="#08090c" textLength="92.40" lengthAdjust="spacingAndGlyphs" font-weight="700">Restaurants</text>
-<text x="839.20" y="480.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="24.40" y="498.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="58.00" y="498.00" fill="#ece8e0" textLength="42.00" lengthAdjust="spacingAndGlyphs" font-weight="700">Which</text>
-<text x="108.40" y="498.00" fill="#ece8e0" textLength="92.40" lengthAdjust="spacingAndGlyphs" font-weight="700">restaurants</text>
-<text x="209.20" y="498.00" fill="#ece8e0" textLength="50.40" lengthAdjust="spacingAndGlyphs" font-weight="700">should</text>
-<text x="268.00" y="498.00" fill="#ece8e0" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">I</text>
-<text x="284.80" y="498.00" fill="#ece8e0" textLength="67.20" lengthAdjust="spacingAndGlyphs" font-weight="700">compare?</text>
-<text x="839.20" y="498.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="856.00" y="498.00" fill="#b8c0cb" textLength="50.40" lengthAdjust="spacingAndGlyphs">Active</text>
-<text x="914.80" y="498.00" fill="#b8c0cb" textLength="42.00" lengthAdjust="spacingAndGlyphs">tools</text>
-<text x="1099.60" y="498.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">6</text>
-<text x="24.40" y="516.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<rect x="41.20" y="502.00" width="8.40" height="18" fill="#5e3040"/>
-<text x="41.20" y="516.00" fill="#e9a227" textLength="8.40" lengthAdjust="spacingAndGlyphs">❯</text>
-<rect x="49.60" y="502.00" width="8.40" height="18" fill="#5e3040"/>
-<rect x="58.00" y="502.00" width="25.20" height="18" fill="#5e3040"/>
-<text x="58.00" y="516.00" fill="#e9a227" textLength="16.80" lengthAdjust="spacingAndGlyphs">1.</text>
-<rect x="83.20" y="502.00" width="126.00" height="18" fill="#5e3040"/>
-<text x="83.20" y="516.00" fill="#ece8e0" textLength="25.20" lengthAdjust="spacingAndGlyphs" font-weight="700">[✓]</text>
-<text x="116.80" y="516.00" fill="#ece8e0" textLength="42.00" lengthAdjust="spacingAndGlyphs" font-weight="700">Luigi</text>
-<text x="167.20" y="516.00" fill="#ece8e0" textLength="42.00" lengthAdjust="spacingAndGlyphs" font-weight="700">Pizza</text>
-<rect x="209.20" y="502.00" width="327.60" height="18" fill="#5e3040"/>
-<text x="226.00" y="516.00" fill="#7a8494" textLength="42.00" lengthAdjust="spacingAndGlyphs">$2.99</text>
-<text x="276.40" y="516.00" fill="#7a8494" textLength="67.20" lengthAdjust="spacingAndGlyphs">delivery</text>
-<text x="360.40" y="516.00" fill="#7a8494" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="385.60" y="516.00" fill="#7a8494" textLength="33.60" lengthAdjust="spacingAndGlyphs">4.5★</text>
-<text x="436.00" y="516.00" fill="#7a8494" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="461.20" y="516.00" fill="#7a8494" textLength="42.00" lengthAdjust="spacingAndGlyphs">20–30</text>
-<text x="511.60" y="516.00" fill="#7a8494" textLength="25.20" lengthAdjust="spacingAndGlyphs">min</text>
-<rect x="536.80" y="502.00" width="294.00" height="18" fill="#5e3040"/>
-<text x="839.20" y="516.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="856.00" y="516.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="872.80" y="516.00" fill="#2bd9c0" textLength="58.80" lengthAdjust="spacingAndGlyphs">fs_list</text>
-<text x="24.40" y="534.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="58.00" y="534.00" fill="#7a8494" textLength="16.80" lengthAdjust="spacingAndGlyphs">2.</text>
-<text x="83.20" y="534.00" fill="#ece8e0" textLength="8.40" lengthAdjust="spacingAndGlyphs">[</text>
-<text x="100.00" y="534.00" fill="#ece8e0" textLength="8.40" lengthAdjust="spacingAndGlyphs">]</text>
-<text x="116.80" y="534.00" fill="#ece8e0" textLength="42.00" lengthAdjust="spacingAndGlyphs">Sushi</text>
-<text x="167.20" y="534.00" fill="#ece8e0" textLength="16.80" lengthAdjust="spacingAndGlyphs">Go</text>
-<text x="200.80" y="534.00" fill="#7a8494" textLength="42.00" lengthAdjust="spacingAndGlyphs">$1.99</text>
-<text x="251.20" y="534.00" fill="#7a8494" textLength="67.20" lengthAdjust="spacingAndGlyphs">delivery</text>
-<text x="335.20" y="534.00" fill="#7a8494" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="360.40" y="534.00" fill="#7a8494" textLength="33.60" lengthAdjust="spacingAndGlyphs">4.7★</text>
-<text x="410.80" y="534.00" fill="#7a8494" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="436.00" y="534.00" fill="#7a8494" textLength="42.00" lengthAdjust="spacingAndGlyphs">30–40</text>
-<text x="486.40" y="534.00" fill="#7a8494" textLength="25.20" lengthAdjust="spacingAndGlyphs">min</text>
-<text x="839.20" y="534.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="856.00" y="534.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="872.80" y="534.00" fill="#2bd9c0" textLength="67.20" lengthAdjust="spacingAndGlyphs">pdf_read</text>
-<text x="24.40" y="552.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="58.00" y="552.00" fill="#7a8494" textLength="16.80" lengthAdjust="spacingAndGlyphs">3.</text>
-<text x="83.20" y="552.00" fill="#ece8e0" textLength="8.40" lengthAdjust="spacingAndGlyphs">[</text>
-<text x="100.00" y="552.00" fill="#ece8e0" textLength="8.40" lengthAdjust="spacingAndGlyphs">]</text>
-<text x="116.80" y="552.00" fill="#ece8e0" textLength="33.60" lengthAdjust="spacingAndGlyphs">Taco</text>
-<text x="158.80" y="552.00" fill="#ece8e0" textLength="33.60" lengthAdjust="spacingAndGlyphs">Town</text>
-<text x="209.20" y="552.00" fill="#7a8494" textLength="33.60" lengthAdjust="spacingAndGlyphs">Free</text>
-<text x="251.20" y="552.00" fill="#7a8494" textLength="67.20" lengthAdjust="spacingAndGlyphs">delivery</text>
-<text x="335.20" y="552.00" fill="#7a8494" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="360.40" y="552.00" fill="#7a8494" textLength="33.60" lengthAdjust="spacingAndGlyphs">4.2★</text>
-<text x="410.80" y="552.00" fill="#7a8494" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="436.00" y="552.00" fill="#7a8494" textLength="42.00" lengthAdjust="spacingAndGlyphs">15–25</text>
-<text x="486.40" y="552.00" fill="#7a8494" textLength="25.20" lengthAdjust="spacingAndGlyphs">min</text>
-<text x="839.20" y="552.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="856.00" y="552.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="872.80" y="552.00" fill="#2bd9c0" textLength="92.40" lengthAdjust="spacingAndGlyphs">python_cell</text>
-<text x="24.40" y="570.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="58.00" y="570.00" fill="#7a8494" textLength="16.80" lengthAdjust="spacingAndGlyphs">4.</text>
-<text x="83.20" y="570.00" fill="#7a8494" textLength="33.60" lengthAdjust="spacingAndGlyphs" font-style="italic">Type</text>
-<text x="125.20" y="570.00" fill="#7a8494" textLength="33.60" lengthAdjust="spacingAndGlyphs" font-style="italic">your</text>
-<text x="167.20" y="570.00" fill="#7a8494" textLength="25.20" lengthAdjust="spacingAndGlyphs" font-style="italic">own</text>
-<text x="200.80" y="570.00" fill="#7a8494" textLength="58.80" lengthAdjust="spacingAndGlyphs" font-style="italic">answer…</text>
-<text x="839.20" y="570.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="856.00" y="570.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="872.80" y="570.00" fill="#2bd9c0" textLength="67.20" lengthAdjust="spacingAndGlyphs">fs_write</text>
-<text x="24.40" y="588.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="58.00" y="588.00" fill="#e9a227" textLength="16.80" lengthAdjust="spacingAndGlyphs" font-weight="700">↑↓</text>
-<text x="83.20" y="588.00" fill="#7a8494" textLength="33.60" lengthAdjust="spacingAndGlyphs">move</text>
-<text x="125.20" y="588.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="142.00" y="588.00" fill="#e9a227" textLength="42.00" lengthAdjust="spacingAndGlyphs" font-weight="700">space</text>
-<text x="192.40" y="588.00" fill="#7a8494" textLength="50.40" lengthAdjust="spacingAndGlyphs">select</text>
-<text x="251.20" y="588.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="268.00" y="588.00" fill="#e9a227" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">↵</text>
-<text x="284.80" y="588.00" fill="#7a8494" textLength="50.40" lengthAdjust="spacingAndGlyphs">submit</text>
-<text x="343.60" y="588.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="360.40" y="588.00" fill="#e9a227" textLength="25.20" lengthAdjust="spacingAndGlyphs" font-weight="700">1-9</text>
-<text x="394.00" y="588.00" fill="#7a8494" textLength="33.60" lengthAdjust="spacingAndGlyphs">jump</text>
-<text x="436.00" y="588.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="452.80" y="588.00" fill="#e9a227" textLength="25.20" lengthAdjust="spacingAndGlyphs" font-weight="700">esc</text>
-<text x="486.40" y="588.00" fill="#7a8494" textLength="50.40" lengthAdjust="spacingAndGlyphs">cancel</text>
-<text x="839.20" y="588.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="856.00" y="588.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="872.80" y="588.00" fill="#a78bfa" textLength="109.20" lengthAdjust="spacingAndGlyphs">data-analysis</text>
-<text x="24.40" y="606.00" fill="#222731" textLength="571.20" lengthAdjust="spacingAndGlyphs">├───────────────────────────────────────────────────────────────────</text>
-<text x="604.00" y="606.00" fill="#7a8494" textLength="50.40" lengthAdjust="spacingAndGlyphs">answer</text>
-<text x="662.80" y="606.00" fill="#7a8494" textLength="25.20" lengthAdjust="spacingAndGlyphs">the</text>
-<text x="696.40" y="606.00" fill="#7a8494" textLength="67.20" lengthAdjust="spacingAndGlyphs">question</text>
-<text x="772.00" y="606.00" fill="#7a8494" textLength="42.00" lengthAdjust="spacingAndGlyphs">above</text>
-<text x="822.40" y="606.00" fill="#222731" textLength="25.20" lengthAdjust="spacingAndGlyphs">──┤</text>
-<text x="856.00" y="606.00" fill="#3f4653" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="872.80" y="606.00" fill="#a78bfa" textLength="33.60" lengthAdjust="spacingAndGlyphs">xlsx</text>
-<text x="24.40" y="624.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="41.20" y="624.00" fill="#e32c40" textLength="8.40" lengthAdjust="spacingAndGlyphs">❯</text>
-<text x="66.40" y="624.00" fill="#7a8494" textLength="25.20" lengthAdjust="spacingAndGlyphs" font-style="italic">Ask</text>
-<text x="100.00" y="624.00" fill="#7a8494" textLength="75.60" lengthAdjust="spacingAndGlyphs" font-style="italic">anything,</text>
-<text x="184.00" y="624.00" fill="#7a8494" textLength="16.80" lengthAdjust="spacingAndGlyphs" font-style="italic">or</text>
-<text x="209.20" y="624.00" fill="#7a8494" textLength="67.20" lengthAdjust="spacingAndGlyphs" font-style="italic">describe</text>
-<text x="284.80" y="624.00" fill="#7a8494" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-style="italic">a</text>
-<text x="301.60" y="624.00" fill="#7a8494" textLength="42.00" lengthAdjust="spacingAndGlyphs" font-style="italic">task…</text>
-<text x="839.20" y="624.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="24.40" y="642.00" fill="#222731" textLength="823.20" lengthAdjust="spacingAndGlyphs">╰────────────────────────────────────────────────────────────────────────────────────────────────╯</text>
-<text x="32.80" y="678.00" fill="#7a8494" textLength="8.40" lengthAdjust="spacingAndGlyphs">○</text>
-<text x="49.60" y="678.00" fill="#7a8494" textLength="33.60" lengthAdjust="spacingAndGlyphs" font-weight="700">Idle</text>
-<text x="100.00" y="678.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="125.20" y="678.00" fill="#b8c0cb" textLength="16.80" lengthAdjust="spacingAndGlyphs">Q3</text>
-<text x="150.40" y="678.00" fill="#b8c0cb" textLength="58.80" lengthAdjust="spacingAndGlyphs">invoice</text>
-<text x="217.60" y="678.00" fill="#b8c0cb" textLength="58.80" lengthAdjust="spacingAndGlyphs">summary</text>
-<text x="394.00" y="678.00" fill="#7a8494" textLength="58.80" lengthAdjust="spacingAndGlyphs">Context</text>
-<text x="461.20" y="678.00" fill="#35cf8b" textLength="16.80" lengthAdjust="spacingAndGlyphs">━━</text>
-<text x="478.00" y="678.00" fill="#2e343f" textLength="50.40" lengthAdjust="spacingAndGlyphs">──────</text>
-<text x="536.80" y="678.00" fill="#ece8e0" textLength="84.00" lengthAdjust="spacingAndGlyphs" font-weight="700">41.2k/200k</text>
-<text x="629.20" y="678.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="646.00" y="678.00" fill="#7a8494" textLength="33.60" lengthAdjust="spacingAndGlyphs">Turn</text>
-<text x="688.00" y="678.00" fill="#ece8e0" textLength="16.80" lengthAdjust="spacingAndGlyphs" font-weight="700">09</text>
-<text x="713.20" y="678.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="730.00" y="678.00" fill="#7a8494" textLength="33.60" lengthAdjust="spacingAndGlyphs">Time</text>
-<text x="772.00" y="678.00" fill="#ece8e0" textLength="42.00" lengthAdjust="spacingAndGlyphs" font-weight="700">01:52</text>
-<text x="822.40" y="678.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="839.20" y="678.00" fill="#7a8494" textLength="50.40" lengthAdjust="spacingAndGlyphs">Tokens</text>
-<text x="898.00" y="678.00" fill="#ece8e0" textLength="84.00" lengthAdjust="spacingAndGlyphs" font-weight="700">18.4k/4.2k</text>
-<text x="990.40" y="678.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="1007.20" y="678.00" fill="#7a8494" textLength="33.60" lengthAdjust="spacingAndGlyphs">Cost</text>
-<text x="1049.20" y="678.00" fill="#ece8e0" textLength="58.80" lengthAdjust="spacingAndGlyphs" font-weight="700">$0.0241</text>
-<text x="32.80" y="696.00" fill="#e9a227" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">↵</text>
-<text x="49.60" y="696.00" fill="#7a8494" textLength="50.40" lengthAdjust="spacingAndGlyphs">answer</text>
-<text x="108.40" y="696.00" fill="#222731" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
-<text x="125.20" y="696.00" fill="#e9a227" textLength="25.20" lengthAdjust="spacingAndGlyphs" font-weight="700">esc</text>
-<text x="158.80" y="696.00" fill="#7a8494" textLength="58.80" lengthAdjust="spacingAndGlyphs">decline</text>
-<text x="1057.60" y="696.00" fill="#3f4653" textLength="50.40" lengthAdjust="spacingAndGlyphs">v1.4.1</text>
+<text x="32.80" y="30.00" fill="#4dff4d" textLength="75.60" lengthAdjust="spacingAndGlyphs" font-weight="700">MaskShift</text>
+<text x="116.80" y="30.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="133.60" y="30.00" fill="#2eaf2e" textLength="75.60" lengthAdjust="spacingAndGlyphs">Workspace</text>
+<text x="217.60" y="30.00" fill="#4dff4d" textLength="75.60" lengthAdjust="spacingAndGlyphs" font-weight="700">Documents</text>
+<text x="301.60" y="30.00" fill="#4dff4d" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">·</text>
+<text x="318.40" y="30.00" fill="#4dff4d" textLength="33.60" lengthAdjust="spacingAndGlyphs" font-weight="700">main</text>
+<text x="360.40" y="30.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="377.20" y="30.00" fill="#2eaf2e" textLength="42.00" lengthAdjust="spacingAndGlyphs">Model</text>
+<text x="427.60" y="30.00" fill="#4dff4d" textLength="92.40" lengthAdjust="spacingAndGlyphs" font-weight="700">ollama:auto</text>
+<text x="604.00" y="30.00" fill="#2eaf2e" textLength="33.60" lengthAdjust="spacingAndGlyphs">Mode</text>
+<text x="646.00" y="30.00" fill="#9dff9d" textLength="84.00" lengthAdjust="spacingAndGlyphs" font-weight="700">Autonomous</text>
+<text x="738.40" y="30.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="755.20" y="30.00" fill="#2eaf2e" textLength="42.00" lengthAdjust="spacingAndGlyphs">Tools</text>
+<text x="805.60" y="30.00" fill="#3ee03e" textLength="25.20" lengthAdjust="spacingAndGlyphs" font-weight="700">202</text>
+<text x="839.20" y="30.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="856.00" y="30.00" fill="#2eaf2e" textLength="50.40" lengthAdjust="spacingAndGlyphs">Skills</text>
+<text x="914.80" y="30.00" fill="#9dff9d" textLength="16.80" lengthAdjust="spacingAndGlyphs" font-weight="700">59</text>
+<text x="940.00" y="30.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="956.80" y="30.00" fill="#2eaf2e" textLength="25.20" lengthAdjust="spacingAndGlyphs">MCP</text>
+<text x="990.40" y="30.00" fill="#33c433" textLength="16.80" lengthAdjust="spacingAndGlyphs" font-weight="700">43</text>
+<text x="1015.60" y="30.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="1032.40" y="30.00" fill="#2eaf2e" textLength="8.40" lengthAdjust="spacingAndGlyphs">●</text>
+<text x="1049.20" y="30.00" fill="#2eaf2e" textLength="58.80" lengthAdjust="spacingAndGlyphs" font-weight="700">Offline</text>
+<rect x="32.80" y="34.00" width="8.40" height="18" fill="#4dff4d"/>
+<rect x="41.20" y="34.00" width="8.40" height="18" fill="#4dff4d"/>
+<text x="41.20" y="48.00" fill="#237823" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">1</text>
+<rect x="49.60" y="34.00" width="50.40" height="18" fill="#4dff4d"/>
+<text x="58.00" y="48.00" fill="#010a01" textLength="33.60" lengthAdjust="spacingAndGlyphs" font-weight="700">Chat</text>
+<text x="100.00" y="48.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="116.80" y="48.00" fill="#176017" textLength="8.40" lengthAdjust="spacingAndGlyphs">2</text>
+<text x="133.60" y="48.00" fill="#2eaf2e" textLength="42.00" lengthAdjust="spacingAndGlyphs">Files</text>
+<text x="184.00" y="48.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="200.80" y="48.00" fill="#176017" textLength="8.40" lengthAdjust="spacingAndGlyphs">3</text>
+<text x="217.60" y="48.00" fill="#2eaf2e" textLength="100.80" lengthAdjust="spacingAndGlyphs">Capabilities</text>
+<text x="326.80" y="48.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="343.60" y="48.00" fill="#176017" textLength="8.40" lengthAdjust="spacingAndGlyphs">4</text>
+<text x="360.40" y="48.00" fill="#2eaf2e" textLength="58.80" lengthAdjust="spacingAndGlyphs">Runtime</text>
+<text x="427.60" y="48.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="444.40" y="48.00" fill="#176017" textLength="8.40" lengthAdjust="spacingAndGlyphs">5</text>
+<text x="461.20" y="48.00" fill="#2eaf2e" textLength="58.80" lengthAdjust="spacingAndGlyphs">Browser</text>
+<text x="528.40" y="48.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="545.20" y="48.00" fill="#176017" textLength="8.40" lengthAdjust="spacingAndGlyphs">6</text>
+<text x="562.00" y="48.00" fill="#2eaf2e" textLength="25.20" lengthAdjust="spacingAndGlyphs">Git</text>
+<text x="595.60" y="48.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="612.40" y="48.00" fill="#176017" textLength="8.40" lengthAdjust="spacingAndGlyphs">7</text>
+<text x="629.20" y="48.00" fill="#2eaf2e" textLength="42.00" lengthAdjust="spacingAndGlyphs">Fleet</text>
+<text x="990.40" y="48.00" fill="#2eaf2e" textLength="58.80" lengthAdjust="spacingAndGlyphs">Sidebar</text>
+<text x="1057.60" y="48.00" fill="#3ee03e" textLength="50.40" lengthAdjust="spacingAndGlyphs" font-weight="700">Active</text>
+<text x="24.40" y="84.00" fill="#124012" textLength="16.80" lengthAdjust="spacingAndGlyphs">╭─</text>
+<text x="49.60" y="84.00" fill="#2eaf2e" textLength="16.80" lengthAdjust="spacingAndGlyphs">Q3</text>
+<text x="74.80" y="84.00" fill="#2eaf2e" textLength="58.80" lengthAdjust="spacingAndGlyphs">invoice</text>
+<text x="142.00" y="84.00" fill="#2eaf2e" textLength="58.80" lengthAdjust="spacingAndGlyphs">summary</text>
+<text x="209.20" y="84.00" fill="#124012" textLength="520.80" lengthAdjust="spacingAndGlyphs">──────────────────────────────────────────────────────────────</text>
+<text x="738.40" y="84.00" fill="#2eaf2e" textLength="8.40" lengthAdjust="spacingAndGlyphs">6</text>
+<text x="755.20" y="84.00" fill="#2eaf2e" textLength="67.20" lengthAdjust="spacingAndGlyphs">messages</text>
+<text x="830.80" y="84.00" fill="#124012" textLength="16.80" lengthAdjust="spacingAndGlyphs">─╮</text>
+<text x="856.00" y="84.00" fill="#2eaf2e" textLength="33.60" lengthAdjust="spacingAndGlyphs">Plan</text>
+<text x="898.00" y="84.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="914.80" y="84.00" fill="#c8ffc8" textLength="50.40" lengthAdjust="spacingAndGlyphs" font-weight="700" text-decoration="underline">Active</text>
+<text x="973.60" y="84.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="990.40" y="84.00" fill="#2eaf2e" textLength="50.40" lengthAdjust="spacingAndGlyphs">Events</text>
+<text x="24.40" y="102.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.20" y="102.00" fill="#43de43" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="58.00" y="102.00" fill="#4dff4d" textLength="42.00" lengthAdjust="spacingAndGlyphs">There</text>
+<text x="108.40" y="102.00" fill="#4dff4d" textLength="25.20" lengthAdjust="spacingAndGlyphs">are</text>
+<text x="142.00" y="102.00" fill="#4dff4d" textLength="16.80" lengthAdjust="spacingAndGlyphs">23</text>
+<text x="167.20" y="102.00" fill="#4dff4d" textLength="42.00" lengthAdjust="spacingAndGlyphs">PDFs.</text>
+<text x="217.60" y="102.00" fill="#4dff4d" textLength="8.40" lengthAdjust="spacingAndGlyphs">I</text>
+<text x="234.40" y="102.00" fill="#4dff4d" textLength="33.60" lengthAdjust="spacingAndGlyphs">will</text>
+<text x="276.40" y="102.00" fill="#4dff4d" textLength="58.80" lengthAdjust="spacingAndGlyphs">extract</text>
+<text x="343.60" y="102.00" fill="#4dff4d" textLength="25.20" lengthAdjust="spacingAndGlyphs">the</text>
+<text x="377.20" y="102.00" fill="#4dff4d" textLength="50.40" lengthAdjust="spacingAndGlyphs">vendor</text>
+<text x="436.00" y="102.00" fill="#4dff4d" textLength="25.20" lengthAdjust="spacingAndGlyphs">and</text>
+<text x="469.60" y="102.00" fill="#4dff4d" textLength="50.40" lengthAdjust="spacingAndGlyphs">amount</text>
+<text x="528.40" y="102.00" fill="#4dff4d" textLength="33.60" lengthAdjust="spacingAndGlyphs">from</text>
+<text x="570.40" y="102.00" fill="#4dff4d" textLength="33.60" lengthAdjust="spacingAndGlyphs">each</text>
+<text x="612.40" y="102.00" fill="#4dff4d" textLength="33.60" lengthAdjust="spacingAndGlyphs">one,</text>
+<text x="654.40" y="102.00" fill="#4dff4d" textLength="42.00" lengthAdjust="spacingAndGlyphs">check</text>
+<text x="704.80" y="102.00" fill="#4dff4d" textLength="33.60" lengthAdjust="spacingAndGlyphs">that</text>
+<text x="746.80" y="102.00" fill="#4dff4d" textLength="25.20" lengthAdjust="spacingAndGlyphs">the</text>
+<text x="822.40" y="102.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="839.20" y="102.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="856.00" y="102.00" fill="#3ee03e" textLength="58.80" lengthAdjust="spacingAndGlyphs">Context</text>
+<text x="1066.00" y="102.00" fill="#176017" textLength="42.00" lengthAdjust="spacingAndGlyphs">large</text>
+<text x="24.40" y="120.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.20" y="120.00" fill="#43de43" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="58.00" y="120.00" fill="#4dff4d" textLength="50.40" lengthAdjust="spacingAndGlyphs">totals</text>
+<text x="116.80" y="120.00" fill="#4dff4d" textLength="25.20" lengthAdjust="spacingAndGlyphs">add</text>
+<text x="150.40" y="120.00" fill="#4dff4d" textLength="25.20" lengthAdjust="spacingAndGlyphs">up,</text>
+<text x="184.00" y="120.00" fill="#4dff4d" textLength="25.20" lengthAdjust="spacingAndGlyphs">and</text>
+<text x="217.60" y="120.00" fill="#4dff4d" textLength="42.00" lengthAdjust="spacingAndGlyphs">write</text>
+<text x="268.00" y="120.00" fill="#4dff4d" textLength="25.20" lengthAdjust="spacingAndGlyphs">one</text>
+<text x="301.60" y="120.00" fill="#4dff4d" textLength="25.20" lengthAdjust="spacingAndGlyphs">row</text>
+<text x="335.20" y="120.00" fill="#4dff4d" textLength="25.20" lengthAdjust="spacingAndGlyphs">per</text>
+<text x="368.80" y="120.00" fill="#4dff4d" textLength="58.80" lengthAdjust="spacingAndGlyphs">vendor.</text>
+<text x="822.40" y="120.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="839.20" y="120.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="872.80" y="120.00" fill="#4dff4d" textLength="25.20" lengthAdjust="spacingAndGlyphs" font-weight="700">21%</text>
+<text x="1024.00" y="120.00" fill="#4dff4d" textLength="84.00" lengthAdjust="spacingAndGlyphs">41.2k/200k</text>
+<text x="24.40" y="138.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.20" y="138.00" fill="#43de43" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="822.40" y="138.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="839.20" y="138.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="872.80" y="138.00" fill="#4dff4d" textLength="50.40" lengthAdjust="spacingAndGlyphs">━━━━━━</text>
+<text x="923.20" y="138.00" fill="#176017" textLength="184.80" lengthAdjust="spacingAndGlyphs">──────────────────────</text>
+<text x="24.40" y="156.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.20" y="156.00" fill="#43de43" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="58.00" y="156.00" fill="#2eaf2e" textLength="8.40" lengthAdjust="spacingAndGlyphs">•</text>
+<text x="74.80" y="156.00" fill="#4dff4d" textLength="33.60" lengthAdjust="spacingAndGlyphs">list</text>
+<text x="116.80" y="156.00" fill="#4dff4d" textLength="25.20" lengthAdjust="spacingAndGlyphs">the</text>
+<text x="150.40" y="156.00" fill="#4dff4d" textLength="50.40" lengthAdjust="spacingAndGlyphs">folder</text>
+<text x="209.20" y="156.00" fill="#4dff4d" textLength="25.20" lengthAdjust="spacingAndGlyphs">and</text>
+<text x="242.80" y="156.00" fill="#4dff4d" textLength="33.60" lengthAdjust="spacingAndGlyphs">read</text>
+<text x="284.80" y="156.00" fill="#4dff4d" textLength="33.60" lengthAdjust="spacingAndGlyphs">each</text>
+<text x="326.80" y="156.00" fill="#4dff4d" textLength="58.80" lengthAdjust="spacingAndGlyphs">invoice</text>
+<text x="822.40" y="156.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="839.20" y="156.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="872.80" y="156.00" fill="#2eaf2e" textLength="50.40" lengthAdjust="spacingAndGlyphs">Window</text>
+<text x="931.60" y="156.00" fill="#2eaf2e" textLength="67.20" lengthAdjust="spacingAndGlyphs">reported</text>
+<text x="1007.20" y="156.00" fill="#2eaf2e" textLength="16.80" lengthAdjust="spacingAndGlyphs">by</text>
+<text x="1032.40" y="156.00" fill="#2eaf2e" textLength="25.20" lengthAdjust="spacingAndGlyphs">the</text>
+<text x="24.40" y="174.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.20" y="174.00" fill="#43de43" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="58.00" y="174.00" fill="#2eaf2e" textLength="8.40" lengthAdjust="spacingAndGlyphs">•</text>
+<text x="74.80" y="174.00" fill="#4dff4d" textLength="42.00" lengthAdjust="spacingAndGlyphs">group</text>
+<text x="125.20" y="174.00" fill="#4dff4d" textLength="25.20" lengthAdjust="spacingAndGlyphs">the</text>
+<text x="158.80" y="174.00" fill="#4dff4d" textLength="58.80" lengthAdjust="spacingAndGlyphs">amounts</text>
+<text x="226.00" y="174.00" fill="#4dff4d" textLength="16.80" lengthAdjust="spacingAndGlyphs">by</text>
+<text x="251.20" y="174.00" fill="#4dff4d" textLength="50.40" lengthAdjust="spacingAndGlyphs">vendor</text>
+<text x="822.40" y="174.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="839.20" y="174.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="872.80" y="174.00" fill="#2eaf2e" textLength="75.60" lengthAdjust="spacingAndGlyphs">provider.</text>
+<text x="956.80" y="174.00" fill="#2eaf2e" textLength="58.80" lengthAdjust="spacingAndGlyphs">Replies</text>
+<text x="1024.00" y="174.00" fill="#2eaf2e" textLength="16.80" lengthAdjust="spacingAndGlyphs">up</text>
+<text x="1049.20" y="174.00" fill="#2eaf2e" textLength="16.80" lengthAdjust="spacingAndGlyphs">to</text>
+<text x="24.40" y="192.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.20" y="192.00" fill="#43de43" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="58.00" y="192.00" fill="#2eaf2e" textLength="8.40" lengthAdjust="spacingAndGlyphs">•</text>
+<text x="74.80" y="192.00" fill="#4dff4d" textLength="42.00" lengthAdjust="spacingAndGlyphs">write</text>
+<rect x="125.20" y="178.00" width="159.60" height="18" fill="#0a1f0a"/>
+<text x="133.60" y="192.00" fill="#4dff4d" textLength="142.80" lengthAdjust="spacingAndGlyphs">q3-by-vendor.xlsx</text>
+<text x="293.20" y="192.00" fill="#4dff4d" textLength="25.20" lengthAdjust="spacingAndGlyphs">and</text>
+<text x="326.80" y="192.00" fill="#4dff4d" textLength="50.40" lengthAdjust="spacingAndGlyphs">verify</text>
+<text x="385.60" y="192.00" fill="#4dff4d" textLength="16.80" lengthAdjust="spacingAndGlyphs">it</text>
+<text x="410.80" y="192.00" fill="#4dff4d" textLength="16.80" lengthAdjust="spacingAndGlyphs">by</text>
+<text x="436.00" y="192.00" fill="#4dff4d" textLength="58.80" lengthAdjust="spacingAndGlyphs">reading</text>
+<text x="503.20" y="192.00" fill="#4dff4d" textLength="16.80" lengthAdjust="spacingAndGlyphs">it</text>
+<text x="528.40" y="192.00" fill="#4dff4d" textLength="33.60" lengthAdjust="spacingAndGlyphs">back</text>
+<text x="822.40" y="192.00" fill="#1a6a1a" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
+<text x="839.20" y="192.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="872.80" y="192.00" fill="#2eaf2e" textLength="42.00" lengthAdjust="spacingAndGlyphs">16.4k</text>
+<text x="923.20" y="192.00" fill="#2eaf2e" textLength="58.80" lengthAdjust="spacingAndGlyphs">tokens.</text>
+<text x="24.40" y="210.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.20" y="210.00" fill="#43de43" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="822.40" y="210.00" fill="#1a6a1a" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
+<text x="839.20" y="210.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="24.40" y="228.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.20" y="228.00" fill="#43de43" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="58.00" y="228.00" fill="#2eaf2e" textLength="50.40" lengthAdjust="spacingAndGlyphs">python</text>
+<text x="116.80" y="228.00" fill="#124012" textLength="697.20" lengthAdjust="spacingAndGlyphs">───────────────────────────────────────────────────────────────────────────────────</text>
+<text x="822.40" y="228.00" fill="#1a6a1a" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
+<text x="839.20" y="228.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="872.80" y="228.00" fill="#2eaf2e" textLength="42.00" lengthAdjust="spacingAndGlyphs">Tools</text>
+<text x="1049.20" y="228.00" fill="#3ee03e" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">4</text>
+<text x="1066.00" y="228.00" fill="#176017" textLength="8.40" lengthAdjust="spacingAndGlyphs">/</text>
+<text x="1082.80" y="228.00" fill="#176017" textLength="25.20" lengthAdjust="spacingAndGlyphs">202</text>
+<text x="24.40" y="246.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.20" y="246.00" fill="#43de43" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="58.00" y="246.00" fill="#176017" textLength="8.40" lengthAdjust="spacingAndGlyphs">1</text>
+<text x="74.80" y="246.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="91.60" y="246.00" fill="#4dff4d" textLength="50.40" lengthAdjust="spacingAndGlyphs">totals</text>
+<text x="150.40" y="246.00" fill="#33c433" textLength="8.40" lengthAdjust="spacingAndGlyphs">=</text>
+<text x="167.20" y="246.00" fill="#4dff4d" textLength="92.40" lengthAdjust="spacingAndGlyphs">defaultdict</text>
+<text x="259.60" y="246.00" fill="#33c433" textLength="8.40" lengthAdjust="spacingAndGlyphs">(</text>
+<text x="268.00" y="246.00" fill="#4dff4d" textLength="42.00" lengthAdjust="spacingAndGlyphs">float</text>
+<text x="310.00" y="246.00" fill="#33c433" textLength="8.40" lengthAdjust="spacingAndGlyphs">)</text>
+<text x="822.40" y="246.00" fill="#1a6a1a" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
+<text x="839.20" y="246.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="872.80" y="246.00" fill="#3ee03e" textLength="8.40" lengthAdjust="spacingAndGlyphs">━</text>
+<text x="881.20" y="246.00" fill="#176017" textLength="226.80" lengthAdjust="spacingAndGlyphs">───────────────────────────</text>
+<text x="24.40" y="264.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.20" y="264.00" fill="#43de43" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="58.00" y="264.00" fill="#176017" textLength="8.40" lengthAdjust="spacingAndGlyphs">2</text>
+<text x="74.80" y="264.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="91.60" y="264.00" fill="#9dff9d" textLength="25.20" lengthAdjust="spacingAndGlyphs" font-weight="700">for</text>
+<text x="125.20" y="264.00" fill="#4dff4d" textLength="58.80" lengthAdjust="spacingAndGlyphs">invoice</text>
+<text x="192.40" y="264.00" fill="#9dff9d" textLength="16.80" lengthAdjust="spacingAndGlyphs" font-weight="700">in</text>
+<text x="217.60" y="264.00" fill="#4dff4d" textLength="67.20" lengthAdjust="spacingAndGlyphs">invoices</text>
+<text x="284.80" y="264.00" fill="#33c433" textLength="8.40" lengthAdjust="spacingAndGlyphs">:</text>
+<text x="822.40" y="264.00" fill="#1a6a1a" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
+<text x="839.20" y="264.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="24.40" y="282.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.20" y="282.00" fill="#43de43" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="58.00" y="282.00" fill="#176017" textLength="8.40" lengthAdjust="spacingAndGlyphs">3</text>
+<text x="74.80" y="282.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="125.20" y="282.00" fill="#4dff4d" textLength="50.40" lengthAdjust="spacingAndGlyphs">totals</text>
+<text x="175.60" y="282.00" fill="#33c433" textLength="8.40" lengthAdjust="spacingAndGlyphs">[</text>
+<text x="184.00" y="282.00" fill="#4dff4d" textLength="58.80" lengthAdjust="spacingAndGlyphs">invoice</text>
+<text x="242.80" y="282.00" fill="#33c433" textLength="8.40" lengthAdjust="spacingAndGlyphs">.</text>
+<text x="251.20" y="282.00" fill="#4dff4d" textLength="50.40" lengthAdjust="spacingAndGlyphs">vendor</text>
+<text x="301.60" y="282.00" fill="#33c433" textLength="8.40" lengthAdjust="spacingAndGlyphs">]</text>
+<text x="318.40" y="282.00" fill="#33c433" textLength="16.80" lengthAdjust="spacingAndGlyphs">+=</text>
+<text x="343.60" y="282.00" fill="#4dff4d" textLength="58.80" lengthAdjust="spacingAndGlyphs">invoice</text>
+<text x="402.40" y="282.00" fill="#33c433" textLength="8.40" lengthAdjust="spacingAndGlyphs">.</text>
+<text x="410.80" y="282.00" fill="#4dff4d" textLength="50.40" lengthAdjust="spacingAndGlyphs">amount</text>
+<text x="822.40" y="282.00" fill="#1a6a1a" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
+<text x="839.20" y="282.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="872.80" y="282.00" fill="#2eaf2e" textLength="50.40" lengthAdjust="spacingAndGlyphs">Skills</text>
+<text x="1057.60" y="282.00" fill="#9dff9d" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">2</text>
+<text x="1074.40" y="282.00" fill="#176017" textLength="8.40" lengthAdjust="spacingAndGlyphs">/</text>
+<text x="1091.20" y="282.00" fill="#176017" textLength="16.80" lengthAdjust="spacingAndGlyphs">59</text>
+<text x="24.40" y="300.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.20" y="300.00" fill="#43de43" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="58.00" y="300.00" fill="#124012" textLength="756.00" lengthAdjust="spacingAndGlyphs">──────────────────────────────────────────────────────────────────────────────────────────</text>
+<text x="822.40" y="300.00" fill="#1a6a1a" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
+<text x="839.20" y="300.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="872.80" y="300.00" fill="#9dff9d" textLength="8.40" lengthAdjust="spacingAndGlyphs">━</text>
+<text x="881.20" y="300.00" fill="#176017" textLength="226.80" lengthAdjust="spacingAndGlyphs">───────────────────────────</text>
+<text x="24.40" y="318.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="822.40" y="318.00" fill="#1a6a1a" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
+<text x="839.20" y="318.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="24.40" y="336.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.20" y="336.00" fill="#4dff4d" textLength="8.40" lengthAdjust="spacingAndGlyphs">✓</text>
+<text x="58.00" y="336.00" fill="#3ee03e" textLength="58.80" lengthAdjust="spacingAndGlyphs" font-weight="700">fs_list</text>
+<text x="226.00" y="336.00" fill="#33c433" textLength="168.00" lengthAdjust="spacingAndGlyphs">~/Documents/Invoices</text>
+<text x="402.40" y="336.00" fill="#33c433" textLength="8.40" lengthAdjust="spacingAndGlyphs">—</text>
+<text x="419.20" y="336.00" fill="#33c433" textLength="16.80" lengthAdjust="spacingAndGlyphs">23</text>
+<text x="444.40" y="336.00" fill="#33c433" textLength="42.00" lengthAdjust="spacingAndGlyphs">files</text>
+<text x="822.40" y="336.00" fill="#1a6a1a" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
+<text x="839.20" y="336.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="872.80" y="336.00" fill="#2eaf2e" textLength="25.20" lengthAdjust="spacingAndGlyphs">MCP</text>
+<text x="1057.60" y="336.00" fill="#33c433" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">0</text>
+<text x="1074.40" y="336.00" fill="#176017" textLength="8.40" lengthAdjust="spacingAndGlyphs">/</text>
+<text x="1091.20" y="336.00" fill="#176017" textLength="16.80" lengthAdjust="spacingAndGlyphs">43</text>
+<text x="24.40" y="354.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.20" y="354.00" fill="#4dff4d" textLength="8.40" lengthAdjust="spacingAndGlyphs">✓</text>
+<text x="58.00" y="354.00" fill="#3ee03e" textLength="67.20" lengthAdjust="spacingAndGlyphs" font-weight="700">pdf_read</text>
+<text x="226.00" y="354.00" fill="#33c433" textLength="16.80" lengthAdjust="spacingAndGlyphs">23</text>
+<text x="251.20" y="354.00" fill="#33c433" textLength="67.20" lengthAdjust="spacingAndGlyphs">invoices</text>
+<text x="326.80" y="354.00" fill="#33c433" textLength="33.60" lengthAdjust="spacingAndGlyphs">read</text>
+<text x="368.80" y="354.00" fill="#33c433" textLength="8.40" lengthAdjust="spacingAndGlyphs">—</text>
+<text x="385.60" y="354.00" fill="#33c433" textLength="8.40" lengthAdjust="spacingAndGlyphs">2</text>
+<text x="402.40" y="354.00" fill="#33c433" textLength="50.40" lengthAdjust="spacingAndGlyphs">needed</text>
+<text x="461.20" y="354.00" fill="#33c433" textLength="25.20" lengthAdjust="spacingAndGlyphs">OCR</text>
+<text x="822.40" y="354.00" fill="#1a6a1a" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
+<text x="839.20" y="354.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="872.80" y="354.00" fill="#176017" textLength="235.20" lengthAdjust="spacingAndGlyphs">────────────────────────────</text>
+<text x="24.40" y="372.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.20" y="372.00" fill="#4dff4d" textLength="8.40" lengthAdjust="spacingAndGlyphs">✓</text>
+<text x="58.00" y="372.00" fill="#3ee03e" textLength="92.40" lengthAdjust="spacingAndGlyphs" font-weight="700">python_cell</text>
+<text x="226.00" y="372.00" fill="#33c433" textLength="8.40" lengthAdjust="spacingAndGlyphs">9</text>
+<text x="242.80" y="372.00" fill="#33c433" textLength="67.20" lengthAdjust="spacingAndGlyphs">vendors,</text>
+<text x="318.40" y="372.00" fill="#33c433" textLength="42.00" lengthAdjust="spacingAndGlyphs">total</text>
+<text x="368.80" y="372.00" fill="#33c433" textLength="84.00" lengthAdjust="spacingAndGlyphs">$48,215.60</text>
+<text x="461.20" y="372.00" fill="#33c433" textLength="8.40" lengthAdjust="spacingAndGlyphs">—</text>
+<text x="478.00" y="372.00" fill="#33c433" textLength="58.80" lengthAdjust="spacingAndGlyphs">matches</text>
+<text x="545.20" y="372.00" fill="#33c433" textLength="25.20" lengthAdjust="spacingAndGlyphs">the</text>
+<text x="578.80" y="372.00" fill="#33c433" textLength="25.20" lengthAdjust="spacingAndGlyphs">sum</text>
+<text x="612.40" y="372.00" fill="#33c433" textLength="16.80" lengthAdjust="spacingAndGlyphs">of</text>
+<text x="637.60" y="372.00" fill="#33c433" textLength="25.20" lengthAdjust="spacingAndGlyphs">the</text>
+<text x="671.20" y="372.00" fill="#33c433" textLength="67.20" lengthAdjust="spacingAndGlyphs">invoices</text>
+<text x="822.40" y="372.00" fill="#1a6a1a" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
+<text x="839.20" y="372.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="24.40" y="390.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="822.40" y="390.00" fill="#1a6a1a" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
+<text x="839.20" y="390.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="872.80" y="390.00" fill="#2eaf2e" textLength="75.60" lengthAdjust="spacingAndGlyphs">Subagents</text>
+<text x="1066.00" y="390.00" fill="#9dff9d" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">0</text>
+<text x="1082.80" y="390.00" fill="#176017" textLength="8.40" lengthAdjust="spacingAndGlyphs">/</text>
+<text x="1099.60" y="390.00" fill="#176017" textLength="8.40" lengthAdjust="spacingAndGlyphs">6</text>
+<text x="24.40" y="408.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.20" y="408.00" fill="#4dff4d" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
+<text x="58.00" y="408.00" fill="#4dff4d" textLength="75.60" lengthAdjust="spacingAndGlyphs" font-weight="700">MaskShift</text>
+<text x="763.60" y="408.00" fill="#176017" textLength="42.00" lengthAdjust="spacingAndGlyphs">02:04</text>
+<text x="822.40" y="408.00" fill="#1a6a1a" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
+<text x="839.20" y="408.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="872.80" y="408.00" fill="#176017" textLength="235.20" lengthAdjust="spacingAndGlyphs">────────────────────────────</text>
+<text x="24.40" y="426.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.20" y="426.00" fill="#43de43" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="58.00" y="426.00" fill="#4dff4d" textLength="42.00" lengthAdjust="spacingAndGlyphs">Done.</text>
+<rect x="108.40" y="412.00" width="159.60" height="18" fill="#0a1f0a"/>
+<text x="116.80" y="426.00" fill="#4dff4d" textLength="142.80" lengthAdjust="spacingAndGlyphs">q3-by-vendor.xlsx</text>
+<text x="276.40" y="426.00" fill="#4dff4d" textLength="25.20" lengthAdjust="spacingAndGlyphs">has</text>
+<text x="310.00" y="426.00" fill="#4dff4d" textLength="25.20" lengthAdjust="spacingAndGlyphs">one</text>
+<text x="343.60" y="426.00" fill="#4dff4d" textLength="25.20" lengthAdjust="spacingAndGlyphs">row</text>
+<text x="377.20" y="426.00" fill="#4dff4d" textLength="25.20" lengthAdjust="spacingAndGlyphs">per</text>
+<text x="410.80" y="426.00" fill="#4dff4d" textLength="50.40" lengthAdjust="spacingAndGlyphs">vendor</text>
+<text x="469.60" y="426.00" fill="#4dff4d" textLength="16.80" lengthAdjust="spacingAndGlyphs">(9</text>
+<text x="494.80" y="426.00" fill="#4dff4d" textLength="16.80" lengthAdjust="spacingAndGlyphs">in</text>
+<text x="520.00" y="426.00" fill="#4dff4d" textLength="50.40" lengthAdjust="spacingAndGlyphs">total)</text>
+<text x="578.80" y="426.00" fill="#4dff4d" textLength="25.20" lengthAdjust="spacingAndGlyphs">and</text>
+<text x="612.40" y="426.00" fill="#4dff4d" textLength="8.40" lengthAdjust="spacingAndGlyphs">a</text>
+<text x="629.20" y="426.00" fill="#4dff4d" textLength="42.00" lengthAdjust="spacingAndGlyphs">total</text>
+<text x="679.60" y="426.00" fill="#4dff4d" textLength="16.80" lengthAdjust="spacingAndGlyphs">of</text>
+<text x="704.80" y="426.00" fill="#4dff4d" textLength="92.40" lengthAdjust="spacingAndGlyphs">$48,215.60.</text>
+<text x="805.60" y="426.00" fill="#4dff4d" textLength="8.40" lengthAdjust="spacingAndGlyphs">I</text>
+<text x="822.40" y="426.00" fill="#1a6a1a" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
+<text x="839.20" y="426.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="24.40" y="444.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.20" y="444.00" fill="#43de43" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="58.00" y="444.00" fill="#4dff4d" textLength="75.60" lengthAdjust="spacingAndGlyphs">re-opened</text>
+<text x="142.00" y="444.00" fill="#4dff4d" textLength="25.20" lengthAdjust="spacingAndGlyphs">the</text>
+<text x="175.60" y="444.00" fill="#4dff4d" textLength="33.60" lengthAdjust="spacingAndGlyphs">file</text>
+<text x="217.60" y="444.00" fill="#4dff4d" textLength="16.80" lengthAdjust="spacingAndGlyphs">to</text>
+<text x="242.80" y="444.00" fill="#4dff4d" textLength="58.80" lengthAdjust="spacingAndGlyphs">confirm</text>
+<text x="310.00" y="444.00" fill="#4dff4d" textLength="25.20" lengthAdjust="spacingAndGlyphs">the</text>
+<text x="343.60" y="444.00" fill="#4dff4d" textLength="50.40" lengthAdjust="spacingAndGlyphs">totals</text>
+<text x="402.40" y="444.00" fill="#4dff4d" textLength="42.00" lengthAdjust="spacingAndGlyphs">match</text>
+<text x="452.80" y="444.00" fill="#4dff4d" textLength="25.20" lengthAdjust="spacingAndGlyphs">the</text>
+<text x="486.40" y="444.00" fill="#4dff4d" textLength="75.60" lengthAdjust="spacingAndGlyphs">invoices.</text>
+<text x="570.40" y="444.00" fill="#4dff4d" textLength="25.20" lengthAdjust="spacingAndGlyphs">Two</text>
+<text x="604.00" y="444.00" fill="#4dff4d" textLength="42.00" lengthAdjust="spacingAndGlyphs">scans</text>
+<text x="654.40" y="444.00" fill="#4dff4d" textLength="33.60" lengthAdjust="spacingAndGlyphs">were</text>
+<text x="696.40" y="444.00" fill="#4dff4d" textLength="25.20" lengthAdjust="spacingAndGlyphs">low</text>
+<text x="730.00" y="444.00" fill="#4dff4d" textLength="67.20" lengthAdjust="spacingAndGlyphs">quality,</text>
+<text x="822.40" y="444.00" fill="#1a6a1a" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
+<text x="839.20" y="444.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="856.00" y="444.00" fill="#3ee03e" textLength="42.00" lengthAdjust="spacingAndGlyphs">Token</text>
+<text x="906.40" y="444.00" fill="#3ee03e" textLength="33.60" lengthAdjust="spacingAndGlyphs">flow</text>
+<text x="24.40" y="462.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.20" y="462.00" fill="#43de43" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="58.00" y="462.00" fill="#4dff4d" textLength="16.80" lengthAdjust="spacingAndGlyphs">so</text>
+<text x="83.20" y="462.00" fill="#4dff4d" textLength="8.40" lengthAdjust="spacingAndGlyphs">I</text>
+<text x="100.00" y="462.00" fill="#4dff4d" textLength="50.40" lengthAdjust="spacingAndGlyphs">listed</text>
+<text x="158.80" y="462.00" fill="#4dff4d" textLength="33.60" lengthAdjust="spacingAndGlyphs">them</text>
+<text x="200.80" y="462.00" fill="#4dff4d" textLength="16.80" lengthAdjust="spacingAndGlyphs">on</text>
+<text x="226.00" y="462.00" fill="#4dff4d" textLength="8.40" lengthAdjust="spacingAndGlyphs">a</text>
+<text x="242.80" y="462.00" fill="#4dff4d" textLength="50.40" lengthAdjust="spacingAndGlyphs">second</text>
+<text x="301.60" y="462.00" fill="#4dff4d" textLength="42.00" lengthAdjust="spacingAndGlyphs">sheet</text>
+<text x="352.00" y="462.00" fill="#4dff4d" textLength="25.20" lengthAdjust="spacingAndGlyphs">for</text>
+<text x="385.60" y="462.00" fill="#4dff4d" textLength="25.20" lengthAdjust="spacingAndGlyphs">you</text>
+<text x="419.20" y="462.00" fill="#4dff4d" textLength="16.80" lengthAdjust="spacingAndGlyphs">to</text>
+<text x="444.40" y="462.00" fill="#4dff4d" textLength="109.20" lengthAdjust="spacingAndGlyphs">double-check.</text>
+<text x="822.40" y="462.00" fill="#1a6a1a" textLength="8.40" lengthAdjust="spacingAndGlyphs">▌</text>
+<text x="839.20" y="462.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="872.80" y="462.00" fill="#9dff9d" textLength="84.00" lengthAdjust="spacingAndGlyphs">▁▄▂▇▄█▃▆▄▇</text>
+<text x="24.40" y="480.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<rect x="58.00" y="466.00" width="126.00" height="18" fill="#9dff9d"/>
+<text x="74.80" y="480.00" fill="#010a01" textLength="92.40" lengthAdjust="spacingAndGlyphs" font-weight="700">Restaurants</text>
+<text x="839.20" y="480.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="24.40" y="498.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="58.00" y="498.00" fill="#4dff4d" textLength="42.00" lengthAdjust="spacingAndGlyphs" font-weight="700">Which</text>
+<text x="108.40" y="498.00" fill="#4dff4d" textLength="92.40" lengthAdjust="spacingAndGlyphs" font-weight="700">restaurants</text>
+<text x="209.20" y="498.00" fill="#4dff4d" textLength="50.40" lengthAdjust="spacingAndGlyphs" font-weight="700">should</text>
+<text x="268.00" y="498.00" fill="#4dff4d" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">I</text>
+<text x="284.80" y="498.00" fill="#4dff4d" textLength="67.20" lengthAdjust="spacingAndGlyphs" font-weight="700">compare?</text>
+<text x="839.20" y="498.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="856.00" y="498.00" fill="#3ee03e" textLength="50.40" lengthAdjust="spacingAndGlyphs">Active</text>
+<text x="914.80" y="498.00" fill="#3ee03e" textLength="42.00" lengthAdjust="spacingAndGlyphs">tools</text>
+<text x="1099.60" y="498.00" fill="#176017" textLength="8.40" lengthAdjust="spacingAndGlyphs">6</text>
+<text x="24.40" y="516.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<rect x="41.20" y="502.00" width="8.40" height="18" fill="#0e300e"/>
+<text x="41.20" y="516.00" fill="#9dff9d" textLength="8.40" lengthAdjust="spacingAndGlyphs">❯</text>
+<rect x="49.60" y="502.00" width="8.40" height="18" fill="#0e300e"/>
+<rect x="58.00" y="502.00" width="25.20" height="18" fill="#0e300e"/>
+<text x="58.00" y="516.00" fill="#9dff9d" textLength="16.80" lengthAdjust="spacingAndGlyphs">1.</text>
+<rect x="83.20" y="502.00" width="126.00" height="18" fill="#0e300e"/>
+<text x="83.20" y="516.00" fill="#4dff4d" textLength="25.20" lengthAdjust="spacingAndGlyphs" font-weight="700">[✓]</text>
+<text x="116.80" y="516.00" fill="#4dff4d" textLength="42.00" lengthAdjust="spacingAndGlyphs" font-weight="700">Luigi</text>
+<text x="167.20" y="516.00" fill="#4dff4d" textLength="42.00" lengthAdjust="spacingAndGlyphs" font-weight="700">Pizza</text>
+<rect x="209.20" y="502.00" width="327.60" height="18" fill="#0e300e"/>
+<text x="226.00" y="516.00" fill="#2eaf2e" textLength="42.00" lengthAdjust="spacingAndGlyphs">$2.99</text>
+<text x="276.40" y="516.00" fill="#2eaf2e" textLength="67.20" lengthAdjust="spacingAndGlyphs">delivery</text>
+<text x="360.40" y="516.00" fill="#2eaf2e" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="385.60" y="516.00" fill="#2eaf2e" textLength="33.60" lengthAdjust="spacingAndGlyphs">4.5★</text>
+<text x="436.00" y="516.00" fill="#2eaf2e" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="461.20" y="516.00" fill="#2eaf2e" textLength="42.00" lengthAdjust="spacingAndGlyphs">20–30</text>
+<text x="511.60" y="516.00" fill="#2eaf2e" textLength="25.20" lengthAdjust="spacingAndGlyphs">min</text>
+<rect x="536.80" y="502.00" width="285.60" height="18" fill="#0e300e"/>
+<text x="830.80" y="516.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="847.60" y="516.00" fill="#176017" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="864.40" y="516.00" fill="#3ee03e" textLength="58.80" lengthAdjust="spacingAndGlyphs">fs_list</text>
+<text x="24.40" y="534.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="58.00" y="534.00" fill="#2eaf2e" textLength="16.80" lengthAdjust="spacingAndGlyphs">2.</text>
+<text x="83.20" y="534.00" fill="#4dff4d" textLength="8.40" lengthAdjust="spacingAndGlyphs">[</text>
+<text x="100.00" y="534.00" fill="#4dff4d" textLength="8.40" lengthAdjust="spacingAndGlyphs">]</text>
+<text x="116.80" y="534.00" fill="#4dff4d" textLength="42.00" lengthAdjust="spacingAndGlyphs">Sushi</text>
+<text x="167.20" y="534.00" fill="#4dff4d" textLength="16.80" lengthAdjust="spacingAndGlyphs">Go</text>
+<text x="200.80" y="534.00" fill="#2eaf2e" textLength="42.00" lengthAdjust="spacingAndGlyphs">$1.99</text>
+<text x="251.20" y="534.00" fill="#2eaf2e" textLength="67.20" lengthAdjust="spacingAndGlyphs">delivery</text>
+<text x="335.20" y="534.00" fill="#2eaf2e" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="360.40" y="534.00" fill="#2eaf2e" textLength="33.60" lengthAdjust="spacingAndGlyphs">4.7★</text>
+<text x="410.80" y="534.00" fill="#2eaf2e" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="436.00" y="534.00" fill="#2eaf2e" textLength="42.00" lengthAdjust="spacingAndGlyphs">30–40</text>
+<text x="486.40" y="534.00" fill="#2eaf2e" textLength="25.20" lengthAdjust="spacingAndGlyphs">min</text>
+<text x="830.80" y="534.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="847.60" y="534.00" fill="#176017" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="864.40" y="534.00" fill="#3ee03e" textLength="67.20" lengthAdjust="spacingAndGlyphs">pdf_read</text>
+<text x="24.40" y="552.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="58.00" y="552.00" fill="#2eaf2e" textLength="16.80" lengthAdjust="spacingAndGlyphs">3.</text>
+<text x="83.20" y="552.00" fill="#4dff4d" textLength="8.40" lengthAdjust="spacingAndGlyphs">[</text>
+<text x="100.00" y="552.00" fill="#4dff4d" textLength="8.40" lengthAdjust="spacingAndGlyphs">]</text>
+<text x="116.80" y="552.00" fill="#4dff4d" textLength="33.60" lengthAdjust="spacingAndGlyphs">Taco</text>
+<text x="158.80" y="552.00" fill="#4dff4d" textLength="33.60" lengthAdjust="spacingAndGlyphs">Town</text>
+<text x="209.20" y="552.00" fill="#2eaf2e" textLength="33.60" lengthAdjust="spacingAndGlyphs">Free</text>
+<text x="251.20" y="552.00" fill="#2eaf2e" textLength="67.20" lengthAdjust="spacingAndGlyphs">delivery</text>
+<text x="335.20" y="552.00" fill="#2eaf2e" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="360.40" y="552.00" fill="#2eaf2e" textLength="33.60" lengthAdjust="spacingAndGlyphs">4.2★</text>
+<text x="410.80" y="552.00" fill="#2eaf2e" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="436.00" y="552.00" fill="#2eaf2e" textLength="42.00" lengthAdjust="spacingAndGlyphs">15–25</text>
+<text x="486.40" y="552.00" fill="#2eaf2e" textLength="25.20" lengthAdjust="spacingAndGlyphs">min</text>
+<text x="830.80" y="552.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="847.60" y="552.00" fill="#176017" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="864.40" y="552.00" fill="#3ee03e" textLength="92.40" lengthAdjust="spacingAndGlyphs">python_cell</text>
+<text x="24.40" y="570.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="58.00" y="570.00" fill="#2eaf2e" textLength="16.80" lengthAdjust="spacingAndGlyphs">4.</text>
+<text x="83.20" y="570.00" fill="#2eaf2e" textLength="33.60" lengthAdjust="spacingAndGlyphs" font-style="italic">Type</text>
+<text x="125.20" y="570.00" fill="#2eaf2e" textLength="33.60" lengthAdjust="spacingAndGlyphs" font-style="italic">your</text>
+<text x="167.20" y="570.00" fill="#2eaf2e" textLength="25.20" lengthAdjust="spacingAndGlyphs" font-style="italic">own</text>
+<text x="200.80" y="570.00" fill="#2eaf2e" textLength="58.80" lengthAdjust="spacingAndGlyphs" font-style="italic">answer…</text>
+<text x="839.20" y="570.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="856.00" y="570.00" fill="#176017" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="872.80" y="570.00" fill="#3ee03e" textLength="67.20" lengthAdjust="spacingAndGlyphs">fs_write</text>
+<text x="24.40" y="588.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="58.00" y="588.00" fill="#9dff9d" textLength="16.80" lengthAdjust="spacingAndGlyphs" font-weight="700">↑↓</text>
+<text x="83.20" y="588.00" fill="#2eaf2e" textLength="33.60" lengthAdjust="spacingAndGlyphs">move</text>
+<text x="125.20" y="588.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="142.00" y="588.00" fill="#9dff9d" textLength="42.00" lengthAdjust="spacingAndGlyphs" font-weight="700">space</text>
+<text x="192.40" y="588.00" fill="#2eaf2e" textLength="50.40" lengthAdjust="spacingAndGlyphs">select</text>
+<text x="251.20" y="588.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="268.00" y="588.00" fill="#9dff9d" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">↵</text>
+<text x="284.80" y="588.00" fill="#2eaf2e" textLength="50.40" lengthAdjust="spacingAndGlyphs">submit</text>
+<text x="343.60" y="588.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="360.40" y="588.00" fill="#9dff9d" textLength="25.20" lengthAdjust="spacingAndGlyphs" font-weight="700">1-9</text>
+<text x="394.00" y="588.00" fill="#2eaf2e" textLength="33.60" lengthAdjust="spacingAndGlyphs">jump</text>
+<text x="436.00" y="588.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="452.80" y="588.00" fill="#9dff9d" textLength="25.20" lengthAdjust="spacingAndGlyphs" font-weight="700">esc</text>
+<text x="486.40" y="588.00" fill="#2eaf2e" textLength="50.40" lengthAdjust="spacingAndGlyphs">cancel</text>
+<text x="839.20" y="588.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="856.00" y="588.00" fill="#176017" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="872.80" y="588.00" fill="#9dff9d" textLength="109.20" lengthAdjust="spacingAndGlyphs">data-analysis</text>
+<text x="24.40" y="606.00" fill="#124012" textLength="571.20" lengthAdjust="spacingAndGlyphs">├───────────────────────────────────────────────────────────────────</text>
+<text x="604.00" y="606.00" fill="#2eaf2e" textLength="50.40" lengthAdjust="spacingAndGlyphs">answer</text>
+<text x="662.80" y="606.00" fill="#2eaf2e" textLength="25.20" lengthAdjust="spacingAndGlyphs">the</text>
+<text x="696.40" y="606.00" fill="#2eaf2e" textLength="67.20" lengthAdjust="spacingAndGlyphs">question</text>
+<text x="772.00" y="606.00" fill="#2eaf2e" textLength="42.00" lengthAdjust="spacingAndGlyphs">above</text>
+<text x="822.40" y="606.00" fill="#124012" textLength="25.20" lengthAdjust="spacingAndGlyphs">──┤</text>
+<text x="856.00" y="606.00" fill="#176017" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="872.80" y="606.00" fill="#9dff9d" textLength="33.60" lengthAdjust="spacingAndGlyphs">xlsx</text>
+<text x="24.40" y="624.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.20" y="624.00" fill="#4dff4d" textLength="8.40" lengthAdjust="spacingAndGlyphs">❯</text>
+<text x="66.40" y="624.00" fill="#2eaf2e" textLength="25.20" lengthAdjust="spacingAndGlyphs" font-style="italic">Ask</text>
+<text x="100.00" y="624.00" fill="#2eaf2e" textLength="75.60" lengthAdjust="spacingAndGlyphs" font-style="italic">anything,</text>
+<text x="184.00" y="624.00" fill="#2eaf2e" textLength="16.80" lengthAdjust="spacingAndGlyphs" font-style="italic">or</text>
+<text x="209.20" y="624.00" fill="#2eaf2e" textLength="67.20" lengthAdjust="spacingAndGlyphs" font-style="italic">describe</text>
+<text x="284.80" y="624.00" fill="#2eaf2e" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-style="italic">a</text>
+<text x="301.60" y="624.00" fill="#2eaf2e" textLength="42.00" lengthAdjust="spacingAndGlyphs" font-style="italic">task…</text>
+<text x="839.20" y="624.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="24.40" y="642.00" fill="#124012" textLength="823.20" lengthAdjust="spacingAndGlyphs">╰────────────────────────────────────────────────────────────────────────────────────────────────╯</text>
+<text x="32.80" y="678.00" fill="#2eaf2e" textLength="8.40" lengthAdjust="spacingAndGlyphs">○</text>
+<text x="49.60" y="678.00" fill="#2eaf2e" textLength="33.60" lengthAdjust="spacingAndGlyphs" font-weight="700">Idle</text>
+<text x="100.00" y="678.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="125.20" y="678.00" fill="#3ee03e" textLength="16.80" lengthAdjust="spacingAndGlyphs">Q3</text>
+<text x="150.40" y="678.00" fill="#3ee03e" textLength="58.80" lengthAdjust="spacingAndGlyphs">invoice</text>
+<text x="217.60" y="678.00" fill="#3ee03e" textLength="58.80" lengthAdjust="spacingAndGlyphs">summary</text>
+<text x="394.00" y="678.00" fill="#2eaf2e" textLength="58.80" lengthAdjust="spacingAndGlyphs">Context</text>
+<text x="461.20" y="678.00" fill="#4dff4d" textLength="16.80" lengthAdjust="spacingAndGlyphs">━━</text>
+<text x="478.00" y="678.00" fill="#176017" textLength="50.40" lengthAdjust="spacingAndGlyphs">──────</text>
+<text x="536.80" y="678.00" fill="#4dff4d" textLength="84.00" lengthAdjust="spacingAndGlyphs" font-weight="700">41.2k/200k</text>
+<text x="629.20" y="678.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="646.00" y="678.00" fill="#2eaf2e" textLength="33.60" lengthAdjust="spacingAndGlyphs">Turn</text>
+<text x="688.00" y="678.00" fill="#4dff4d" textLength="16.80" lengthAdjust="spacingAndGlyphs" font-weight="700">09</text>
+<text x="713.20" y="678.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="730.00" y="678.00" fill="#2eaf2e" textLength="33.60" lengthAdjust="spacingAndGlyphs">Time</text>
+<text x="772.00" y="678.00" fill="#4dff4d" textLength="42.00" lengthAdjust="spacingAndGlyphs" font-weight="700">01:52</text>
+<text x="822.40" y="678.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="839.20" y="678.00" fill="#2eaf2e" textLength="50.40" lengthAdjust="spacingAndGlyphs">Tokens</text>
+<text x="898.00" y="678.00" fill="#4dff4d" textLength="84.00" lengthAdjust="spacingAndGlyphs" font-weight="700">18.4k/4.2k</text>
+<text x="990.40" y="678.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="1007.20" y="678.00" fill="#2eaf2e" textLength="33.60" lengthAdjust="spacingAndGlyphs">Cost</text>
+<text x="1049.20" y="678.00" fill="#4dff4d" textLength="58.80" lengthAdjust="spacingAndGlyphs" font-weight="700">$0.0241</text>
+<text x="32.80" y="696.00" fill="#9dff9d" textLength="8.40" lengthAdjust="spacingAndGlyphs" font-weight="700">↵</text>
+<text x="49.60" y="696.00" fill="#2eaf2e" textLength="50.40" lengthAdjust="spacingAndGlyphs">answer</text>
+<text x="108.40" y="696.00" fill="#124012" textLength="8.40" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="125.20" y="696.00" fill="#9dff9d" textLength="25.20" lengthAdjust="spacingAndGlyphs" font-weight="700">esc</text>
+<text x="158.80" y="696.00" fill="#2eaf2e" textLength="58.80" lengthAdjust="spacingAndGlyphs">decline</text>
+<text x="1057.60" y="696.00" fill="#176017" textLength="50.40" lengthAdjust="spacingAndGlyphs">v1.4.1</text>
 </g></svg>

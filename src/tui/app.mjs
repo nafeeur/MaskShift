@@ -20,7 +20,7 @@ import { RAIL_TABS } from './rail.mjs';
 import { LAYER, Regions } from './regions.mjs';
 import { renderMarkdown } from './markdown.mjs';
 import { Screen } from './screen.mjs';
-import { Theme, listThemes } from './theme.mjs';
+import { Theme } from './theme.mjs';
 import { fit, oneLine, truncate, visibleWidth, wrap } from './text.mjs';
 import { Composer, ListView, Spinner, TextField, Toasts, Viewport } from './widgets.mjs';
 import { columns, gutter, key as typeKey, label as sectionLabel } from './type.mjs';
@@ -86,7 +86,6 @@ const SLASH_COMMANDS = [
   { name: 'skills', hint: 'browse skills' },
   { name: 'mcp', hint: 'manage MCP servers' },
   { name: 'runtime', hint: 'open runtime: automations, processes, browser instances' },
-  { name: 'themes', hint: 'switch colour theme' },
   { name: 'files', hint: 'browse files' },
   { name: 'terminal', hint: 'open terminal' },
   { name: 'browser', hint: 'watch and control a browser tab' },
@@ -116,7 +115,6 @@ export class MaskShiftTui {
       // in the preferences must not quietly override it.
       ...(preferences.colorDepth === null || preferences.colorDepth === undefined || noColorRequested() ? {} : { depth: Number(preferences.colorDepth) }),
       ...(preferences.unicode === null || preferences.unicode === undefined ? {} : { unicode: Boolean(preferences.unicode) }),
-      ...(preferences.themeId ? { themeId: preferences.themeId } : {}),
     });
     // A headless render is a still: every clock-driven part of the interface
     // freezes together so a captured frame is reproducible byte for byte.
@@ -2635,29 +2633,6 @@ export class MaskShiftTui {
     });
   }
 
-  openThemePicker() {
-    const items = listThemes().map((entry) => ({
-      id: entry.id,
-      label: entry.name,
-      tone: entry.id === this.theme.themeId ? this.theme.roles.primary : undefined,
-    }));
-    this.overlay = new PickerOverlay({
-      title: 'Choose theme',
-      placeholder: 'Filter themes…',
-      items,
-      selectedId: this.theme.themeId,
-      onSelect: (item) => void this.setTheme(item.id, item.label),
-    });
-  }
-
-  async setTheme(themeId, name) {
-    this.theme.setTheme(themeId);
-    const ui = { ...(this.runtime.config.get().ui || {}), themeId };
-    await this.runtime.config.update({ ui });
-    this.toast(`Theme: ${name || themeId}`, 'success');
-    this.requestRender();
-  }
-
   openWorkspaceDialog({ force = false } = {}) {
     if (!force && (this.busy || this.composer.value || this.promptQueue.length)) {
       this.overlay = new ConfirmOverlay({
@@ -2954,7 +2929,6 @@ export class MaskShiftTui {
       action('git.commit', 'git', 'Commit staged changes'),
       action('git.refresh', 'git', 'Refresh git view'),
       action('mouse.cycle', 'system', 'Mouse: click / click + hover / off'),
-      action('theme.pick', 'system', 'Change colour theme'),
       action('permission.cycle', 'system', 'Cycle the permission mode'),
       action('doctor', 'system', 'Run diagnostics'),
       action('settings', 'system', 'Settings', 'f2'),
@@ -2978,7 +2952,6 @@ export class MaskShiftTui {
       case 'run.undo': void this.openUndoLastRun(); break;
       case 'voice.capture': await this.startVoiceCapture(); break;
       case 'model.pick': this.openModelPicker(); break;
-      case 'theme.pick': this.openThemePicker(); break;
       case 'model.discover': await this.discoverProviders(); this.toast('Providers re-discovered', 'success'); break;
       case 'workspace.open': this.openWorkspaceDialog(); break;
       case 'workspace.index': void this.reindex(); break;
@@ -3306,7 +3279,7 @@ export class MaskShiftTui {
 
   async refreshCustomCommands() {
     if (!this.workspace) return [];
-    const reserved = new Set(SLASH_COMMANDS.map((entry) => entry.name).concat(['theme', 'exit']));
+    const reserved = new Set(SLASH_COMMANDS.map((entry) => entry.name).concat(['exit']));
     this.customCommands = await loadCustomCommands(commandDirectories(this.workspace.path, this.runtime.config.get().home), reserved)
       .catch(() => []);
     return this.customCommands;
@@ -3424,7 +3397,6 @@ export class MaskShiftTui {
       case 'skills': this.switchView(2); this.capabilitiesTab = 'skills'; if (argument) this.capabilitiesFilter.set(argument); break;
       case 'mcp': this.switchView(2); this.capabilitiesTab = 'mcp'; if (argument) this.capabilitiesFilter.set(argument); break;
       case 'runtime': case 'mods': this.switchView(3); break;
-      case 'themes': case 'theme': this.openThemePicker(); break;
       case 'files': this.switchView(1); break;
       case 'terminal': this.switchView(3); break;
       case 'browser': this.switchView(4); this.openBrowserTargetPicker(); break;

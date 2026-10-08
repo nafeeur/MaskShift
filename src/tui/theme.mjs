@@ -1,15 +1,13 @@
-// MaskShift terminal theme.
+// MaskShift terminal theme (green phosphor).
 //
 // The palette itself lives in tokens.mjs; this file is the renderer that puts
 // it on the wire, degrading truecolor to 256 and 16 colours so the identity
 // survives on any terminal. Nothing here decides what a colour means.
 
 import { Motion } from './motion.mjs';
-import { NEUTRAL, PALETTE, ROLES, SIGNAL, BRAND } from './tokens.mjs';
-import { DEFAULT_THEME_ID, resolveTheme, resolveThemeId } from './themes.mjs';
+import { PALETTE, ROLES, SIGNAL_STYLE } from './tokens.mjs';
 
-export { PALETTE, ROLES, NEUTRAL, BRAND, SIGNAL };
-export { DEFAULT_THEME_ID, listThemes, resolveThemeId } from './themes.mjs';
+export { PALETTE, ROLES };
 
 export const ESC = String.fromCharCode(27);
 const CSI = `${ESC}[`;
@@ -92,30 +90,16 @@ export function supportsUnicode() {
 }
 
 export class Theme {
-  constructor({ depth = detectDepth(), unicode = supportsUnicode(), motion = null, frozen = false, themeId = DEFAULT_THEME_ID } = {}) {
+  constructor({ depth = detectDepth(), unicode = supportsUnicode(), motion = null, frozen = false } = {}) {
     this.depth = depth;
     this.unicode = unicode;
-    // Always the original MaskShift brand palette, regardless of the selected theme — a handful
-    // of call sites (and one test) reach for a plain, known-good hex value off it rather than a
-    // themed role, and have no reason to change colour when the user switches themes.
     this.palette = PALETTE;
-    this.themeId = resolveThemeId(themeId);
-    const resolved = resolveTheme(this.themeId);
-    this.roles = resolved.roles;
-    this.signalStyle = resolved.signalStyle || {};
+    this.roles = ROLES;
+    this.signalStyle = SIGNAL_STYLE;
     // Animations read the clock through the theme so a headless render can
     // freeze every moving part at once.
     this.motion = motion || new Motion({ frozen });
     this.mixCache = new Map();
-  }
-
-  /** Swaps the active role palette in place — every existing reference to this Theme instance
-   *  (the screen, every widget, every view) picks it up on its next paint with no other wiring. */
-  setTheme(themeId) {
-    this.themeId = resolveThemeId(themeId);
-    const resolved = resolveTheme(this.themeId);
-    this.roles = resolved.roles;
-    this.signalStyle = resolved.signalStyle || {};
   }
 
   get enabled() { return this.depth > 0; }
@@ -208,7 +192,7 @@ export class Theme {
       : { ...options, ...rest, fg: hex };
   }
 
-  role(name) { return this.roles[name] || PALETTE.bone; }
+  role(name) { return this.roles[name] || PALETTE.normal; }
 }
 
 export const defaultTheme = new Theme();

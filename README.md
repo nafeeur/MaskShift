@@ -9,11 +9,11 @@
 </p>
 
 <p align="center">
-  <img alt="npm version" src="https://img.shields.io/npm/v/maskshift?style=flat-square&color=cb3837">
-  <img alt="npm downloads" src="https://img.shields.io/npm/dt/maskshift?style=flat-square&color=cb3837&label=downloads">
-  <img alt="Node 22+" src="https://img.shields.io/badge/node-%E2%89%A522-35cf8b?style=flat-square">
-  <img alt="Runtime dependencies: none" src="https://img.shields.io/badge/runtime%20deps-0-7fb8ff?style=flat-square">
-  <img alt="GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-e42a3c?style=flat-square">
+  <img alt="npm version" src="https://img.shields.io/npm/v/maskshift?style=flat-square&color=4dff4d">
+  <img alt="npm downloads" src="https://img.shields.io/npm/dt/maskshift?style=flat-square&color=4dff4d&label=downloads">
+  <img alt="Node 22+" src="https://img.shields.io/badge/node-%E2%89%A522-4dff4d?style=flat-square">
+  <img alt="Runtime dependencies: none" src="https://img.shields.io/badge/runtime%20deps-0-33c433?style=flat-square">
+  <img alt="GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-9dff9d?style=flat-square">
 </p>
 
 ![MaskShift interface](docs/screenshots/chat.svg)

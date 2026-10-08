@@ -40,7 +40,7 @@ class FakeTerminal extends Writable {
 }
 
 test('text measurement ignores ANSI and respects wide characters', () => {
-  const painted = theme.paint('hello', { fg: theme.palette.crimson, bold: true });
+  const painted = theme.paint('hello', { fg: theme.palette.normal, bold: true });
   assert.equal(visibleWidth(painted), 5);
   assert.equal(stripAnsi(painted), 'hello');
   assert.equal(visibleWidth(fit(painted, 12)), 12);
