@@ -17,9 +17,10 @@ function theme(name, {
   primary, primaryDeep, primaryTrack, accent, accentDeep, onPrimary,
   success, warning, danger, info,
   tool, skill, user,
-}) {
+}, signalStyle = {}) {
   return {
     name,
+    signalStyle,
     roles: {
       heading, text, label, dim, muted, faint, hairline,
       background: bg, surface, surfaceRaised, surfaceSunken, selection,
@@ -31,21 +32,34 @@ function theme(name, {
   };
 }
 
-export const DEFAULT_THEME_ID = 'maskshift';
+export const DEFAULT_THEME_ID = 'retro';
 
 export const THEMES = {
   maskshift: { name: 'MaskShift', roles: ROLES },
 
-  // Old green-phosphor terminal: one hue (green) in different brightnesses, nothing else.
-  // Every role is a shade of green; status is told apart by glyph shape (see status.mjs) and
-  // by brightness, exactly as the two-tone themes do, not by an extra hue.
+  // Green-phosphor terminal. One hue (120deg, so red === blue in every swatch) in a handful of
+  // brightness levels, the way a monochrome CRT has no colour to spend and only intensity:
+  //
+  //   bright  #c8ffc8  headings, and the inverse bar that marks a failure
+  //   high    #9dff9d  warnings
+  //   normal  #4dff4d  body text, primary, success
+  //   mid     #33c433  secondary text, info
+  //   low     #2eaf2e  hints and placeholders (still >= 4.5:1 on every surface)
+  //   rule    #176017  borders and other non-text structure
+  //
+  // Severity is carried by brightness order (failure > warning > success > info > muted) and
+  // by *weight*: a failure is drawn inverse (dark on bright green), a warning is bold. Glyph
+  // shape (see status.mjs) still says the same thing for terminals without bold or inverse.
   retro: theme('Retro', {
-    bg: '#030a03', surface: '#061106', surfaceRaised: '#0a1a0a', selection: '#0f2a0f',
-    border: '#0f2a0f', borderStrong: '#1f5a1f', borderActive: '#33ff33',
-    heading: '#66ff66', text: '#33ff33', label: '#2bd62b', dim: '#22a822', muted: '#1a7a1a', faint: '#0d3d0d', hairline: '#145214',
-    primary: '#33ff33', primaryDeep: '#1f9e1f', primaryTrack: '#0f3d0f', accent: '#99ff99', accentDeep: '#4fbf4f', onPrimary: '#030a03',
-    success: '#66ff66', warning: '#99ff99', danger: '#c8ffc8', info: '#2bd62b',
-    tool: '#4fe84f', skill: '#80ff80', user: '#b3ffb3',
+    bg: '#010a01', surface: '#041204', surfaceRaised: '#0a1f0a', surfaceSunken: '#000600', selection: '#0e300e',
+    border: '#124012', borderStrong: '#176017', borderActive: '#4dff4d',
+    heading: '#c8ffc8', text: '#4dff4d', label: '#3ee03e', dim: '#33c433', muted: '#2eaf2e', faint: '#176017', hairline: '#1a6a1a',
+    primary: '#4dff4d', primaryDeep: '#1f8f1f', primaryTrack: '#0e300e', accent: '#9dff9d', accentDeep: '#33c433', onPrimary: '#010a01',
+    success: '#4dff4d', warning: '#9dff9d', danger: '#c8ffc8', info: '#33c433',
+    tool: '#3ee03e', skill: '#9dff9d', user: '#c8ffc8',
+  }, {
+    danger: { inverse: true, bold: true },
+    warning: { bold: true },
   }),
 };
 
