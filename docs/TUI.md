@@ -36,6 +36,18 @@ monochrome display. There is one theme and no `/theme` command. It is drawn like
 - **Frames** are square, and the pane that holds the keyboard gets a double line.
   Pane and section titles are upper case; the key hints at the foot are inverse
   blocks with upper-case labels.
+- **Messages are cards**: a quiet header row (`YOU · 02:21`) on the margin, the body
+  indented under it, one blank row between turns and none inside one. The
+  transcript is a reading column, capped at 100 columns and centred on a wide
+  terminal, with a second column of margin from 100 columns up.
+- **Header**: labels (`Workspace`, `Model`, `Mode`) appear from 118 columns and the
+  capability counts from 150; below that the values stand alone.
+- **One control shape**: tabs and key hints are `[ ]` brackets (`[1 Chat]`,
+  `[^K] PALETTE`); the current tab is the same bracket filled in, and a control
+  under the pointer lights up as a whole bar, as does a clickable tool result.
+- **Sidebar**: sections are set off by a labelled hairline rule (`─ LOADED ───`),
+  not boxes, and every gauge is one row — label, meter, right-aligned value.
+  Empty states are whole sentences with a hint.
 - **Selection** is a full inverse bar (dark text on bright green), as on a
   terminal of the period.
 - **Diffs** read by weight, not hue: added lines bright and bold, removed lines

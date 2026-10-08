@@ -161,8 +161,12 @@ export function renderMarkdown(theme, text, width) {
   const source = String(text ?? '').replace(/\r\n/g, '\n').split('\n');
   const out = [];
   let index = 0;
+  // A heading belongs to the block under it: no blank line between the two.
+  let afterHeading = false;
   while (index < source.length) {
     const line = source[index];
+    const wasHeading = afterHeading;
+    afterHeading = false;
 
     const fence = /^\s*```+\s*([\w+-]*)\s*$/.exec(line);
     if (fence) {
@@ -197,6 +201,7 @@ export function renderMarkdown(theme, text, width) {
         out.push(theme.paint(truncate(label, width), { fg: theme.roles.label, bold: true }));
       }
       index += 1;
+      afterHeading = true;
       continue;
     }
 
@@ -232,7 +237,11 @@ export function renderMarkdown(theme, text, width) {
       continue;
     }
 
-    if (line.trim() === '') { out.push(''); index += 1; continue; }
+    if (line.trim() === '') {
+      if (wasHeading) afterHeading = true; else out.push('');
+      index += 1;
+      continue;
+    }
     out.push(...wrap(inline(theme, line), width));
     index += 1;
   }

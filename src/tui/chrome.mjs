@@ -24,8 +24,8 @@ import { RAIL_TITLES } from './rail.mjs';
 const MODE_TONES = { autonomous: 'warning' };
 
 /** The one way a value is labelled anywhere in the chrome. */
-function stat(theme, name, value, tone) {
-  return theme.paint(`${name} `, { fg: theme.roles.muted })
+function stat(theme, name, value, tone, { labelled = true } = {}) {
+  return theme.paint(labelled ? `${name} ` : '', { fg: theme.roles.muted })
     + theme.paint(value, { fg: tone || theme.roles.text, bold: true });
 }
 
@@ -67,13 +67,18 @@ export function headerBand(app, width, offset = 0) {
   // Rendered left to right; dropped in reverse priority. What survives longest
   // is what a user would actually miss — whether there is a provider at
   // all, and how much this session is allowed to do — not a capability count.
+  // Labels (`Mode`, `Workspace`, `Model`) are for a wide screen; on a narrower one the values speak
+  // for themselves. The capability counts are the quietest thing in the row and only appear when
+  // there is room to spare — they are one keystroke away in the palette and on the welcome screen.
+  const labelled = width >= 118;
+  const counts = width >= 150;
   const rightChips = [
-    { priority: 1, text: stat(theme, 'Mode', sentence(mode), theme.role(MODE_TONES[mode] || 'text')) },
-    { priority: 3, text: stat(theme, 'Tools', String(app.counts.tools), theme.roles.tool) },
-    { priority: 4, text: stat(theme, 'Skills', String(app.counts.skills), theme.roles.skill) },
-    { priority: 2, text: stat(theme, 'MCP', String(app.counts.mcp), theme.roles.mcp) },
+    { priority: 1, text: stat(theme, 'Mode', sentence(mode), theme.role(MODE_TONES[mode] || 'text'), { labelled }) },
+    counts && { priority: 3, text: stat(theme, 'Tools', String(app.counts.tools), theme.roles.tool) },
+    counts && { priority: 4, text: stat(theme, 'Skills', String(app.counts.skills), theme.roles.skill) },
+    counts && { priority: 2, text: stat(theme, 'MCP', String(app.counts.mcp), theme.roles.mcp) },
     { priority: 0, text: link },
-  ];
+  ].filter(Boolean);
 
   const target = workspace ? `${workspace.name}${app.gitBranch ? ` ${glyphs(theme).dot} ${app.gitBranch}` : ''}` : 'No workspace';
   const model = app.modelRef || config.defaultModel || '';
@@ -87,7 +92,7 @@ export function headerBand(app, width, offset = 0) {
   // single character — they identify *this* chat, a tool/skill/MCP count
   // is available one keystroke away in the palette.
   const gapWidth = visibleWidth(divider(theme));
-  const labelCost = visibleWidth('Workspace ') + visibleWidth('Model ');
+  const labelCost = labelled ? visibleWidth('Workspace ') + visibleWidth('Model ') : 0;
   const leftFixed = visibleWidth(brand) + gapWidth * 2 + labelCost;
   const valueFloor = Math.min(Math.floor(width * 0.55), Math.max(24, visibleWidth(target) + visibleWidth(model)));
 
@@ -109,8 +114,8 @@ export function headerBand(app, width, offset = 0) {
   // a branch name while blank columns sat beside it.
   const modelWidth = Math.max(6, Math.min(visibleWidth(model), Math.floor(available * 0.45)));
   const targetWidth = Math.max(6, available - modelWidth);
-  const targetChip = stat(theme, 'Workspace', truncate(target, targetWidth), theme.roles.text);
-  const modelChip = stat(theme, 'Model', truncate(model, modelWidth), theme.roles.text);
+  const targetChip = stat(theme, 'Workspace', truncate(target, targetWidth), theme.roles.text, { labelled });
+  const modelChip = stat(theme, 'Model', truncate(model, modelWidth), theme.roles.text, { labelled });
   const left = [targetChip, modelChip].join(divider(theme));
 
   const body = `${brand}${divider(theme)}${left}`;
@@ -165,17 +170,19 @@ export function tabStrip(app, width, offset = 0) {
   for (const [index, view] of app.views.entries()) {
     const active = view.id === app.view;
     const hovered = regions?.hoverId === `tab:${view.id}`;
-    const plain = ` ${view.index} ${view.title} `;
-    // The ordinal is navigation, not content: it stays a step quieter than the
-    // name it belongs to, in both states.
+    // One control shape everywhere: `[ key label ]`. The current tab is the same bracket filled
+    // in; an idle one is a quiet bracket, and the one under the pointer lights up as a whole.
+    const plain = `[${view.index} ${view.title}]`;
     const painted = active && !theme.enabled
       ? `[${view.index} ${view.title}]`
       : active
-      ? theme.paint(' ', { bg: theme.roles.primary })
-        + theme.paint(view.index, { fg: theme.mixed(theme.roles.primary, theme.roles.onPrimary, 0.55), bg: theme.roles.primary, bold: true })
-        + theme.paint(` ${view.title} `, { fg: theme.roles.onPrimary, bg: theme.roles.primary, bold: true })
-      : theme.paint(` ${view.index} `, { fg: theme.roles.faint })
-        + theme.paint(`${view.title} `, { fg: hovered ? theme.roles.text : theme.roles.muted, bold: hovered });
+      ? theme.paint(plain, { fg: theme.roles.onPrimary, bg: theme.roles.primary, bold: true })
+      : hovered
+      ? theme.paint(plain, { fg: theme.roles.onPrimary, bg: theme.roles.dim, bold: true })
+      : theme.paint('[', { fg: theme.roles.faint })
+        + theme.paint(view.index, { fg: theme.roles.faint })
+        + theme.paint(` ${view.title}`, { fg: theme.roles.muted })
+        + theme.paint(']', { fg: theme.roles.faint });
     out += painted;
 
     regions?.add({
@@ -186,7 +193,7 @@ export function tabStrip(app, width, offset = 0) {
     column += visibleWidth(plain);
 
     if (index < app.views.length - 1) {
-      out += theme.paint(glyphs(theme).pipe, { fg: theme.roles.border });
+      out += ' ';
       column += 1;
     }
   }
@@ -299,11 +306,15 @@ export function hintRail(app, width, offset = 0) {
   for (const [index, [key, label, action]] of hints.entries()) {
     if (index > 0) { pieces.push(separator); column += visibleWidth(separator); }
     const hovered = app.regions?.hoverId === `hint:${key}`;
-    // The footer of a text-mode screen: the key as an inverse block, its function in capitals.
+    // The footer of a text-mode screen: `[KEY]` in the one control shape, its function in capitals.
+    // Under the pointer the whole thing lights up as a bar.
     const caption = label.toUpperCase();
-    const text = theme.paint(key, theme.enabled ? { fg: theme.roles.onPrimary, bg: theme.roles.dim, bold: true } : { bold: true })
-      + theme.paint(` ${caption}`, { fg: hovered ? theme.roles.text : theme.roles.muted });
-    const span = visibleWidth(key) + 1 + visibleWidth(caption);
+    const plain = `[${key}] ${caption}`;
+    const text = hovered && theme.enabled
+      ? theme.paint(plain, { fg: theme.roles.onPrimary, bg: theme.roles.dim, bold: true })
+      : theme.paint('[', { fg: theme.roles.faint }) + theme.paint(key, { fg: theme.roles.accent, bold: true })
+        + theme.paint(']', { fg: theme.roles.faint }) + theme.paint(` ${caption}`, { fg: theme.roles.muted });
+    const span = visibleWidth(plain);
     if (action) {
       app.regions?.add({
         row, column, width: span, height: 1,
