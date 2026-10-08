@@ -10,7 +10,7 @@
 import { frameColour, glyphs, panel, rule } from '../box.mjs';
 import { hstack, split } from '../layout.mjs';
 import { LAYER, listZone, viewportZone } from '../regions.mjs';
-import { center, fit, underlay, visibleWidth, wrap } from '../text.mjs';
+import { center, fit, selectedRow, visibleWidth, wrap } from '../text.mjs';
 import { FIELD_LABEL_WIDTH, SPACE } from '../tokens.mjs';
 import { columns, field, gutter, label as typeLabel } from '../type.mjs';
 
@@ -115,7 +115,7 @@ export function listRow(app, { selected, marker = '', markerTone = null, cells, 
     : gutter(theme, marker, { tone: markerTone || theme.roles.faint });
   const body = columns(theme, cells, Math.max(0, width - SPACE.gutter));
   const line = fit(`${lead}${body}`, width);
-  return selected ? underlay(line, theme.bg(theme.roles.selection)) : line;
+  return selected ? selectedRow(theme, line) : line;
 }
 
 /**
@@ -175,7 +175,7 @@ export function sidePane(app, { width, height, title, stamp, focused, body }) {
       stamp,
       active: focused,
       colour: frameColour(theme, focused),
-      weight: focused ? 'heavy' : 'light',
+      weight: focused ? 'double' : 'square',
     }),
     ...body,
   ];

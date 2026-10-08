@@ -115,6 +115,9 @@ export class MaskShiftTui {
       // in the preferences must not quietly override it.
       ...(preferences.colorDepth === null || preferences.colorDepth === undefined || noColorRequested() ? {} : { depth: Number(preferences.colorDepth) }),
       ...(preferences.unicode === null || preferences.unicode === undefined ? {} : { unicode: Boolean(preferences.unicode) }),
+      ...(preferences.contrast && !process.env.MASKSHIFT_CONTRAST ? { contrast: preferences.contrast } : {}),
+      ...(preferences.opaque === undefined ? {} : { opaque: Boolean(preferences.opaque) }),
+      ...(preferences.scanlines === undefined ? {} : { scanlines: Boolean(preferences.scanlines) }),
     });
     // A headless render is a still: every clock-driven part of the interface
     // freezes together so a captured frame is reproducible byte for byte.
@@ -489,7 +492,7 @@ export class MaskShiftTui {
     // Anything clock-driven has to keep the loop awake for as long as it is
     // moving, or a toast would sit at half-opacity until the next keystroke.
     if (this.busy || dirty || this.terminalBusy || this.toasts.animating || this.overlay?.pending
-      || this.overlay?.animating) this.requestRender();
+      || this.overlay?.animating || (!this.theme.motion.frozen && this.theme.motion.elapsed < 2600)) this.requestRender();
   }
 
   requestRender() {
@@ -2377,7 +2380,7 @@ export class MaskShiftTui {
     // The echoed command wears the prompt marker in the gutter and its output
     // sits in the blank one below it, so a command and everything it printed
     // share the left edge the live prompt is already on.
-    this.pushTerminal(gutter(theme, '❯', { tone: theme.roles.primary })
+    this.pushTerminal(gutter(theme, '$', { tone: theme.roles.primary })
       + theme.paint(value, { fg: theme.roles.text, bold: true }));
     this.terminalBusy = true;
     const startedAt = Date.now();

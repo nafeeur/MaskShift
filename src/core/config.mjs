@@ -241,6 +241,11 @@ export function defaultConfig() {
       railVisible: true,
       unicode: null,
       colorDepth: null,
+      // 'standard' | 'high' | 'soft'. Overridden by MASKSHIFT_CONTRAST.
+      contrast: 'standard',
+      // Paint the screen's own background so the look is the same on any terminal.
+      opaque: true,
+      scanlines: false,
       expandToolOutput: false,
       // 'click' | 'hover' | 'off'. Overridden by MASKSHIFT_MOUSE.
       mouse: 'click',

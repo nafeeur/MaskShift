@@ -25,22 +25,24 @@ export const FRAMES = {
     light: { tl: '╭', tr: '╮', bl: '╰', br: '╯', h: '─', v: '│', tabL: '┤', tabR: '├' },
     square: { tl: '┌', tr: '┐', bl: '└', br: '┘', h: '─', v: '│', tabL: '┤', tabR: '├' },
     double: { tl: '╔', tr: '╗', bl: '╚', br: '╝', h: '═', v: '║', tabL: '╣', tabR: '╠' },
+    dotted: { tl: '┌', tr: '┐', bl: '└', br: '┘', h: '╌', v: '╎', tabL: '┤', tabR: '├' },
   },
   ascii: {
     heavy: { tl: '+', tr: '+', bl: '+', br: '+', h: '=', v: '|', tabL: '|', tabR: '|' },
     light: { tl: '+', tr: '+', bl: '+', br: '+', h: '-', v: '|', tabL: '|', tabR: '|' },
     square: { tl: '+', tr: '+', bl: '+', br: '+', h: '-', v: '|', tabL: '|', tabR: '|' },
     double: { tl: '+', tr: '+', bl: '+', br: '+', h: '=', v: '|', tabL: '|', tabR: '|' },
+    dotted: { tl: '+', tr: '+', bl: '+', br: '+', h: '.', v: ':', tabL: '|', tabR: '|' },
   },
 };
 
 export const MARKS = {
   unicode: {
-    spine: '▌', spineRight: '▐', bar: '│', caret: '❯', dot: '·',
+    spine: '▌', spineRight: '█', bar: '│', caret: '>', dot: '·',
     bullet: '•', dash: '–', diamond: '◆',
     arrowRight: '›', arrowDown: '▾', arrowUp: '▴',
     check: '✓', cross: '✕', warn: '▲', ring: '○', lamp: '●',
-    meterFull: '━', meterEmpty: '─', shade: '░',
+    meterFull: '█', meterEmpty: '░', shade: '░',
     branch: '├', branchLast: '└', pipe: '│', tick: '─', rule: '╌',
     slash: '╱', mask: '⬢', lock: '⬤', search: '⌕',
   },
@@ -49,7 +51,7 @@ export const MARKS = {
     bullet: '*', dash: '-', diamond: '#',
     arrowRight: '>', arrowDown: 'v', arrowUp: '^',
     check: 'y', cross: 'x', warn: '!', ring: 'o', lamp: 'o',
-    meterFull: '=', meterEmpty: '-', shade: ':',
+    meterFull: '#', meterEmpty: '-', shade: ':',
     branch: '|', branchLast: '`', pipe: '|', tick: '-', rule: '-',
     slash: '/', mask: '#', lock: '@', search: '/',
   },
@@ -59,8 +61,8 @@ export function glyphs(theme) {
   return theme.unicode ? MARKS.unicode : MARKS.ascii;
 }
 
-export function frameSet(theme, weight = 'light') {
-  return (theme.unicode ? FRAMES.unicode : FRAMES.ascii)[weight] || FRAMES.unicode.light;
+export function frameSet(theme, weight = 'square') {
+  return (theme.unicode ? FRAMES.unicode : FRAMES.ascii)[weight] || FRAMES.unicode.square;
 }
 
 /**
@@ -102,7 +104,7 @@ function topRail({ theme, width, chars, title, titleRaw, colour, focused, note =
   const head = titleRaw
     ? ` ${titleRaw} `
     : (title
-      ? ` ${typeLabel(theme, truncate(title, Math.max(1, width - 12)), { tone: focused ? theme.roles.text : theme.roles.muted })} `
+      ? ` ${typeLabel(theme, truncate(title, Math.max(1, width - 12)).toUpperCase(), { tone: focused ? theme.roles.text : theme.roles.muted })} `
       : '');
   const room = Math.max(0, width - visibleWidth(head) - 8);
   const stamp = note && room > 2 ? ` ${theme.paint(truncate(note, room), { fg: theme.roles.muted })} ` : '';
@@ -142,7 +144,9 @@ export function panel({
   body = [], focused = false, weight = null, colour = null, padding = SPACE.pad,
   seamRows = null, note = '', busy = false,
 }) {
-  const chars = frameSet(theme, weight || (focused ? 'heavy' : 'light'));
+  // A square frame, and a double line for the pane that holds the keyboard: the way a text-mode
+  // interface of the period showed focus, with no brightness change needed.
+  const chars = frameSet(theme, weight || (focused ? 'double' : 'square'));
   const edge = colour || frameColour(theme, focused);
   const inner = Math.max(0, width - 2 - padding * 2);
   const lines = [topRail({ theme, width, chars, title, titleRaw, colour: edge, focused, note, busy })];
@@ -182,13 +186,13 @@ export function contentWidth(width, padding = SPACE.pad) {
  * and its count without spending a second row on chrome.
  */
 export function rule(theme, width, label = '', {
-  colour = null, stamp = '', active = false, weight = 'light', busy = false,
+  colour = null, stamp = '', active = false, weight = 'dotted', busy = false,
 } = {}) {
   const chars = frameSet(theme, weight);
   const tone = colour || theme.roles.border;
   if (!label && !stamp) return fillRule({ theme, chars, colour: tone, width, busy });
 
-  const head = label ? ` ${typeLabel(theme, label, { tone: active ? theme.roles.text : theme.roles.muted })} ` : '';
+  const head = label ? ` ${typeLabel(theme, label.toUpperCase(), { tone: active ? theme.roles.text : theme.roles.muted })} ` : '';
   const tail = stamp
     ? ` ${theme.paint(truncate(stamp, Math.max(1, width - visibleWidth(head) - 6)), { fg: theme.roles.muted })} `
     : '';

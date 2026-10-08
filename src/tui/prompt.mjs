@@ -9,7 +9,7 @@
 // what happens to an answer.
 
 import { glyphs } from './box.mjs';
-import { fit, truncate, underlay, wrap } from './text.mjs';
+import { fit, selectedRow, truncate, wrap } from './text.mjs';
 import { SPACE } from './tokens.mjs';
 import { chip, gutter, key as typeKey } from './type.mjs';
 import { TextField } from './widgets.mjs';
@@ -178,7 +178,7 @@ export class InlinePrompt {
         const tail = detail && width - used > 8 ? theme.paint(`  ${truncate(detail, width - used - 2)}`, { fg: theme.roles.muted }) : '';
         const line = fit(gutter(theme, active ? mark.caret : '', { tone: accent }) + number + label + tail, width);
         hit.push({ offset: rows.length, index });
-        rows.push(active ? underlay(line, theme.bg(theme.roles.selection)) : line);
+        rows.push(active ? selectedRow(theme, line) : line);
       });
       if (this.allowOther) {
         const active = this.cursor === this.otherIndex;
@@ -188,7 +188,7 @@ export class InlinePrompt {
         const line = fit(prefix + rendered.text, width);
         hit.push({ offset: rows.length, index: this.otherIndex });
         if (active) cursor = { row: rows.length, column: SPACE.gutter + numberWidth + 2 + rendered.cursorColumn };
-        rows.push(active ? underlay(line, theme.bg(theme.roles.selection)) : line);
+        rows.push(active ? selectedRow(theme, line) : line);
       }
     }
 

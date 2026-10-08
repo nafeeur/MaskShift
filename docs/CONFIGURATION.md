@@ -86,11 +86,14 @@ The starting level comes from, in order of trust: a **calibration** (`maskshift 
 | `ui.railVisible` | `true` | Whether the sidebar starts visible. It hides itself below 108 columns regardless. |
 | `ui.unicode` | `null` | Force Unicode box drawing on or off. `null` auto-detects from the locale. |
 | `ui.colorDepth` | `null` | Force `0`, `4`, `8` or `24`-bit colour. `null` auto-detects. |
+| `ui.contrast` | `standard` | The green ramp to use: `standard`, `high` (brighter text on pure black, for low vision or a dim display) or `soft` (lower glare for long sessions). Overridden by `MASKSHIFT_CONTRAST`. |
+| `ui.opaque` | `true` | Paint the interface's own dark-green background on every cell, so it looks the same on a light terminal or over a wallpaper. `false` leaves the background to the terminal. |
+| `ui.scanlines` | `false` | Alternate the row background very slightly, like the scan lines of a CRT. |
 | `ui.expandToolOutput` | `false` | Start the transcript with tool output expanded. |
 | `ui.mouse` | `click` | `click` for press, release and drag; `hover` adds pointer-over highlighting at the cost of a report per cell crossed; `off` returns text selection to the terminal. |
 
 Environment overrides: `MASKSHIFT_COLOR=off|basic|full`, `MASKSHIFT_ASCII=1`,
-`MASKSHIFT_MOUSE=click|hover|off`, plus the standard `NO_COLOR` and
+`MASKSHIFT_MOUSE=click|hover|off`, `MASKSHIFT_CONTRAST=standard|high|soft`, plus the standard `NO_COLOR` and
 `FORCE_COLOR`. While the mouse is on, most terminals still select text on
 shift+drag.
 

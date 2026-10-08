@@ -198,6 +198,18 @@ export function underlay(text, bgCode) {
   return `${bgCode}${value.replace(/\x1b\[0m/g, `$&${bgCode}`)}${RESET}`;
 }
 
+/**
+ * A selected list row, the way an old terminal drew one: the whole row inverse, dark text on a
+ * full bar of the primary colour. The row's own tones are dropped — against a bright bar they
+ * would only fight it — and its glyphs and weight carry the meaning instead.
+ */
+export function selectedRow(theme, text) {
+  const value = String(text ?? '');
+  if (!theme.enabled) return value;
+  const plain = stripAnsi(value);
+  return `${theme.fg(theme.roles.onPrimary)}${theme.bg(theme.roles.primary)}${theme.bold}${plain}${RESET}`;
+}
+
 export function truncate(text, width, ellipsis = '…') {
   if (width <= 0) return '';
   const actual = visibleWidth(text);

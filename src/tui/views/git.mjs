@@ -143,13 +143,12 @@ function paintDiff(theme, text, width, { maxLines = 300 } = {}) {
   }
   const shown = raw.slice(0, maxLines);
   const lines = shown.map((line) => {
-    let tone = theme.roles.dim;
-    let bold = false;
-    if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('diff --git') || line.startsWith('index ')) { tone = theme.roles.label; bold = true; }
-    else if (line.startsWith('@@')) { tone = theme.roles.info; bold = true; }
-    else if (line.startsWith('+')) tone = theme.roles.success;
-    else if (line.startsWith('-')) tone = theme.roles.danger;
-    return theme.paint(fit(truncate(line, width), width), { fg: tone, bold });
+    let style = { fg: theme.roles.dim };
+    if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('diff --git') || line.startsWith('index ')) style = { fg: theme.roles.label, bold: true };
+    else if (line.startsWith('@@')) style = { fg: theme.roles.info, bold: true };
+    else if (line.startsWith('+')) style = { fg: theme.roles.heading, bold: true };
+    else if (line.startsWith('-')) style = { fg: theme.roles.muted, strike: true };
+    return theme.paint(fit(truncate(line, width), width), style);
   });
   if (raw.length > maxLines) lines.push(theme.paint(`… ${raw.length - maxLines} more lines`, { fg: theme.roles.faint, italic: true }));
   return lines;

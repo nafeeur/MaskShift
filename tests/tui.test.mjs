@@ -743,7 +743,7 @@ test('typing a slash in the composer shows matching command suggestions, and onl
 
   app.composer.set('/');
   let frame = app.snapshot().map(stripAnsi);
-  assert.ok(frame.some((line) => line.includes('Commands')), 'expected a suggestion panel for a bare slash');
+  assert.ok(frame.some((line) => line.includes('COMMANDS')), 'expected a suggestion panel for a bare slash');
   assert.ok(frame.some((line) => line.includes('/model')), 'expected /model among the suggestions');
 
   app.composer.set('/h');
@@ -789,11 +789,11 @@ test('the slash-command suggestion panel stays inside the chat panel and never b
   app.composer.set('/');
   const frame = app.snapshot().map(stripAnsi);
   const railStart = app.lastRegion.width;
-  const suggestionRow = frame.find((line) => line.includes('┏━ Commands'));
+  const suggestionRow = frame.find((line) => /[┌╔][─═] COMMANDS/.test(line));
   assert.ok(suggestionRow, 'expected the suggestion panel to be visible');
   // The panel's own right border must land at or before the chat panel's
   // right edge, not spill into the columns the rail owns.
-  const rightBorder = suggestionRow.lastIndexOf('┓');
+  const rightBorder = Math.max(suggestionRow.lastIndexOf('┐'), suggestionRow.lastIndexOf('╗'));
   assert.ok(rightBorder > 0 && rightBorder < railStart, `suggestion panel border at column ${rightBorder} should stay left of the rail at ${railStart}`);
 });
 
@@ -1151,12 +1151,12 @@ test('the chat view keeps the composer inside one unclipped frame', async (t) =>
     // assumed fixed offset isn't reliable, but the panel's own open/close
     // border rows still are.
     const stripped = frame.map(stripAnsi);
-    const openIndex = stripped.findIndex((line) => line.trimStart().startsWith('┏'));
-    const closeIndex = stripped.findIndex((line) => line.trimStart().startsWith('┗'));
+    const openIndex = stripped.findIndex((line) => line.trimStart().startsWith('╔'));
+    const closeIndex = stripped.findIndex((line) => line.trimStart().startsWith('╚'));
     assert.ok(openIndex >= 0 && closeIndex > openIndex, `frame should open and close, got open=${openIndex} close=${closeIndex}`);
     const body = stripped.slice(openIndex, closeIndex + 1);
-    assert.ok(body.at(-1).trimStart().startsWith('┗'), `frame should close, got "${body.at(-1)}"`);
-    assert.equal(body.filter((line) => line.trimStart().startsWith('┏')).length, 1, 'exactly one frame opens');
+    assert.ok(body.at(-1).trimStart().startsWith('╚'), `frame should close, got "${body.at(-1)}"`);
+    assert.equal(body.filter((line) => line.trimStart().startsWith('╔')).length, 1, 'exactly one frame opens');
     for (const line of frame) assert.equal(visibleWidth(line), 120);
   }
 });
@@ -1179,12 +1179,12 @@ test('a toast never overlaps the composer\'s own border or input row', async (t)
   app.screen.invalidate();
   const frame = app.snapshot().map(stripAnsi);
 
-  const inputIndex = frame.findIndex((line) => line.includes('❯'));
+  const inputIndex = frame.findIndex((line) => /[│║]\s+>/.test(line));
   assert.ok(inputIndex >= 1, 'composer input row should be present');
   const seamIndex = inputIndex - 1;
   assert.ok(seamIndex >= 1, 'sanity: the seam is not the very first row');
   assert.ok(
-    frame[seamIndex].trimStart().startsWith('┣') && frame[seamIndex].trimEnd().endsWith('┫'),
+    /^[╠├]/.test(frame[seamIndex].trimStart()) && /[╣┤]$/.test(frame[seamIndex].trimEnd()),
     'the seam divider must render intact, not be cut by a toast',
   );
 
@@ -1192,11 +1192,11 @@ test('a toast never overlaps the composer\'s own border or input row', async (t)
   // render(). Not one below the draft either: the panel's own border
   // already closes the box there.
   const inputRow = frame[seamIndex + 1];
-  assert.ok(inputRow.trimEnd().endsWith('┃'), `composer input row should keep its right border, got "${inputRow}"`);
-  assert.ok(inputRow.includes('❯'), 'composer prompt marker should still be visible');
+  assert.ok(/[│║]$/.test(inputRow.trimEnd()), `composer input row should keep its right border, got "${inputRow}"`);
+  assert.ok(inputRow.includes('>'), 'composer prompt marker should still be visible');
 
   const bottomBorder = frame[seamIndex + 2];
-  assert.ok(bottomBorder.trimEnd().endsWith('┛'), `composer bottom border should be intact, got "${bottomBorder}"`);
+  assert.ok(/[┘╝]$/.test(bottomBorder.trimEnd()), `composer bottom border should be intact, got "${bottomBorder}"`);
 });
 
 test('a streaming reply grows word by word in the transcript, then settles into the finished message', async (t) => {

@@ -32,15 +32,16 @@ export function diffLines(theme, patchText, width, { maxLines = DIFF_MAX_LINES }
   const shown = raw.slice(0, maxLines);
   const lines = shown.map((line) => {
     const kind = classify(line);
-    const tone = {
-      header: theme.roles.label,
-      hunk: theme.roles.info,
-      add: theme.roles.success,
-      remove: theme.roles.danger,
-      context: theme.roles.dim,
+    // One hue, so the cue is brightness and weight: an added line is bright and bold, a removed
+    // line is dim and struck through, context recedes. The +/- markers say the same in text.
+    const style = {
+      header: { fg: theme.roles.label, bold: true },
+      hunk: { fg: theme.roles.info, bold: true },
+      add: { fg: theme.roles.heading, bold: true },
+      remove: { fg: theme.roles.muted, strike: true },
+      context: { fg: theme.roles.dim },
     }[kind];
-    const bold = kind === 'header' || kind === 'hunk';
-    return gutter(theme) + theme.paint(fit(truncate(line, width), width), { fg: tone, bold });
+    return gutter(theme) + theme.paint(fit(truncate(line, width), width), style);
   });
   if (raw.length > maxLines) {
     lines.push(gutter(theme) + theme.paint(`… ${raw.length - maxLines} more line${raw.length - maxLines === 1 ? '' : 's'}`, { fg: theme.roles.faint, italic: true }));

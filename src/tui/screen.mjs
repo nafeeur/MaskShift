@@ -5,7 +5,7 @@
 // keeps large repaints flicker-free over SSH.
 
 import { ESC } from './theme.mjs';
-import { fit, sanitizeTerminalLine } from './text.mjs';
+import { fit, sanitizeTerminalLine, underlay } from './text.mjs';
 import { DELETE_ALL, deleteEscape } from './image/kitty.mjs';
 
 const CSI = `${ESC}[`;
@@ -16,6 +16,9 @@ export const ANSI = {
   altScreenOff: `${CSI}?1049l`,
   hideCursor: `${CSI}?25l`,
   showCursor: `${CSI}?25h`,
+  // DECSCUSR: a blinking block (1) like a terminal of the period, and back to the user's own (0).
+  cursorBlock: `${CSI}1 q`,
+  cursorDefault: `${CSI}0 q`,
   clear: `${CSI}2J${CSI}H`,
   clearLine: `${CSI}2K`,
   home: `${CSI}H`,
@@ -115,7 +118,7 @@ export class Screen {
     this.active = true;
     this.previous = [];
     this.output.ref?.();
-    this.write(`${ANSI.saveTitle}${ANSI.altScreenOn}${ANSI.hideCursor}${ANSI.clear}${ANSI.focusOn}`);
+    this.write(`${ANSI.saveTitle}${ANSI.altScreenOn}${ANSI.hideCursor}${ANSI.clear}${ANSI.focusOn}${ANSI.cursorBlock}`);
     this.applyMouse();
     this.output.on('resize', this.handleResize);
   }
@@ -135,7 +138,7 @@ export class Screen {
     this.imageProtocol = null;
     this.imageRow = null;
     this.imageColumn = null;
-    this.write(`${clearImage}${ANSI.focusOff}${ANSI.reset}${ANSI.showCursor}${ANSI.altScreenOff}${ANSI.restoreTitle}`);
+    this.write(`${clearImage}${ANSI.focusOff}${ANSI.cursorDefault}${ANSI.reset}${ANSI.showCursor}${ANSI.altScreenOff}${ANSI.restoreTitle}`);
     // Writing is synchronous for a TTY, but the handle itself stays referenced until told
     // otherwise, which is what kept the process alive after quitting.
     this.output.unref?.();
@@ -193,7 +196,9 @@ export class Screen {
     const fullRepaint = this.previous.length === 0;
     const frame = [];
     for (let row = 0; row < rows; row += 1) {
-      frame.push(fit(sanitizeTerminalLine(lines[row] ?? ''), columns));
+      const line = fit(sanitizeTerminalLine(lines[row] ?? ''), columns);
+      const ground = this.theme?.groundCode ? this.theme.groundCode(row) : '';
+      frame.push(ground ? underlay(line, ground) : line);
     }
     let out = '';
     // Transmit before the rows that refer to the image, in the same write, so a placeholder

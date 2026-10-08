@@ -166,7 +166,7 @@ function toolLines(app, message, width, key, globalExpanded) {
 
   const head = gutter(theme, failed ? mark.cross : mark.check, { tone })
     + columns(theme, [
-      { text: name, width: nameWidth, tone: theme.roles.tool, bold: true },
+      { text: name.startsWith('shell_') ? `$ ${name}` : name, width: nameWidth, tone: theme.roles.tool, bold: true },
       {
         text: fitsInline ? flat : (shown > 0 ? '' : oneLine(text, resultWidth)),
         tone: failed ? theme.roles.danger : theme.roles.dim,
@@ -345,7 +345,9 @@ export function transcriptLines(app, width) {
     lines.push(rail(theme, colour, { lead: true })
       + speakerRow(theme, 'MaskShift', colour, text, { qualifier: app.modelRef || '' }));
     const body = renderMarkdown(theme, app.streamingText, text);
-    const cursor = theme.paint(mark.spineRight, { fg: colour });
+    // A block cursor that blinks on a one-second beat (solid whenever the clock is frozen).
+    const blinkOn = theme.motion.frozen || theme.motion.phase(1000) < 0.6;
+    const cursor = theme.paint(mark.spineRight, { fg: blinkOn ? colour : theme.roles.surface });
     body.forEach((piece, index) => {
       const isLast = index === body.length - 1;
       lines.push(rail(theme, colour, { weight: 0.14 }) + (isLast && visibleWidth(piece) < text ? piece + cursor : piece));
@@ -488,7 +490,7 @@ export function render(app, region) {
   const seam = rule(theme, width - 2, seamLabel, {
     active: composerFocused,
     // The seam is part of the frame, so it carries the frame's weight.
-    weight: paneFocused ? 'heavy' : 'light',
+    weight: paneFocused ? 'double' : 'square',
     colour: frameColour(theme, paneFocused),
     busy: app.busy,
     stamp: promptView

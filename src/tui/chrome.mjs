@@ -291,7 +291,7 @@ function contextMeter(theme, context) {
 export function hintRail(app, width, offset = 0) {
   const { theme } = app;
   const hints = app.currentHints();
-  const separator = divider(theme);
+  const separator = theme.paint('  ', {});
   const row = app.screen.size.rows - 1;
   let column = 1 + offset;
   const pieces = [];
@@ -299,9 +299,11 @@ export function hintRail(app, width, offset = 0) {
   for (const [index, [key, label, action]] of hints.entries()) {
     if (index > 0) { pieces.push(separator); column += visibleWidth(separator); }
     const hovered = app.regions?.hoverId === `hint:${key}`;
-    const text = typeKey(theme, key)
-      + theme.paint(` ${label}`, { fg: hovered ? theme.roles.text : theme.roles.muted });
-    const span = visibleWidth(key) + 1 + visibleWidth(label);
+    // The footer of a text-mode screen: the key as an inverse block, its function in capitals.
+    const caption = label.toUpperCase();
+    const text = theme.paint(key, theme.enabled ? { fg: theme.roles.onPrimary, bg: theme.roles.dim, bold: true } : { bold: true })
+      + theme.paint(` ${caption}`, { fg: hovered ? theme.roles.text : theme.roles.muted });
+    const span = visibleWidth(key) + 1 + visibleWidth(caption);
     if (action) {
       app.regions?.add({
         row, column, width: span, height: 1,
