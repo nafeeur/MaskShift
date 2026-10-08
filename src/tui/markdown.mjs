@@ -26,27 +26,28 @@ const KEYWORDS = new Set([
 
 const TOKEN = /(\/\/[^\n]*|#[^\n]*|\/\*[\s\S]*?\*\/)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)|(\b\d[\w.]*\b)|(\b[A-Za-z_$][\w$]*\b)|([{}()[\].,;:=+\-*/%<>!&|?^~])/g;
 
-// The code palette. Calm, conventional, and deliberately free of crimson.
+// The code palette. One hue, so syntax is told apart by weight and style: keywords bold,
+// strings the brighter green, numbers underlined, comments italic and dim, punctuation dim.
 export function highlight(theme, line, language = '') {
   if (!theme.enabled) return line;
   const comment = theme.roles.muted;
-  const string = theme.roles.success;
-  const number = theme.roles.accent;
-  const keyword = theme.roles.skill;
+  const string = theme.roles.accent;
+  const number = theme.roles.heading;
+  const keyword = theme.roles.heading;
   const symbol = theme.roles.dim;
   const identifier = theme.roles.text;
   if (['json', 'jsonc'].includes(language)) {
     return line.replace(/("(?:[^"\\]|\\.)*")(\s*:)?|(\b-?\d[\d.eE+-]*\b)|\b(true|false|null)\b/g,
       (match, text, colon, digits, literal) => {
         if (text) return theme.paint(text, { fg: colon ? theme.roles.info : string }) + (colon || '');
-        if (digits) return theme.paint(digits, { fg: number });
-        return theme.paint(literal, { fg: keyword });
+        if (digits) return theme.paint(digits, { fg: number, underline: true });
+        return theme.paint(literal, { fg: keyword, bold: true });
       });
   }
   return line.replace(TOKEN, (match, remark, quoted, digits, word, punctuation) => {
     if (remark) return theme.paint(remark, { fg: comment, italic: true });
     if (quoted) return theme.paint(quoted, { fg: string });
-    if (digits) return theme.paint(digits, { fg: number });
+    if (digits) return theme.paint(digits, { fg: number, underline: true });
     if (word) return KEYWORDS.has(word) ? theme.paint(word, { fg: keyword, bold: true }) : theme.paint(word, { fg: identifier });
     if (punctuation) return theme.paint(punctuation, { fg: symbol });
     return match;
@@ -81,10 +82,11 @@ function codeBlock(theme, width, language, lines) {
     let tint = null;
     let body = source;
     if (isDiff) {
-      if (source.startsWith('+')) tint = theme.roles.success;
-      else if (source.startsWith('-')) tint = theme.roles.danger;
-      else if (source.startsWith('@@')) tint = theme.roles.info;
-      body = theme.paint(source, { fg: tint || theme.roles.dim });
+      let style = { fg: theme.roles.dim };
+      if (source.startsWith('+')) { tint = theme.roles.heading; style = { fg: tint, bold: true }; }
+      else if (source.startsWith('-')) { tint = theme.roles.muted; style = { fg: tint, strike: true }; }
+      else if (source.startsWith('@@')) { tint = theme.roles.info; style = { fg: tint, bold: true }; }
+      body = theme.paint(source, style);
     } else {
       body = highlight(theme, source, language);
     }
@@ -159,8 +161,12 @@ export function renderMarkdown(theme, text, width) {
   const source = String(text ?? '').replace(/\r\n/g, '\n').split('\n');
   const out = [];
   let index = 0;
+  // A heading belongs to the block under it: no blank line between the two.
+  let afterHeading = false;
   while (index < source.length) {
     const line = source[index];
+    const wasHeading = afterHeading;
+    afterHeading = false;
 
     const fence = /^\s*```+\s*([\w+-]*)\s*$/.exec(line);
     if (fence) {
@@ -195,6 +201,7 @@ export function renderMarkdown(theme, text, width) {
         out.push(theme.paint(truncate(label, width), { fg: theme.roles.label, bold: true }));
       }
       index += 1;
+      afterHeading = true;
       continue;
     }
 
@@ -230,7 +237,11 @@ export function renderMarkdown(theme, text, width) {
       continue;
     }
 
-    if (line.trim() === '') { out.push(''); index += 1; continue; }
+    if (line.trim() === '') {
+      if (wasHeading) afterHeading = true; else out.push('');
+      index += 1;
+      continue;
+    }
     out.push(...wrap(inline(theme, line), width));
     index += 1;
   }

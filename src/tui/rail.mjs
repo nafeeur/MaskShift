@@ -10,10 +10,10 @@
 // first line of the transcript beside it. It used to spend two, and every row
 // in the rail was one out of step with the pane it was reporting on.
 
-import { glyphs, meter, sparkline } from './box.mjs';
+import { glyphs, meter, rule, sparkline } from './box.mjs';
 import { LAYER } from './regions.mjs';
 import { statusMark, statusOf } from './status.mjs';
-import { fit, padStart, truncate, visibleWidth, wrap } from './text.mjs';
+import { fit, padEnd, padStart, truncate, visibleWidth, wrap } from './text.mjs';
 import { SPACE } from './tokens.mjs';
 import { columns, gutter, label as typeLabel, spread } from './type.mjs';
 
@@ -21,10 +21,36 @@ export const RAIL_TABS = ['plan', 'telemetry', 'events'];
 
 export const RAIL_TITLES = { plan: 'Plan', telemetry: 'Active', events: 'Events' };
 
-/** A rail section heading. Quieter than a pane title, louder than a value. */
+/**
+ * A rail section heading: a hairline rule with the name set into it, and an optional stamp at the
+ * far end. Sections are separated by this one line, never by a box.
+ */
 function heading(theme, text, width, stamp = '') {
-  return spread(typeLabel(theme, text, { tone: theme.roles.label }),
-    stamp ? theme.paint(stamp, { fg: theme.roles.faint }) : '', width);
+  return rule(theme, width, text, { weight: 'square', stamp, colour: theme.roles.border });
+}
+
+/** An empty state: a short complete sentence, then what to do about it. */
+function emptyState(theme, text, sentence, hint) {
+  const lines = wrap(sentence, text).map((piece) => gutter(theme) + theme.paint(piece, { fg: theme.roles.muted }));
+  if (hint) lines.push(gutter(theme) + theme.paint(hint, { fg: theme.roles.faint }));
+  return lines;
+}
+
+const GAUGE_LABEL = 10;
+const GAUGE_VALUE = 9;
+
+/**
+ * One dashboard row: a fixed-width label, a meter that takes the rest, and a right-aligned value.
+ * Every gauge in the rail goes through this, so the labels, the bars and the numbers each form
+ * their own straight column.
+ */
+function gaugeRow(theme, name, value, total, text, { colour, valueText = null } = {}) {
+  const valueCell = valueText ?? `${value}/${total}`;
+  const bar = Math.max(3, text - GAUGE_LABEL - GAUGE_VALUE);
+  return gutter(theme)
+    + theme.paint(padEnd(name, GAUGE_LABEL), { fg: theme.roles.muted })
+    + meter(theme, value, total, bar, { colour })
+    + theme.paint(padStart(valueCell, GAUGE_VALUE), { fg: colour, bold: true });
 }
 
 function planLines(app, width) {
@@ -32,7 +58,7 @@ function planLines(app, width) {
   const plan = app.plan;
   const text = Math.max(6, width - SPACE.gutter);
   if (!plan?.steps?.length) {
-    return [gutter(theme) + theme.paint('No plan yet. Multi-stage runs publish one here.', { fg: theme.roles.muted, italic: true })];
+    return emptyState(theme, text, 'No plan yet. Multi-stage runs publish one here.', 'ctrl+r  next section');
   }
   const lines = [];
   if (plan.summary) {
@@ -79,18 +105,16 @@ function telemetryLines(app, width) {
   if (context) {
     const tone = theme.role(context.tone);
     lines.push(heading(theme, 'Context', width, String(context.tier || '')));
-    lines.push(gutter(theme) + spread(
-      theme.paint(`${Math.round(context.ratio * 100)}%`, { fg: tone, bold: true }),
-      theme.paint(context.label, { fg: theme.roles.text }),
-      text,
-    ));
-    lines.push(gutter(theme) + meter(theme, context.used, context.window, text, { colour: tone }));
+    lines.push(gaugeRow(theme, 'Used', context.used, context.window, text, {
+      colour: tone, valueText: `${Math.round(context.ratio * 100)}%`,
+    }));
+    lines.push(gutter(theme) + theme.paint(`${context.label} tokens`, { fg: theme.roles.text }));
     const origin = CONTEXT_SOURCES[context.source] || context.source || 'unknown';
     for (const piece of wrap(`Window ${origin}. Replies up to ${compactTokens(context.maxOutputTokens)} tokens.`, text)) {
       lines.push(gutter(theme) + theme.paint(piece, { fg: theme.roles.muted }));
     }
-    lines.push('');
   }
+  lines.push(heading(theme, 'Loaded', width));
   const gauges = [
     ['Tools', snapshot?.tools?.length ?? 0, app.counts.tools, theme.roles.tool],
     ['Skills', snapshot?.skills?.length ?? 0, app.counts.skills, theme.roles.skill],
@@ -98,18 +122,11 @@ function telemetryLines(app, width) {
     ['Subagents', app.subagents, Math.max(1, app.runtime.config.get().maxParallelSubagents), theme.roles.accent],
   ];
   for (const [name, value, total, colour] of gauges) {
-    lines.push(gutter(theme) + spread(
-      typeLabel(theme, name, { tone: theme.roles.muted }),
-      theme.paint(String(value), { fg: colour, bold: true }) + theme.paint(` / ${total}`, { fg: theme.roles.faint }),
-      text,
-    ));
-    lines.push(gutter(theme) + meter(theme, value, total, text, { colour }));
-    lines.push('');
+    lines.push(gaugeRow(theme, name, value, total, text, { colour }));
   }
 
   lines.push(heading(theme, 'Token flow', width));
   lines.push(gutter(theme) + sparkline(theme, app.tokenHistory, text, theme.roles.accent));
-  lines.push('');
 
   const active = [
     ...(snapshot?.tools || []).map((name) => [name, theme.roles.tool]),
@@ -117,7 +134,7 @@ function telemetryLines(app, width) {
     ...(snapshot?.mcpServers || []).map((name) => [`mcp:${name}`, theme.roles.mcp]),
   ];
   lines.push(heading(theme, 'Active tools', width, active.length ? String(active.length) : ''));
-  if (!active.length) lines.push(gutter(theme) + theme.paint('Nothing loaded yet.', { fg: theme.roles.muted, italic: true }));
+  if (!active.length) lines.push(...emptyState(theme, text, 'Nothing loaded yet. Tools and skills appear here as a run uses them.'));
   for (const [name, colour] of active.slice(0, 200)) {
     lines.push(gutter(theme, glyphs(theme).dot, { tone: theme.roles.faint })
       + theme.paint(truncate(name, text), { fg: colour }));
@@ -135,7 +152,7 @@ const EVENT_TONES = {
 function eventLines(app, width) {
   const { theme } = app;
   const text = Math.max(6, width - SPACE.gutter);
-  if (!app.events.length) return [gutter(theme) + theme.paint('Bus is quiet.', { fg: theme.roles.muted, italic: true })];
+  if (!app.events.length) return emptyState(theme, text, 'No events yet. Start a run and its steps appear here.', 'c  clear when there are some');
   const lines = [];
   for (const event of app.events) {
     const tone = theme.role(EVENT_TONES[event.type] || 'muted');
@@ -193,11 +210,13 @@ function sectionRow(app, width, stamp) {
     if (index > 0) out += theme.paint(` ${glyphs(theme).dot} `, { fg: theme.roles.border });
     const active = tab === app.railTab;
     const hovered = app.regions?.hoverId === `rail:${tab}`;
-    out += theme.paint(RAIL_TITLES[tab], {
-      fg: active ? theme.roles.heading : (hovered ? theme.roles.text : theme.roles.muted),
-      bold: active,
-      underline: active,
-    });
+    out += hovered && theme.enabled && !active
+      ? theme.paint(RAIL_TITLES[tab], { fg: theme.roles.onPrimary, bg: theme.roles.dim, bold: true })
+      : theme.paint(RAIL_TITLES[tab], {
+        fg: active ? theme.roles.heading : theme.roles.muted,
+        bold: active,
+        underline: active,
+      });
   }
   return spread(out, stamp ? theme.paint(stamp, { fg: theme.roles.faint }) : '', width);
 }

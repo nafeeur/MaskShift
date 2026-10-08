@@ -114,17 +114,22 @@ test('every transcript row shares one left edge', async (t) => {
   // A blank row inside a turn keeps its rail and nothing else, which is how
   // the rail stays continuous down a reply; those aside, every row must clear
   // the gutter before it starts.
-  const rows = transcriptLines(app, 80).map(stripAnsi).filter((line) => line.trim());
+  // A card header (`YOU · 02:21`) sits on the margin itself, and everything under it — prose, tool
+  // rows — is indented to the gutter's far edge: one header edge, one body edge.
+  const all = transcriptLines(app, 80).map(stripAnsi).filter((line) => line.trim());
+  const headers = all.filter((line) => /^(YOU|MASKSHIFT)\b/.test(line));
+  assert.equal(headers.length, 2, 'each message opens with one header row on the margin');
+  const rows = all.filter((line) => !headers.includes(line));
   for (const line of rows) {
     assert.equal(line.slice(1, SPACE.gutter), ' '.repeat(SPACE.gutter - 1), `row overran its gutter: "${line}"`);
   }
   // And the three kinds of row really do put their first character there.
   const starts = new Set(rows
-    .filter((line) => /You|MaskShift|fs_read|Diff the frame/.test(line))
+    .filter((line) => /fs_read|Diff the frame|Refactor the renderer/.test(line))
     .map((line) => line.slice(SPACE.gutter).length - line.slice(SPACE.gutter).trimStart().length));
   assert.deepEqual([...starts], [0], `speaker, prose and tool rows drifted apart: ${[...starts].join(', ')}`);
-  assert.ok(rows.some((line) => line.includes('You')));
-  assert.ok(rows.some((line) => line.includes('MaskShift')));
+  assert.ok(headers.some((line) => line.includes('YOU')));
+  assert.ok(headers.some((line) => line.includes('MASKSHIFT')));
   assert.ok(rows.some((line) => line.includes('fs_read')));
 });
 
@@ -743,7 +748,7 @@ test('typing a slash in the composer shows matching command suggestions, and onl
 
   app.composer.set('/');
   let frame = app.snapshot().map(stripAnsi);
-  assert.ok(frame.some((line) => line.includes('Commands')), 'expected a suggestion panel for a bare slash');
+  assert.ok(frame.some((line) => line.includes('COMMANDS')), 'expected a suggestion panel for a bare slash');
   assert.ok(frame.some((line) => line.includes('/model')), 'expected /model among the suggestions');
 
   app.composer.set('/h');
@@ -789,11 +794,11 @@ test('the slash-command suggestion panel stays inside the chat panel and never b
   app.composer.set('/');
   const frame = app.snapshot().map(stripAnsi);
   const railStart = app.lastRegion.width;
-  const suggestionRow = frame.find((line) => line.includes('┏━ Commands'));
+  const suggestionRow = frame.find((line) => /[┌╔][─═] COMMANDS/.test(line));
   assert.ok(suggestionRow, 'expected the suggestion panel to be visible');
   // The panel's own right border must land at or before the chat panel's
   // right edge, not spill into the columns the rail owns.
-  const rightBorder = suggestionRow.lastIndexOf('┓');
+  const rightBorder = Math.max(suggestionRow.lastIndexOf('┐'), suggestionRow.lastIndexOf('╗'));
   assert.ok(rightBorder > 0 && rightBorder < railStart, `suggestion panel border at column ${rightBorder} should stay left of the rail at ${railStart}`);
 });
 
@@ -1151,12 +1156,12 @@ test('the chat view keeps the composer inside one unclipped frame', async (t) =>
     // assumed fixed offset isn't reliable, but the panel's own open/close
     // border rows still are.
     const stripped = frame.map(stripAnsi);
-    const openIndex = stripped.findIndex((line) => line.trimStart().startsWith('┏'));
-    const closeIndex = stripped.findIndex((line) => line.trimStart().startsWith('┗'));
+    const openIndex = stripped.findIndex((line) => line.trimStart().startsWith('╔'));
+    const closeIndex = stripped.findIndex((line) => line.trimStart().startsWith('╚'));
     assert.ok(openIndex >= 0 && closeIndex > openIndex, `frame should open and close, got open=${openIndex} close=${closeIndex}`);
     const body = stripped.slice(openIndex, closeIndex + 1);
-    assert.ok(body.at(-1).trimStart().startsWith('┗'), `frame should close, got "${body.at(-1)}"`);
-    assert.equal(body.filter((line) => line.trimStart().startsWith('┏')).length, 1, 'exactly one frame opens');
+    assert.ok(body.at(-1).trimStart().startsWith('╚'), `frame should close, got "${body.at(-1)}"`);
+    assert.equal(body.filter((line) => line.trimStart().startsWith('╔')).length, 1, 'exactly one frame opens');
     for (const line of frame) assert.equal(visibleWidth(line), 120);
   }
 });
@@ -1179,12 +1184,12 @@ test('a toast never overlaps the composer\'s own border or input row', async (t)
   app.screen.invalidate();
   const frame = app.snapshot().map(stripAnsi);
 
-  const inputIndex = frame.findIndex((line) => line.includes('❯'));
+  const inputIndex = frame.findIndex((line) => /[│║]\s+>/.test(line));
   assert.ok(inputIndex >= 1, 'composer input row should be present');
   const seamIndex = inputIndex - 1;
   assert.ok(seamIndex >= 1, 'sanity: the seam is not the very first row');
   assert.ok(
-    frame[seamIndex].trimStart().startsWith('┣') && frame[seamIndex].trimEnd().endsWith('┫'),
+    /^[╠├]/.test(frame[seamIndex].trimStart()) && /[╣┤]$/.test(frame[seamIndex].trimEnd()),
     'the seam divider must render intact, not be cut by a toast',
   );
 
@@ -1192,11 +1197,11 @@ test('a toast never overlaps the composer\'s own border or input row', async (t)
   // render(). Not one below the draft either: the panel's own border
   // already closes the box there.
   const inputRow = frame[seamIndex + 1];
-  assert.ok(inputRow.trimEnd().endsWith('┃'), `composer input row should keep its right border, got "${inputRow}"`);
-  assert.ok(inputRow.includes('❯'), 'composer prompt marker should still be visible');
+  assert.ok(/[│║]$/.test(inputRow.trimEnd()), `composer input row should keep its right border, got "${inputRow}"`);
+  assert.ok(inputRow.includes('>'), 'composer prompt marker should still be visible');
 
   const bottomBorder = frame[seamIndex + 2];
-  assert.ok(bottomBorder.trimEnd().endsWith('┛'), `composer bottom border should be intact, got "${bottomBorder}"`);
+  assert.ok(/[┘╝]$/.test(bottomBorder.trimEnd()), `composer bottom border should be intact, got "${bottomBorder}"`);
 });
 
 test('a streaming reply grows word by word in the transcript, then settles into the finished message', async (t) => {
@@ -1283,4 +1288,85 @@ test('markdown tables line their separators up with their columns', () => {
   assert.deepEqual(crosses(divider), pipes(header), 'crossings must sit under the pipes');
   for (const row of rows) assert.deepEqual(pipes(row), pipes(header), `"${row}" drifted`);
   for (const line of lines) assert.ok(visibleWidth(line) <= 60);
+});
+
+// ---------------------------------------------------------------- layout
+
+async function layoutApp(t, columns, rows = 36) {
+  const project = await createProject(t);
+  const runtime = await runtimeForTest(t, project);
+  const app = new MaskShiftTui(runtime, {
+    workspacePath: project, output: new FakeTerminal(columns, rows), headless: true, theme,
+  });
+  await app.bootstrap();
+  app.view = 'chat';
+  app.messages = [
+    { role: 'user', created_at: new Date().toISOString(), meta: {}, content: 'Refactor the renderer.' },
+    { role: 'assistant', created_at: new Date().toISOString(), meta: {}, content: '## Plan\n\nDiff the frame instead.' },
+  ];
+  return app;
+}
+
+test('the transcript is a reading column: capped at 100 columns and centred on a wide terminal', async (t) => {
+  const wide = await layoutApp(t, 200);
+  const narrow = await layoutApp(t, 80);
+  const indent = (app) => {
+    const line = app.snapshot().map(stripAnsi).find((row) => row.includes('Refactor the renderer.'));
+    return line.indexOf('Refactor');
+  };
+  assert.ok(indent(wide) >= indent(narrow) + 15, `wide terminal should centre the column, text starts at ${indent(wide)} vs ${indent(narrow)}`);
+  assert.ok(indent(narrow) <= 8, `narrow terminal should keep the text at the margin, got ${indent(narrow)}`);
+});
+
+test('messages are cards: a header row, then a body with no rail and no blank row after a heading', async (t) => {
+  const app = await layoutApp(t, 120);
+  const rows = app.snapshot().map(stripAnsi);
+  const you = rows.findIndex((row) => /\bYOU\b/.test(row));
+  assert.ok(you >= 0, 'a YOU header row');
+  assert.ok(!rows[you].includes('▌'), 'no speaker rail');
+  assert.ok(rows[you + 1].includes('Refactor the renderer.'), 'the body follows the header directly');
+  const body = rows.findIndex((row) => row.includes('Diff the frame instead.'));
+  assert.ok(body > 0 && /[│║]\s+Plan\b/.test(rows[body - 1]), `no blank row between a heading and its body: "${rows[body - 1]}"`);
+  assert.deepEqual(stripAnsiLines(renderMarkdown(theme, '## Plan\n\nBody', 40)), ['Plan', 'Body']);
+});
+
+function stripAnsiLines(lines) { return lines.map(stripAnsi); }
+
+test('the header drops its labels, then its counts, as the terminal narrows', async (t) => {
+  const narrow = await layoutApp(t, 100);
+  const mid = await layoutApp(t, 132);
+  const wide = await layoutApp(t, 170);
+  const header = (app) => app.snapshot().map(stripAnsi)[0];
+  assert.ok(!header(narrow).includes('Workspace') && !header(narrow).includes('Model '), header(narrow));
+  assert.ok(header(mid).includes('Workspace') && !header(mid).includes('Tools'), header(mid));
+  assert.ok(header(wide).includes('Tools') && header(wide).includes('Skills'), header(wide));
+});
+
+test('tabs and key hints share one bracket shape', async (t) => {
+  const app = await layoutApp(t, 120);
+  const rows = app.snapshot().map(stripAnsi);
+  assert.ok(rows[1].includes('[1 Chat]') && rows[1].includes('[2 Files]'), rows[1]);
+  assert.ok(rows.at(-1).includes('[') && /\] [A-Z]/.test(rows.at(-1)), rows.at(-1));
+});
+
+test('the sidebar gauges share one aligned row layout and sections are hairline rules', async (t) => {
+  const app = await layoutApp(t, 132);
+  app.railTab = 'telemetry';
+  const rows = app.snapshot().map(stripAnsi);
+  const gauge = ['Tools', 'Skills', 'MCP', 'Subagents'].map((name) => rows.find((row) => new RegExp(`${name}\\s+[█░]`).test(row)));
+  assert.ok(gauge.every(Boolean), `every gauge on one row: ${gauge.join(' | ')}`);
+  const bars = gauge.map((row) => row.search(/[█░]/));
+  assert.equal(new Set(bars).size, 1, `meters start on one column: ${bars.join(', ')}`);
+  const ends = gauge.map((row) => row.trimEnd().length);
+  assert.equal(new Set(ends).size, 1, `values end on one column: ${ends.join(', ')}`);
+  assert.ok(rows.some((row) => /─ LOADED ─+/.test(row)), 'sections are set off by a labelled hairline');
+});
+
+test('empty sidebar states are whole sentences with a hint, not a truncated line', async (t) => {
+  const app = await layoutApp(t, 132);
+  app.railTab = 'plan';
+  const rows = app.snapshot().map(stripAnsi).join('\n');
+  assert.ok(rows.includes('No plan yet.'), rows);
+  assert.ok(!/No plan yet[^\n]*…/.test(rows), 'not truncated');
+  assert.ok(rows.includes('publish one here.') || rows.includes('one here.'), 'the whole sentence is shown');
 });

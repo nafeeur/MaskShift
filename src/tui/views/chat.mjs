@@ -19,7 +19,7 @@ import { buildImagePreview, isImagePath } from '../image/render.mjs';
 import { renderMarkdown } from '../markdown.mjs';
 import { LAYER, Regions } from '../regions.mjs';
 import { hexToRgb } from '../theme.mjs';
-import { center, fit, oneLine, truncate, visibleWidth, wrap } from '../text.mjs';
+import { center, fit, oneLine, selectedRow, truncate, visibleWidth, wrap } from '../text.mjs';
 import { CONTENT_OFFSET, SPACE } from '../tokens.mjs';
 import { columns, gutter, key as typeKey, spread } from '../type.mjs';
 
@@ -31,34 +31,32 @@ const STARTERS = [
 
 const TOOL_NAME_WIDTH = 18;
 
+// The transcript is a reading column: it stops growing at this many columns and centres on a
+// wider terminal, instead of stretching a line across a 200-column screen.
+const READING_WIDTH = 100;
+// Terminals this wide get a second column of margin inside the frame.
+const WIDE = 100;
+
 /**
- * The speaker rail.
+ * A message is a card: one quiet header row naming the speaker, then the body indented under it by
+ * the shared gutter. There is no rail down the side and nothing right-aligned, so the eye reads
+ * down a single left edge, and a turn is told from the next by the blank row between them.
  *
- * `lead` is the row that names the speaker and takes the colour at full
- * strength; every other row of the turn gets the same rail softened toward the
- * panel, which groups the turn without fencing it in. The assistant's rail is
- * softened much further than the user's: the model's output is the page,
- * the user's input is the thing quoted onto it.
+ *   YOU · 02:21
+ *   Go through the PDFs in …
  */
-function rail(theme, colour, { lead = false, weight = 0.35 } = {}) {
+function cardHeader(theme, name, colour, width, { qualifier = '', stamp = '' } = {}) {
   const mark = glyphs(theme);
-  return lead
-    ? gutter(theme, mark.spine, { tone: colour })
-    : gutter(theme, mark.bar, { tone: theme.soften(colour, weight) });
+  const parts = [theme.paint(name.toUpperCase(), { fg: colour, bold: true })];
+  if (stamp) parts.push(theme.paint(stamp, { fg: theme.roles.muted }));
+  if (qualifier) parts.push(theme.paint(truncate(qualifier, Math.max(0, width - name.length - stamp.length - 12)), { fg: theme.roles.muted }));
+  const separator = theme.paint(` ${mark.dot} `, { fg: theme.roles.faint });
+  return fit(parts.join(separator), width + SPACE.gutter);
 }
 
-/** `SPEAKER · qualifier` on the left, a timestamp on the right. */
-function speakerRow(theme, name, colour, width, { qualifier = '', stamp = '' } = {}) {
-  const mark = glyphs(theme);
-  const head = theme.paint(name, { fg: colour, bold: true })
-    + (qualifier
-      ? theme.paint(` ${mark.dot} ${truncate(qualifier, Math.max(0, width - name.length - 12))}`, { fg: theme.roles.muted })
-      : '');
-  const tail = stamp ? theme.paint(stamp, { fg: theme.roles.faint }) : '';
-  // The left edge keeps a gutter's worth of margin before the speaker name;
-  // the timestamp got none on the right, sitting one column off the frame
-  // where every other line kept its full margin. Reserve the same column here.
-  return fit(spread(head, tail, Math.max(0, width - 1)), width);
+/** One row of a card's body, under the header's left edge. */
+function cardRow(theme, piece) {
+  return gutter(theme) + piece;
 }
 
 /**
@@ -166,7 +164,7 @@ function toolLines(app, message, width, key, globalExpanded) {
 
   const head = gutter(theme, failed ? mark.cross : mark.check, { tone })
     + columns(theme, [
-      { text: name, width: nameWidth, tone: theme.roles.tool, bold: true },
+      { text: name.startsWith('shell_') ? `$ ${name}` : name, width: nameWidth, tone: theme.roles.tool, bold: true },
       {
         text: fitsInline ? flat : (shown > 0 ? '' : oneLine(text, resultWidth)),
         tone: failed ? theme.roles.danger : theme.roles.dim,
@@ -232,13 +230,12 @@ function buildMessageLines(app, theme, text) {
     if (message.role === 'user') {
       openBlock('user');
       const colour = theme.roles.user;
-      lines.push(rail(theme, colour, { lead: true })
-        + speakerRow(theme, 'You', colour, text, {
-          qualifier: message.meta?.source === 'steer' ? 'steered mid-run' : '',
-          stamp: app.stamp(message.created_at),
-        }));
+      lines.push(cardHeader(theme, 'You', colour, text, {
+        qualifier: message.meta?.source === 'steer' ? 'steered mid-run' : '',
+        stamp: app.stamp(message.created_at),
+      }));
       for (const piece of wrap(String(message.content || ''), text)) {
-        lines.push(rail(theme, colour) + theme.paint(piece, { fg: theme.roles.text }));
+        lines.push(cardRow(theme, theme.paint(piece, { fg: theme.roles.text })));
       }
       continue;
     }
@@ -248,13 +245,12 @@ function buildMessageLines(app, theme, text) {
       if (!String(message.content || '').trim()) continue;
       openBlock('assistant');
       const colour = theme.roles.primary;
-      lines.push(rail(theme, colour, { lead: true })
-        + speakerRow(theme, 'MaskShift', colour, text, {
-          qualifier: message.meta?.modelRef || '',
-          stamp: app.stamp(message.created_at),
-        }));
+      lines.push(cardHeader(theme, 'MaskShift', colour, text, {
+        qualifier: message.meta?.modelRef || '',
+        stamp: app.stamp(message.created_at),
+      }));
       for (const piece of renderMarkdown(theme, message.content, text)) {
-        lines.push(rail(theme, colour, { weight: 0.14 }) + piece);
+        lines.push(cardRow(theme, piece));
       }
       continue;
     }
@@ -342,16 +338,17 @@ export function transcriptLines(app, width) {
     openBlock('assistant');
     const colour = theme.roles.primary;
     const mark = glyphs(theme);
-    lines.push(rail(theme, colour, { lead: true })
-      + speakerRow(theme, 'MaskShift', colour, text, { qualifier: app.modelRef || '' }));
+    lines.push(cardHeader(theme, 'MaskShift', colour, text, { qualifier: app.modelRef || '' }));
     const body = renderMarkdown(theme, app.streamingText, text);
-    const cursor = theme.paint(mark.spineRight, { fg: colour });
+    // A block cursor that blinks on a one-second beat (solid whenever the clock is frozen).
+    const blinkOn = theme.motion.frozen || theme.motion.phase(1000) < 0.6;
+    const cursor = theme.paint(mark.spineRight, { fg: blinkOn ? colour : theme.roles.surface });
     body.forEach((piece, index) => {
       const isLast = index === body.length - 1;
-      lines.push(rail(theme, colour, { weight: 0.14 }) + (isLast && visibleWidth(piece) < text ? piece + cursor : piece));
-      if (isLast && visibleWidth(piece) >= text) lines.push(rail(theme, colour, { weight: 0.14 }) + cursor);
+      lines.push(cardRow(theme, isLast && visibleWidth(piece) < text ? piece + cursor : piece));
+      if (isLast && visibleWidth(piece) >= text) lines.push(cardRow(theme, cursor));
     });
-    if (!body.length) lines.push(rail(theme, colour, { weight: 0.14 }) + cursor);
+    if (!body.length) lines.push(cardRow(theme, cursor));
   }
 
   for (const entry of app.liveTrail) {
@@ -425,7 +422,9 @@ export function render(app, region) {
   // divider in the app (the rail's section row, a pane's own title rule) sits
   // directly above its content with no gap, and a pad row here just read as
   // dead space above the caret while starving the transcript of a row.
-  const composerWidth = Math.max(8, width - 6);
+  // Two columns of margin on a wide terminal, one on a narrow one.
+  const margin = width >= WIDE ? 1 : 0;
+  const composerWidth = Math.max(8, width - 6 - margin);
   const draftRows = app.composer.layout(composerWidth, 6).total;
   const draftVisibleRows = Math.max(1, Math.min(6, draftRows, Math.max(1, height - 8)));
   const composerRows = draftVisibleRows;
@@ -444,10 +443,20 @@ export function render(app, region) {
 
   const isEmpty = app.messages.length === 0 && app.liveTrail.length === 0;
   if (isEmpty) app._transcriptImageBlocks = [];
-  const body = isEmpty ? emptyState(app, textWidth, transcriptHeight) : transcriptLines(app, textWidth);
+  // The reading column: capped, centred, and never flush against the frame on a wide terminal.
+  const readingWidth = Math.max(8, Math.min(textWidth - margin * 2, READING_WIDTH));
+  const left = isEmpty ? 0 : Math.max(margin, Math.floor((textWidth - readingWidth) / 2));
+  const body = isEmpty ? emptyState(app, textWidth, transcriptHeight) : transcriptLines(app, readingWidth);
 
   app.transcript.set(body);
-  const visible = app.transcript.render(transcriptHeight, textWidth);
+  const hoverRow = (line, row) => {
+    // A clickable row lights up as a whole bar under the pointer, not just the text.
+    const hovered = (app._transcriptToolTriggers || []).some((trigger, index) => (
+      trigger.row - app.transcript.offset === row && app.regions?.hoverId === `chat:tool-expand:${index}`));
+    return hovered ? selectedRow(theme, line) : line;
+  };
+  const visible = app.transcript.render(transcriptHeight, readingWidth)
+    .map((line, row) => `${' '.repeat(left)}${hoverRow(line, row)}`);
   const bar = app.transcript.scrollbar(theme, transcriptHeight);
   const transcriptRows = visible.map((line, index) => `${fit(line, textWidth + 1)}${bar[index] ?? ' '}`);
 
@@ -465,7 +474,7 @@ export function render(app, region) {
       imageOverlay.push({
         ...block.overlay,
         row: region.row + 1 + (block.startLine - scrollOffset),
-        column: region.column + CONTENT_OFFSET,
+        column: region.column + CONTENT_OFFSET + left,
       });
     }
   }
@@ -488,7 +497,7 @@ export function render(app, region) {
   const seam = rule(theme, width - 2, seamLabel, {
     active: composerFocused,
     // The seam is part of the frame, so it carries the frame's weight.
-    weight: paneFocused ? 'heavy' : 'light',
+    weight: paneFocused ? 'double' : 'square',
     colour: frameColour(theme, paneFocused),
     busy: app.busy,
     stamp: promptView
@@ -500,7 +509,7 @@ export function render(app, region) {
 
   // One extra column beyond the usual gutter width, so the caret has more
   // breathing room before the draft text starts than a list row's marker does.
-  const composerGutterWidth = SPACE.gutter + 1;
+  const composerGutterWidth = SPACE.gutter + 1 + margin;
   const layout = app.composer.layout(composerWidth, draftVisibleRows);
   const composerBody = [];
   for (let index = 0; index < draftVisibleRows; index += 1) {

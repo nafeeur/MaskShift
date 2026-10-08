@@ -6,7 +6,7 @@ import { centreOffset } from './layout.mjs';
 import { diffLines } from './diff.mjs';
 import { presence } from './motion.mjs';
 import { LAYER } from './regions.mjs';
-import { fit, repeat, sentence, truncate, underlay, visibleWidth, wrap } from './text.mjs';
+import { fit, repeat, sentence, truncate, selectedRow, visibleWidth, wrap } from './text.mjs';
 import { DURATION, SPACE } from './tokens.mjs';
 import { chip, columns, gutter, key as typeKey } from './type.mjs';
 import { Composer, ListView, TextField, fuzzy, highlightMatch } from './widgets.mjs';
@@ -144,7 +144,7 @@ export class PaletteOverlay extends Overlay {
             { text: item.key || '', width: 10, align: 'right', tone: theme.roles.accent },
           ], Math.max(0, itemWidth - SPACE.gutter));
         return selected
-          ? underlay(fit(line, itemWidth), theme.bg(theme.roles.selection))
+          ? selectedRow(theme, fit(line, itemWidth))
           : fit(line, itemWidth);
       }),
     ];
@@ -233,7 +233,7 @@ export class PickerOverlay extends Overlay {
             { text: item.detail || '', tone: theme.roles.muted },
           ], Math.max(0, itemWidth - SPACE.gutter));
         return selected
-          ? underlay(fit(line, itemWidth), theme.bg(theme.roles.selection))
+          ? selectedRow(theme, fit(line, itemWidth))
           : fit(line, itemWidth);
       }),
     ];
@@ -746,7 +746,7 @@ export class ChangesOverlay extends Overlay {
       const line = (selected ? theme.paint(`${mark.caret} `, { fg: theme.roles.primary }) : '  ')
         + theme.paint(`${symbol} `, { fg: theme.role(tone), bold: true })
         + theme.paint(truncate(file.path, listWidth - 4), { fg: selected ? theme.roles.text : theme.roles.dim, bold: selected });
-      return selected ? underlay(fit(line, listWidth), theme.bg(theme.roles.selection)) : fit(line, listWidth);
+      return selected ? selectedRow(theme, fit(line, listWidth)) : fit(line, listWidth);
     });
     const listStart = Math.max(0, Math.min(this.selected - Math.floor(inner / 2), this.files.length - inner));
 

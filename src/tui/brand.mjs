@@ -3,31 +3,41 @@
 import { glyphs } from './box.mjs';
 import { center, fit, repeat, visibleWidth } from './text.mjs';
 
-// Full block wordmark for the CLI banner and the empty-state hero.
-const WORDMARK = [
-  '███╗   ███╗ █████╗ ███████╗██╗  ██╗███████╗██╗  ██╗██╗███████╗████████╗',
-  '████╗ ████║██╔══██╗██╔════╝██║ ██╔╝██╔════╝██║  ██║██║██╔════╝╚══██╔══╝',
-  '██╔████╔██║███████║███████╗█████╔╝ ███████╗███████║██║█████╗     ██║   ',
-  '██║╚██╔╝██║██╔══██║╚════██║██╔═██╗ ╚════██║██╔══██║██║██╔══╝     ██║   ',
-  '██║ ╚═╝ ██║██║  ██║███████║██║  ██╗███████║██║  ██║██║██║        ██║   ',
-  '╚═╝     ╚═╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝╚═╝        ╚═╝   ',
-];
+// The wordmark: a prompt, the name in a five-row block face, and a cursor. Same idea as the
+// README banner (`> maskshift_`), drawn with full blocks so it reads as a terminal's own type.
+const FACE = {
+  '>': ['██   ', ' ██  ', '  ██ ', ' ██  ', '██   '],
+  m: ['█   █', '██ ██', '█ █ █', '█   █', '█   █'],
+  a: [' ███ ', '█   █', '█████', '█   █', '█   █'],
+  s: [' ████', '█    ', ' ███ ', '    █', '████ '],
+  k: ['█   █', '█  █ ', '███  ', '█  █ ', '█   █'],
+  h: ['█    ', '█    ', '████ ', '█   █', '█   █'],
+  i: ['█████', '  █  ', '  █  ', '  █  ', '█████'],
+  f: [' ████', '█    ', '███  ', '█    ', '█    '],
+  t: ['█████', '  █  ', '  █  ', '  █  ', '  █  '],
+  _: ['     ', '     ', '     ', '     ', '█████'],
+  ' ': ['  ', '  ', '  ', '  ', '  '],
+};
+
+const WORD = ['>', ' ', 'm', 'a', 's', 'k', 's', 'h', 'i', 'f', 't', '_'];
+
+function blockLines() {
+  return [0, 1, 2, 3, 4].map((row) => WORD.map((ch) => FACE[ch][row]).join(' '));
+}
+
+const WORDMARK = blockLines();
 
 // Compact mark for narrow terminals.
-const COMPACT = [
-  '┌┬┐ ┌─┐ ┌─┐ ┬┌─ ┌─┐ ┬ ┬ ┬ ┌─┐ ┌┬┐',
-  '│││ ├─┤ └─┐ ├┴┐ └─┐ ├─┤ │ ├┤   │ ',
-  '┴ ┴ ┴ ┴ └─┘ ┴ ┴ └─┘ ┴ ┴ ┴ ┴    ┴ ',
-];
+const COMPACT = ['> maskshift_'];
 
 export function wordmark(theme, width) {
   const art = width >= visibleWidth(WORDMARK[0]) ? WORDMARK : COMPACT;
-  if (!theme.unicode) return ['MaskShift'];
-  // Reads from roles rather than the fixed "crimson"/"blood"/"gold"/"ember" palette names, so the
-  // gradient re-tones itself for whichever theme is active instead of always being MaskShift red.
+  if (!theme.unicode) return ['> maskshift_'];
+  // The prompt chevron and the name in bright green, "shift" and the cursor a step lower, each row
+  // fading a little toward the bottom like phosphor — all read from roles.
   return art.map((line, index) => theme.gradient(
     fit(line, Math.min(width, visibleWidth(line))),
-    index < art.length / 2 ? theme.roles.primary : theme.roles.primaryDeep,
+    index < art.length / 2 ? theme.roles.heading : theme.roles.primary,
     index < art.length / 2 ? theme.roles.accent : theme.roles.accentDeep,
     { bold: true },
   ));
@@ -49,7 +59,12 @@ export function heroBlock(theme, width) {
   const lines = [];
   for (const line of wordmark(theme, width)) lines.push(center(line, width));
   lines.push('');
-  lines.push(center(theme.paint(TAGLINE, { fg: theme.roles.accent, bold: true }), width));
+  // The tagline types itself out the first moment the interface is up (the clock is frozen for
+  // captures and tests, which see it complete), with a block cursor riding the last character.
+  const typed = theme.motion.frozen ? TAGLINE.length : Math.min(TAGLINE.length, Math.floor(theme.motion.elapsed / 28));
+  const shown = TAGLINE.slice(0, typed);
+  const tail = typed < TAGLINE.length ? theme.paint(mark.spineRight, { fg: theme.roles.primary }) : '';
+  lines.push(center(theme.paint(shown, { fg: theme.roles.accent, bold: true }) + tail + ' '.repeat(Math.max(0, TAGLINE.length - typed - (tail ? 1 : 0))), width));
   lines.push(center(theme.paint(repeat(mark.tick, Math.min(width - 4, visibleWidth(TAGLINE))), { fg: theme.roles.borderStrong }), width));
   return lines;
 }

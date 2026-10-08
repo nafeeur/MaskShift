@@ -31,7 +31,39 @@ other colour. Meaning is carried by brightness and weight, never by hue.
 
 Status never relies on colour alone: every state also has its own glyph (see
 `status.mjs`), so the interface reads the same with `NO_COLOR` or on a
-monochrome display. There is one theme and no `/theme` command.
+monochrome display. There is one theme and no `/theme` command. It is drawn like a text-mode terminal:
+
+- **Frames** are square, and the pane that holds the keyboard gets a double line.
+  Pane and section titles are upper case; the key hints at the foot are inverse
+  blocks with upper-case labels.
+- **Messages are cards**: a quiet header row (`YOU · 02:21`) on the margin, the body
+  indented under it, one blank row between turns and none inside one. The
+  transcript is a reading column, capped at 100 columns and centred on a wide
+  terminal, with a second column of margin from 100 columns up.
+- **Header**: labels (`Workspace`, `Model`, `Mode`) appear from 118 columns and the
+  capability counts from 150; below that the values stand alone.
+- **One control shape**: tabs and key hints are `[ ]` brackets (`[1 Chat]`,
+  `[^K] PALETTE`); the current tab is the same bracket filled in, and a control
+  under the pointer lights up as a whole bar, as does a clickable tool result.
+- **Sidebar**: sections are set off by a labelled hairline rule (`─ LOADED ───`),
+  not boxes, and every gauge is one row — label, meter, right-aligned value.
+  Empty states are whole sentences with a hint.
+- **Selection** is a full inverse bar (dark text on bright green), as on a
+  terminal of the period.
+- **Diffs** read by weight, not hue: added lines bright and bold, removed lines
+  dim and struck through. **Syntax** is bold keywords, underlined numbers and
+  italic comments. Meters are solid `█` against a hollow `░` track.
+- **The cursor** is a blinking block (DECSCUSR), the composer prompt is `>`, shell
+  commands carry a `$`, and the welcome screen types its tagline out once.
+- **Ground**: the interface paints its own near-black green on every cell, so it
+  looks the same on a light terminal or a transparent window (`ui.opaque`).
+  `ui.scanlines` alternates the row background very slightly.
+- **Contrast**: `ui.contrast` is `standard`, `high` (brighter text on pure black)
+  or `soft` (lower glare); `MASKSHIFT_CONTRAST` overrides it. All three keep every
+  text colour at 4.5:1 or better.
+- **Fewer colours**: on 256 colours the greens are matched to the nearest cube
+  entry; on 16 colours text maps to green and bright green and borders stay
+  visible.
 
 Two consequences are worth stating outright, because breaking either is what
 made earlier revisions read as noise:
