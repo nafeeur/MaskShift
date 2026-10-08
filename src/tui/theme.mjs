@@ -100,7 +100,9 @@ export class Theme {
     // themed role, and have no reason to change colour when the user switches themes.
     this.palette = PALETTE;
     this.themeId = resolveThemeId(themeId);
-    this.roles = resolveTheme(this.themeId).roles;
+    const resolved = resolveTheme(this.themeId);
+    this.roles = resolved.roles;
+    this.signalStyle = resolved.signalStyle || {};
     // Animations read the clock through the theme so a headless render can
     // freeze every moving part at once.
     this.motion = motion || new Motion({ frozen });
@@ -111,7 +113,9 @@ export class Theme {
    *  (the screen, every widget, every view) picks it up on its next paint with no other wiring. */
   setTheme(themeId) {
     this.themeId = resolveThemeId(themeId);
-    this.roles = resolveTheme(this.themeId).roles;
+    const resolved = resolveTheme(this.themeId);
+    this.roles = resolved.roles;
+    this.signalStyle = resolved.signalStyle || {};
   }
 
   get enabled() { return this.depth > 0; }
@@ -187,6 +191,21 @@ export class Theme {
   /** A colour softened toward the surface it is drawn on. */
   soften(hex, ratio = 0.5, surface = null) {
     return this.mixed(surface || this.roles.surface, hex, 1 - ratio);
+  }
+
+  /**
+   * Paint options for a role used as a signal (success, warning, danger, ...). Themes with no
+   * hue to spare — Retro is all one green — give a signal weight instead: bold, or inverse
+   * (dark text on a bar of the role's colour). Themes that don't define one get a plain `fg`.
+   */
+  signal(name, options = {}) {
+    const hex = this.role(name);
+    const style = this.signalStyle[name];
+    if (!style) return { ...options, fg: hex };
+    const { inverse, ...rest } = style;
+    return inverse
+      ? { ...options, ...rest, fg: this.roles.background, bg: hex }
+      : { ...options, ...rest, fg: hex };
   }
 
   role(name) { return this.roles[name] || PALETTE.bone; }

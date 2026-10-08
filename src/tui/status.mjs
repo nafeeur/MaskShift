@@ -127,7 +127,7 @@ export function statusMark(theme, value, { animate = false } = {}) {
 /** `glyph label` in one tone. The canonical way to show state inline. */
 export function statusLine(theme, value, { animate = true, label = null, bold = false } = {}) {
   const state = statusOf(value, { label });
-  const tone = theme.role(state.tone);
-  return theme.paint(`${statusGlyph(theme, value, { animate })} `, { fg: tone })
-    + theme.paint(state.label, { fg: tone, bold });
+  const options = theme.signal(state.tone, { bold });
+  return theme.paint(`${statusGlyph(theme, value, { animate })} `, options)
+    + theme.paint(state.label, options);
 }
