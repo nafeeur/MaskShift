@@ -1,6 +1,6 @@
 {
   "name": "maskshift",
-  "version": "1.4.1",
+  "version": "2.0.0",
   "description": "A general-purpose, model-agnostic agent harness for the terminal, with tools loaded on demand, skills, MCP and multi-agent orchestration.",
   "type": "module",
   "bin": {

@@ -123,12 +123,67 @@ async function readNDJSON(response, maxBytes, onFrame) {
 }
 
 /**
+ * AWS event-stream (Bedrock ConverseStream) — binary frames: 12-byte prelude (total length, header
+ * length, CRC), headers, JSON payload, trailing CRC. Each frame is handed on as { event, data }
+ * where `event` is the :event-type (or :exception-type) header.
+ */
+async function readEventStream(response, maxBytes, onFrame) {
+  if (!response.body) return;
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = Buffer.alloc(0);
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) throw Object.assign(new Error(`Provider response exceeded ${maxBytes} bytes`), { code: 'HARNESS_RESPONSE_TOO_LARGE' });
+      buffer = Buffer.concat([buffer, value]);
+      while (buffer.length >= 12) {
+        const frameLength = buffer.readUInt32BE(0);
+        if (buffer.length < frameLength) break;
+        const headerLength = buffer.readUInt32BE(4);
+        const headers = {};
+        let offset = 12;
+        const headerEnd = 12 + headerLength;
+        while (offset < headerEnd) {
+          const nameLength = buffer[offset++];
+          const name = buffer.toString('utf8', offset, offset + nameLength);
+          offset += nameLength;
+          const type = buffer[offset++];
+          if (type === 7) {
+            const valueLength = buffer.readUInt16BE(offset);
+            headers[name] = buffer.toString('utf8', offset + 2, offset + 2 + valueLength);
+            offset += 2 + valueLength;
+          } else if (type === 6) {
+            offset += 2 + buffer.readUInt16BE(offset);
+          } else {
+            // Fixed-width header values: true/false carry none, then byte, short, int, long, timestamp, uuid.
+            offset += [0, 0, 1, 2, 4, 8, 0, 0, 8, 16][type] ?? 0;
+          }
+        }
+        const payload = decoder.decode(buffer.subarray(headerEnd, frameLength - 4));
+        buffer = buffer.subarray(frameLength);
+        if (headers[':message-type'] === 'exception') {
+          const detail = safeJsonParse(payload, null);
+          throw new Error(`${headers[':exception-type'] || 'Bedrock stream error'}: ${detail?.message || payload}`);
+        }
+        onFrame({ event: headers[':event-type'] || 'message', data: payload });
+      }
+    }
+  } finally {
+    try { reader.releaseLock(); } catch { /* already released on stream error */ }
+  }
+}
+
+/**
  * Streams a provider response frame-by-frame instead of buffering the whole body, so partial
  * text can reach the transcript as it's generated. Error responses are still read in full (they
  * are small, and providers send them as ordinary JSON, not as a stream) so the existing
  * status/message handling in `fetchJson` keeps working unchanged for the failure path.
  */
-async function fetchStream(url, options, { signal, timeoutMs = 180_000, maxBytes = 32 * 1024 * 1024, onFrame, ndjson = false }) {
+async function fetchStream(url, options, { signal, timeoutMs = 180_000, maxBytes = 32 * 1024 * 1024, onFrame, ndjson = false, eventStream = false }) {
   const combined = combineSignals(signal, timeoutMs);
   let response;
   try {
@@ -148,7 +203,8 @@ async function fetchStream(url, options, { signal, timeoutMs = 180_000, maxBytes
     throw error;
   }
   try {
-    if (ndjson) await readNDJSON(response, maxBytes, onFrame);
+    if (eventStream) await readEventStream(response, maxBytes, onFrame);
+    else if (ndjson) await readNDJSON(response, maxBytes, onFrame);
     else await readSSE(response, maxBytes, onFrame);
   } catch (error) {
     if (error.code === 'HARNESS_RESPONSE_TOO_LARGE') throw error;
@@ -240,6 +296,38 @@ function toOllamaMessages(messages, ref = null) {
     }
     return value;
   });
+}
+
+// Converse wants alternating user/assistant turns, tool calls and results as content blocks, and
+// some models (Kimi K3) reject system messages outright, so system text is folded into the first user turn.
+function toBedrockMessages(messages) {
+  const system = messages.filter((m) => m.role === 'system').map((m) => String(m.content || '')).filter(Boolean).join('\n\n');
+  const turns = [];
+  const push = (role, blocks) => {
+    if (!blocks.length) return;
+    const last = turns[turns.length - 1];
+    if (last && last.role === role) last.content.push(...blocks);
+    else turns.push({ role, content: [...blocks] });
+  };
+  for (const message of messages) {
+    if (message.role === 'system') continue;
+    if (message.role === 'tool') {
+      push('user', [{ toolResult: { toolUseId: message.toolCallId, content: [{ text: String(message.content || '') || '(no output)' }] } }]);
+    } else if (message.role === 'assistant') {
+      const blocks = [];
+      if (message.content) blocks.push({ text: String(message.content) });
+      for (const call of message.toolCalls || []) blocks.push({ toolUse: { toolUseId: call.id, name: call.name, input: call.args || {} } });
+      push('assistant', blocks);
+    } else {
+      push('user', [{ text: String(message.content || '') || '(empty)' }]);
+    }
+  }
+  if (system) {
+    if (turns[0]?.role === 'user') turns[0].content.unshift({ text: `${system}\n\n---\n\n` });
+    else turns.unshift({ role: 'user', content: [{ text: system }] });
+  }
+  if (turns[0]?.role === 'assistant') turns.unshift({ role: 'user', content: [{ text: '(start)' }] });
+  return turns;
 }
 
 function toOpenAiTools(tools) {
@@ -623,6 +711,7 @@ export class ProviderManager {
     else if (resolved.provider.type === 'openai-responses') result = await this.#openAiResponses(resolved, outbound, wireTools, { signal, temperature, maxTokens, onDelta: forwardDelta });
     else if (resolved.provider.type === 'ollama') result = await this.#ollama(resolved, outbound, wireTools, { signal, temperature, maxTokens, onDelta: forwardDelta });
     else if (resolved.provider.type === 'gemini') result = await this.#gemini(resolved, outbound, wireTools, { signal, temperature, maxTokens, onDelta: forwardDelta });
+    else if (resolved.provider.type === 'bedrock') result = await this.#bedrock(resolved, outbound, wireTools, { signal, temperature, maxTokens, onDelta: forwardDelta });
     else result = await this.#openAiCompatible(resolved, outbound, wireTools, { signal, temperature, maxTokens, onDelta: forwardDelta });
 
     result.toolProtocol = useText ? 'text' : 'native';
@@ -1007,6 +1096,105 @@ export class ProviderManager {
       toolCalls: parts.filter((part) => part.functionCall).map((part, index) => normalizeToolCall(part, index)),
       finishReason, usage,
       providerState: { type: 'gemini', ref: resolved.ref, parts },
+    };
+  }
+
+  /**
+   * AWS Bedrock runtime using the Converse API with a Bearer token.
+   * Supports inference profiles (e.g. global.moonshotai.kimi-k3) directly.
+   * Uses the Bedrock Runtime Converse API, which supports tool use, reasoning,
+   * and streaming for supported models.
+   */
+async #bedrock(resolved, messages, tools, { signal, temperature, maxTokens, onDelta }) {
+    const provider = resolved.provider;
+    const region = provider.region || 'us-east-1';
+    const endpoint = provider.baseUrl || `https://bedrock-runtime.${region}.amazonaws.com`;
+
+    const modelId = resolved.model;
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${this.apiKey(provider)}`,
+      ...provider.headers,
+    };
+
+    // Some Bedrock models (e.g. Kimi K3) reject the temperature field.
+    const inferenceConfig = { maxTokens };
+    if (temperature != null && temperature !== 0.1) inferenceConfig.temperature = temperature;
+
+    const body = {
+      modelId,
+      messages: toBedrockMessages(messages),
+      inferenceConfig,
+      ...(tools.length ? {
+        toolConfig: {
+          tools: tools.map((tool) => ({
+            toolSpec: {
+              name: tool.name,
+              description: truncate(tool.description || '', 1024),
+              inputSchema: { json: tool.inputSchema || { type: 'object', properties: {} } },
+            },
+          })),
+        },
+      } : {}),
+      ...provider.requestDefaults,
+    };
+
+    const url = `${endpoint.replace(/\/$/, '')}/model/${encodeURIComponent(modelId)}/converse-stream`;
+
+    let content = '';
+    let reasoningContent = '';
+    let finishReason = null;
+    let usage = {};
+    const toolBlocks = new Map();
+    try {
+      await fetchStream(url, {
+        method: 'POST', headers: { ...headers, Accept: 'application/vnd.amazon.eventstream' }, body: JSON.stringify(body),
+      }, {
+        signal, timeoutMs: provider.timeoutMs || 300_000, eventStream: true,
+        onFrame: ({ event, data }) => {
+          const chunk = safeJsonParse(data, null);
+          if (!chunk) return;
+          const index = chunk.contentBlockIndex ?? 0;
+          if (event === 'contentBlockStart' && chunk.start?.toolUse) {
+            toolBlocks.set(index, { id: chunk.start.toolUse.toolUseId, name: chunk.start.toolUse.name, args: '' });
+          } else if (event === 'contentBlockDelta') {
+            const delta = chunk.delta || {};
+            if (typeof delta.text === 'string' && delta.text) {
+              content += delta.text;
+              onDelta?.(content);
+            }
+            if (typeof delta.reasoningContent?.text === 'string') reasoningContent += delta.reasoningContent.text;
+            if (typeof delta.toolUse?.input === 'string' && toolBlocks.has(index)) toolBlocks.get(index).args += delta.toolUse.input;
+          } else if (event === 'messageStop') {
+            finishReason = chunk.stopReason || null;
+          } else if (event === 'metadata') {
+            usage = chunk.usage || usage;
+          }
+        },
+      });
+    } catch (error) {
+      if (error.message?.includes('inference profile')) {
+        throw new Error(`Bedrock: model '${modelId}' requires an inference profile. Use 'global.${modelId}' or 'us.${modelId}' instead.`);
+      }
+      throw error;
+    }
+
+    const toolCalls = [...toolBlocks.values()].map((call, index) => normalizeToolCall({
+      id: call.id,
+      function: { name: call.name, arguments: call.args || '{}' },
+    }, index));
+
+    return {
+      content,
+      toolCalls,
+      finishReason,
+      usage: {
+        input_tokens: usage.inputTokens,
+        output_tokens: usage.outputTokens,
+        total_tokens: usage.totalTokens,
+      },
+      providerState: { type: 'bedrock', ref: resolved.ref, reasoningContent: reasoningContent || undefined },
     };
   }
 }

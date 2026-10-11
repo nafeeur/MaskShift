@@ -82,6 +82,16 @@ function envProviderDefaults() {
       autoDiscover: true,
       models: [],
     },
+    {
+      id: 'bedrock',
+      name: 'AWS Bedrock',
+      type: 'bedrock',
+      baseUrl: 'https://bedrock-runtime.us-east-1.amazonaws.com',
+      apiKeyEnv: 'AWS_BEARER_TOKEN_BEDROCK',
+      enabled: true,
+      autoDiscover: false,
+      models: [],
+    },
   ];
 }
 

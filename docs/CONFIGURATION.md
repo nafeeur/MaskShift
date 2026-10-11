@@ -464,7 +464,7 @@ connected and its tools listed when it was added.
 
 | Group | Servers | Setup |
 |---|---|---|
-| **Ready to use** | `deepwiki`, `microsoft-learn`, `huggingface`, `cloudflare-docs`, `exa`, `gitmcp`, `context7`, `openai-docs`, `playwright`, `chrome-devtools`, `markitdown`, `duckduckgo`, `svelte`, `time-mcp`, `fetch-mcp`, `memory-mcp`, `sequential-thinking` | None. Hosted ones are remote URLs; the rest run through `npx` or `uvx`. |
+| **Ready to use** | `deepwiki`, `microsoft-learn`, `huggingface`, `cloudflare-docs`, `exa`, `gitmcp`, `context7`, `openai-docs`, `playwright`, `chrome-devtools`, `markitdown`, `duckduckgo`, `rea`, `svelte`, `time-mcp`, `fetch-mcp`, `memory-mcp`, `sequential-thinking` | None. Hosted ones are remote URLs; the rest run through `npx` or `uvx`. |
 | **Token in your environment** | `github` (`GITHUB_TOKEN`), `linear` (`LINEAR_API_KEY`), `stripe` (`STRIPE_API_KEY`), `supabase` (`SUPABASE_ACCESS_TOKEN`), `apify` (`APIFY_TOKEN`), `brave-search` (`BRAVE_API_KEY`), `tavily` (`TAVILY_API_KEY`), `firecrawl` (`FIRECRAWL_API_KEY`), `notion-api` (`NOTION_TOKEN`), `figma-api` (`FIGMA_API_KEY`), `mapbox` (`MAPBOX_ACCESS_TOKEN`) | Export the variable, then connect with `force` (TUI `↵` on a disabled server, or `maskshift mcp connect NAME --force`). The token is read from the environment at connect time and never stored. |
 | **Sign in with your browser** | `notion`, `sentry`, `atlassian`, `asana`, `vercel`, `figma`, `neon`, `hubspot`, `paypal`, `canva` | Run through `mcp-remote`, which opens the provider's sign-in page on first connect. |
 | **Off by default** | `filesystem-mcp`, `git-mcp`, `docker-mcp`, `sqlite-mcp`, `everything-mcp` | Overlap with native tools or need a path; connect with `force` when wanted. |

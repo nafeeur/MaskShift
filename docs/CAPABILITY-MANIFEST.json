@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-10-04T20:22:53.567Z",
-  "version": "1.4.1",
+  "generatedAt": "2026-10-11T02:37:16.622Z",
+  "version": "2.0.0",
   "nativeToolCount": 202,
-  "bundledSkillCount": 50,
-  "curatedMcpCount": 43,
+  "bundledSkillCount": 51,
+  "curatedMcpCount": 44,
   "tools": [
     {
       "name": "agent_bridge_discover",
@@ -2303,6 +2303,19 @@
       "updatedAt": "2026-10-04T02:28:26.298Z"
     },
     {
+      "name": "reverse-engineering",
+      "description": "Reverse engineer shipped binaries, JavaScript/Electron apps, .NET assemblies, Android APKs, firmware, and websites using the REA MCP server, with evidence-backed findings and a guided investigation workflow.",
+      "path": "skills/reverse-engineering",
+      "file": "skills/reverse-engineering/SKILL.md",
+      "source": "bundled",
+      "meta": {
+        "name": "reverse-engineering",
+        "description": "Reverse engineer shipped binaries, JavaScript/Electron apps, .NET assemblies, Android APKs, firmware, and websites using the REA MCP server, with evidence-backed findings and a guided investigation workflow."
+      },
+      "bodyChars": 3364,
+      "updatedAt": "2026-10-11T02:33:47.368Z"
+    },
+    {
       "name": "rust-engineering",
       "description": "Implement reliable Rust systems with ownership-aware design, errors, async cancellation, tests, and workspace conventions.",
       "path": "skills/rust-engineering",
@@ -2817,6 +2830,38 @@
         "ui",
         "test",
         "automation"
+      ],
+      "enabled": true,
+      "lazy": true,
+      "source": "curated",
+      "status": "available",
+      "protocol": null,
+      "era": null,
+      "serverInfo": null,
+      "toolCount": 0
+    },
+    {
+      "name": "rea",
+      "title": "REA Reverse Engineering",
+      "description": "Reverse engineer shipped artifacts locally: native binaries, JavaScript/Electron apps, .NET assemblies, Android APKs, firmware, websites, and runtime behavior. Returns evidence and limitations with each finding. Deep native analysis needs an optional Hopper, Ghidra, or IDA install.",
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "rea-agents@latest",
+        "mcp"
+      ],
+      "keywords": [
+        "reverse engineering",
+        "binary",
+        "decompile",
+        "disassemble",
+        "static analysis",
+        "electron",
+        "apk",
+        "ghidra",
+        "hopper",
+        "evidence"
       ],
       "enabled": true,
       "lazy": true,

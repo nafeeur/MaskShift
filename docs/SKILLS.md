@@ -1,6 +1,6 @@
 # Bundled Skills
 
-MaskShift ships with **50 skills**. Descriptions are indexed at startup; full skill bodies are loaded only after activation.
+MaskShift ships with **51 skills**. Descriptions are indexed at startup; full skill bodies are loaded only after activation.
 
 Fourteen skills are imported from [`anthropics/skills`](https://github.com/anthropics/skills) under Apache-2.0.
 Their individual license files and third-party notices are retained in `skills/`.
@@ -43,6 +43,7 @@ Their individual license files and third-party notices are retained in `skills/`
 | `refactoring` | Restructure code safely while preserving behavior, reducing duplication, clarifying ownership, and maintaining compatibility. | `skills/refactoring` |
 | `release` | Prepare reproducible production releases with versioning, changelogs, packaging, smoke tests, and rollback notes. | `skills/release` |
 | `repo-cartography` | Map unfamiliar repositories and identify the correct files, dependency paths, conventions, and verification commands before implementation. | `skills/repo-cartography` |
+| `reverse-engineering` | Reverse engineer shipped binaries, JavaScript/Electron apps, .NET assemblies, Android APKs, firmware, and websites using the REA MCP server, with evidence-backed findings and a guided investigation workflow. | `skills/reverse-engineering` |
 | `rust-engineering` | Implement reliable Rust systems with ownership-aware design, errors, async cancellation, tests, and workspace conventions. | `skills/rust-engineering` |
 | `scientific-computing` | Implement numerically sound scientific and engineering software with units, validation, reproducibility, and performance awareness. | `skills/scientific-computing` |
 | `security-audit` | Audit code and dependencies for concrete exploitable weaknesses while preserving MaskShift’s intentionally permissive local execution philosophy. | `skills/security-audit` |
