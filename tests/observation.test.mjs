@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
-import { cleanText, condenseText, dedupeLines, shapeObservation } from '../src/agent/observation.mjs';
+import { blankCodeText, cleanText, condenseText, crushJson, dedupeLines, detectContentKind, parseJsonPrefix, shapeObservation, skeletonCode } from '../src/agent/observation.mjs';
 import { createProject, isDiscoveryProbe, jsonServer, readJsonBody, respondJson, respondOpenAIChatSSE, runtimeForTest, waitFor } from './helpers.mjs';
 
 test('cleanText strips ANSI colour and keeps only the last frame of a progress bar', () => {
@@ -147,4 +147,118 @@ test('a large diff keeps its start and end rather than lines that merely mention
   assert.match(text, /line0\(\)/);
   assert.match(text, /line799\(\)/);
   assert.ok(!/boom/.test(text), 'diffs are not error-hunted like logs');
+});
+
+test('detectContentKind routes json, code, logs and prose', () => {
+  assert.equal(detectContentKind('{"a":{"b":[1,2,3]}}'), 'json');
+  assert.equal(detectContentKind('import x from "y";\nexport function f() {\n  return 1;\n}'), 'code');
+  assert.equal(detectContentKind('[INFO] boot\n[INFO] up\n[ERROR] bad\n[INFO] done'), 'log');
+  assert.equal(detectContentKind('just prose, no structure'), 'text');
+});
+
+test('crushJson collapses repeated sibling shapes and keeps their identities', () => {
+  const tool = (name) => ({ name, description: 'd'.repeat(400), inputSchema: { type: 'object', properties: { a: { type: 'string' } }, required: ['a'] } });
+  const { crushed, dedupedShapes, truncatedStrings } = crushJson({ tools: Array.from({ length: 30 }, (_, i) => tool(`tool_${i}`)) });
+  assert.ok(dedupedShapes >= 10, `expected many repeated shapes collapsed, got ${dedupedShapes}`);
+  assert.ok(truncatedStrings >= 1, 'long descriptions are shortened');
+  assert.equal(crushed.tools[5].name, 'tool_5', 'the identity field survives the collapse');
+  assert.match(crushed.tools[5]['…'], /same shape as earlier/);
+});
+
+test('a repeated-schema JSON payload (an MCP tool list) compresses ~90% and still parses', async () => {
+  const tool = (name) => ({ name, title: name, description: 'what it does '.repeat(30), inputSchema: { type: 'object', properties: { input: { type: 'string', description: 'd'.repeat(200) } }, required: ['input'] }, annotations: { readOnlyHint: false, destructiveHint: true } });
+  const payload = { tools: Array.from({ length: 40 }, (_, i) => tool(`mcp__server__tool_${i}`)) };
+  const original = JSON.stringify(payload);
+  const { text, condensed } = await shapeObservation(payload, { budget: 20000 });
+  assert.equal(condensed, true);
+  const ratio = text.length / original.length;
+  assert.ok(ratio < 0.25, `expected >75% cut, got ${(100 - ratio * 100).toFixed(0)}% (${original.length} -> ${text.length})`);
+  assert.match(text, /mcp__server__tool_0/, 'the exemplar schema survives in full');
+  assert.match(text, /mcp__server__tool_11/, 'repeated siblings keep their identity fields');
+  assert.match(text, /same shape as earlier/, 'the repeated shape is described once');
+  assert.match(text, /more items/, 'the tail of the long list is counted, not silently dropped');
+  assert.doesNotThrow(() => JSON.parse(text), 'the compressed payload is still valid JSON');
+});
+
+test('skeletonCode collapses function bodies but keeps every signature', () => {
+  const code = Array.from({ length: 12 }, (_, i) => `export function handler_${i}(req, res) {\n${Array.from({ length: 20 }, (_, j) => `  const step${j} = compute(${j}, req);`).join('\n')}\n  return res.send(step0);\n}`).join('\n\n');
+  const { text, hiddenLines, condensed } = skeletonCode(code);
+  assert.equal(condensed, true);
+  assert.ok(hiddenLines > 150, `most body lines are hidden, got ${hiddenLines}`);
+  for (let i = 0; i < 12; i += 1) assert.match(text, new RegExp(`export function handler_${i}\\(req, res\\)`));
+  assert.match(text, /body lines collapsed/);
+});
+
+test('a big pasted source string is skeletonized rather than decapitated', async () => {
+  const code = ['import fs from "node:fs";', ...Array.from({ length: 10 }, (_, i) => `export function worker_${i}(job) {\n${Array.from({ length: 25 }, (_, j) => `  await stage${j}(job);`).join('\n')}\n  return job.done;\n}`)].join('\n\n');
+  const { text, condensed } = await shapeObservation(code, { budget: 20000 });
+  assert.equal(condensed, true);
+  assert.match(text, /import fs from "node:fs";/);
+  assert.match(text, /worker_9\(job\)/, 'the last signature survives — head/tail condense would have cut it');
+  assert.match(text, /body lines collapsed/);
+});
+
+test('blankCodeText blanks strings, comments and regexes but keeps division', () => {
+  assert.equal(blankCodeText('  const s = "}}{{";'), '  const s =       ;');
+  assert.equal(blankCodeText('  const r = /}/g;'), '  const r =    g;');
+  assert.equal(blankCodeText('  const x = a / b / c;'), '  const x = a / b / c;');
+  assert.equal(blankCodeText('  return /^\\d+$/.test(s);'), '  return        .test(s);');
+  assert.equal(blankCodeText('  // a comment with } { /x/'), '    ');
+});
+
+test('skeletonCode handles Go functions and code whose strings contain braces', () => {
+  const go = 'package main\n\nfunc main() {\n' + '    fmt.Println(x)\n'.repeat(20) + '}\n';
+  const goResult = skeletonCode(go);
+  assert.ok(goResult.hiddenLines > 10, `go body collapsed, hid ${goResult.hiddenLines}`);
+  assert.match(goResult.text, /func main\(\) \{/);
+  const tricky = 'export function f() {\n  const s = "}}{{";\n  const r = /}/g;\n  if (/}/.test(s)) {\n    log(s);\n'.repeat(6) + '  }\n  return s;\n}\n';
+  const trickyResult = skeletonCode(tricky);
+  assert.ok(trickyResult.hiddenLines > 10, `regex/string braces did not poison the depth, hid ${trickyResult.hiddenLines}`);
+});
+
+test('crushJson pools repeated long strings into a $values table', () => {
+  const ref = '#/$defs/__schema12/' + 'x'.repeat(60);
+  const payload = { a: { ref, b: { ref }, c: { ref } } };
+  const { crushed, pooledStrings } = crushJson(payload);
+  assert.ok(pooledStrings >= 1, 'the repeated string entered the pool');
+  assert.match(JSON.stringify(crushed), /\$v0/);
+  assert.ok(crushed.$values, 'the pool is attached for decoding');
+  assert.equal(crushed.$values.$v0, ref);
+});
+
+test('crushJson marks dropped array items and depth with a retrieval hint', () => {
+  const payload = { items: Array.from({ length: 30 }, (_, i) => ({ id: i, data: 'x'.repeat(60) })) };
+  const { crushed } = crushJson(payload);
+  const text = JSON.stringify(crushed);
+  assert.match(text, /more items like item\[0\] — full payload is in the session transcript/);
+  const deep = { a: { b: { c: { d: { e: { f: { g: { h: 'too deep' } } } } } } } };
+  const deepCrushed = crushJson(deep);
+  assert.match(JSON.stringify(deepCrushed), /depth limit, full payload is in the session transcript/);
+});
+
+test('a truncated JSON payload is detected and its parseable prefix crushed', async () => {
+  const good = { tools: Array.from({ length: 60 }, (_, i) => ({ name: `tool_${i}`, description: 'd'.repeat(120) })) };
+  const whole = JSON.stringify(good);
+  const truncated = whole.slice(0, Math.floor(whole.length * 0.7));
+  assert.ok(truncated.length > 4000, 'big enough to trigger kind routing');
+  assert.equal(detectContentKind(truncated), 'json-partial');
+  const prefix = parseJsonPrefix(truncated);
+  assert.ok(prefix && prefix.value, 'a parseable prefix was recovered');
+  assert.ok(prefix.value.tools.length > 0 && prefix.value.tools.length < 60, 'a strict subset of the tools survives');
+  const shaped = await shapeObservation(truncated, { budget: truncated.length + 1000 });
+  assert.match(shaped.text, /truncated JSON — recovered the parseable prefix, \d+ chars lost/);
+  assert.ok(shaped.text.length < truncated.length, `compressed below the original ${truncated.length}, got ${shaped.text.length}`);
+});
+
+test('crushJson leaves singleton long strings inline and wraps array roots that need a pool', () => {
+  const once = 'a unique long string value that appears once only, 45+';
+  const single = crushJson({ x: once });
+  assert.equal(single.pooledStrings, 0);
+  assert.equal(single.crushed.$values, undefined);
+  const ref = '#/$defs/' + 'y'.repeat(50);
+  const { crushed } = crushJson([ref, ref, ref]);
+  assert.equal(crushed.$values.$v0, ref);
+  assert.deepEqual(crushed.$items, ['$v0', '$v0', '$v0']);
+  const taken = crushJson({ $values: 'mine', a: ref, b: ref });
+  assert.equal(taken.crushed.$values, 'mine', 'an existing $values key is never overwritten');
 });

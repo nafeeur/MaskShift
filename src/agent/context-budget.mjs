@@ -1,4 +1,5 @@
 import { truncate } from '../core/utils.mjs';
+import { crushJson, detectContentKind, parseJsonPrefix, skeletonCode } from './observation.mjs';
 
 // Conservative UTF-8-bytes-per-token estimate; not a real tokenizer, just enough to stay
 // safely under a small model's context window without an extra dependency.
@@ -79,6 +80,46 @@ export function elideStaleToolResults(history, { keepRecentTurns = 4, minChars =
     const replacement = {
       ...message,
       content: `[Older ${message.toolName || 'tool'} result elided to save context (${content.length} chars). Re-run the tool if you need it again. It began:]\n${content.slice(0, 300)}`,
+    };
+    onReplace?.(message, replacement);
+    return replacement;
+  })));
+}
+
+/**
+ * Shrinks older tool results in place by content kind — JSON payloads crush structurally, source
+ * code keeps only its skeleton — instead of jumping straight from full text to elision. A result
+ * that still answers the question costs a fraction of its original size; anything that does not
+ * compress enough falls through to elideStaleToolResults unchanged.
+ */
+export function compressStaleToolResults(history, { keepRecentTurns = 4, minChars = 4000, budget = 6000, onReplace } = {}) {
+  const turns = groupTurns(history);
+  const cutoff = Math.max(0, turns.length - keepRecentTurns);
+  return turns.flatMap((turn, index) => (index >= cutoff ? turn : turn.map((message) => {
+    if (message.role !== 'tool') return message;
+    const content = String(message.content || '');
+    if (content.length < minChars) return message;
+    const kind = detectContentKind(content);
+    let compressed = null;
+    if (kind === 'json') {
+      try {
+        const { crushed, dedupedShapes, truncatedStrings, pooledStrings } = crushJson(JSON.parse(content));
+        if (dedupedShapes + truncatedStrings + pooledStrings > 0) compressed = JSON.stringify(crushed);
+      } catch { /* fall through to elision */ }
+    } else if (kind === 'json-partial') {
+      const prefix = parseJsonPrefix(content);
+      if (prefix && prefix.value && typeof prefix.value === 'object') {
+        const { crushed } = crushJson(prefix.value);
+        compressed = `[truncated JSON — parseable prefix compressed, ${prefix.recovered} chars lost]\n${JSON.stringify(crushed)}`;
+      }
+    } else if (kind === 'code') {
+      const skeleton = skeletonCode(content);
+      if (skeleton.condensed) compressed = skeleton.text;
+    }
+    if (!compressed || compressed.length >= content.length * 0.8 || compressed.length > budget) return message;
+    const replacement = {
+      ...message,
+      content: `[Older ${message.toolName || 'tool'} result compressed (${content.length} → ${compressed.length} chars). Re-run the tool or read the session transcript for the full output.]\n${compressed}`,
     };
     onReplace?.(message, replacement);
     return replacement;

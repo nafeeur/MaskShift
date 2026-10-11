@@ -1,5 +1,67 @@
 import { truncate } from '../core/utils.mjs';
 
+// After first use the model knows the call shape; a stub keeps the tool callable while its
+// schema stops being billed on every turn. capability_activate brings the full schema back.
+function stubDescriptor(tool) {
+  return {
+    ...tool,
+    description: truncate(String(tool.description || ''), 120),
+    inputSchema: { type: 'object', properties: {}, additionalProperties: true },
+  };
+}
+
+// MCP schemas are the heaviest descriptors the harness carries: $defs recursion, outputSchema
+// trees, and long prose descriptions. The model needs the input shape to call the tool — the
+// rest compresses without losing the contract.
+// Names a schema points at through $ref ("#/$defs/Foo" → Foo), ignoring the definition tables
+// themselves so only references reachable from the live schema count.
+function collectRefs(node, into = new Set()) {
+  if (!node || typeof node !== 'object') return into;
+  if (Array.isArray(node)) { node.forEach((item) => collectRefs(item, into)); return into; }
+  for (const [key, value] of Object.entries(node)) {
+    if (key === '$ref' && typeof value === 'string') into.add(value.split('/').pop());
+    else if (key !== '$defs' && key !== 'definitions') collectRefs(value, into);
+  }
+  return into;
+}
+
+export function compactMcpSchema(schema, depth = 0) {
+  if (!schema || typeof schema !== 'object' || depth > 8) return schema;
+  if (Array.isArray(schema)) return schema.map((item) => compactMcpSchema(item, depth + 1));
+  const out = {};
+  for (const [key, value] of Object.entries(schema)) {
+    if (key === 'description' && typeof value === 'string' && value.length > 200) { out[key] = truncate(value, 200); continue; }
+    // A $ref is only resolvable if its definition survives, so referenced definitions (and the
+    // ones they reference in turn) stay in full; unreferenced ones collapse to a count.
+    if ((key === '$defs' || key === 'definitions') && value && typeof value === 'object') {
+      const needed = collectRefs({ ...schema, [key]: undefined });
+      const queue = [...needed];
+      while (queue.length) {
+        const name = queue.pop();
+        if (!(name in value)) continue;
+        for (const ref of collectRefs(value[name])) if (!needed.has(ref)) { needed.add(ref); queue.push(ref); }
+      }
+      const kept = Object.keys(value).filter((name) => needed.has(name));
+      const dropped = Object.keys(value).filter((name) => !needed.has(name));
+      out[key] = Object.fromEntries(kept.map((name) => [name, compactMcpSchema(value[name], depth + 1)]));
+      if (dropped.length) out[key]['…'] = `${dropped.length} unreferenced definitions omitted: ${dropped.slice(0, 8).join(', ')}`;
+      continue;
+    }
+    out[key] = compactMcpSchema(value, depth + 1);
+  }
+  return out;
+}
+
+function compactMcpDescriptor(mcp) {
+  return {
+    name: mcp.qualifiedName,
+    title: mcp.title || mcp.name,
+    description: truncate(`[MCP:${mcp.server}] ${mcp.description || ''}`, 400),
+    inputSchema: compactMcpSchema(mcp.inputSchema || { type: 'object', properties: {} }),
+    category: 'mcp', readOnly: false, risk: 'external-tool',
+  };
+}
+
 function cleanSearchItem(item, kind) {
   return {
     kind,
@@ -31,6 +93,9 @@ export class CapabilityController {
       skills: new Map(),
       mcpServers: new Set(),
       activated: [],
+      // A tool whose full schema has already been sent and successfully used drops to a stub on
+      // later turns — the model knows the call shape, and re-activating brings the schema back.
+      usedTools: new Set(),
     };
     return state;
   }
@@ -76,6 +141,7 @@ export class CapabilityController {
     for (const name of requested.filter(Boolean)) {
       if ((kind === 'auto' || kind === 'tool') && this.toolRegistry.has(name)) {
         state.tools.add(name);
+        state.usedTools?.delete(name); // re-activation restores the full schema
         results.push({ kind: 'tool', name, activated: true });
         continue;
       }
@@ -105,6 +171,7 @@ export class CapabilityController {
         }
         if (tool) {
           state.tools.add(tool.qualifiedName);
+          state.usedTools?.delete(tool.qualifiedName);
           state.mcpServers.add(tool.server);
           results.push({ kind: 'mcp-tool', name, activated: true, server: tool.server });
           continue;
@@ -117,21 +184,28 @@ export class CapabilityController {
     return { results, state: this.snapshot(state) };
   }
 
+  /** Mark a tool as successfully used; its descriptor becomes a stub on later turns. */
+  markUsed(state, name) {
+    if (state?.usedTools && state.tools.has(name)) state.usedTools.add(name);
+  }
+
+  /** A failed call restores the full schema, so the model can see the contract it got wrong. */
+  markFailed(state, name) {
+    state?.usedTools?.delete(name);
+  }
+
   async descriptors(state) {
     const descriptors = [];
     for (const name of state.tools) {
       const local = this.toolRegistry.descriptor(name);
-      if (local) { descriptors.push(local); continue; }
+      if (local) {
+        descriptors.push(state.usedTools?.has(name) ? stubDescriptor(local) : local);
+        continue;
+      }
       if (name.startsWith('mcp__')) {
         const connected = await this.mcpManager.allConnectedTools(state.workspaceId);
         const mcp = connected.find((item) => item.qualifiedName === name);
-        if (mcp) descriptors.push({
-          name: mcp.qualifiedName,
-          title: mcp.title || mcp.name,
-          description: truncate(`[MCP:${mcp.server}] ${mcp.description || ''}`, 1200),
-          inputSchema: mcp.inputSchema || { type: 'object', properties: {} },
-          category: 'mcp', readOnly: false, risk: 'external-tool',
-        });
+        if (mcp) descriptors.push(state.usedTools?.has(name) ? stubDescriptor({ name: mcp.qualifiedName, description: mcp.description }) : compactMcpDescriptor(mcp));
       }
     }
     return descriptors;

@@ -138,3 +138,105 @@ test('memory_save deduplicates by title and memory_optimize merges duplicates an
   assert.equal(runtime.store.getMemory(throwaway.id), null);
   assert.ok(runtime.store.getMemory(first.id), 'the merge survivor must remain');
 });
+
+test('a used tool drops to a stub schema on later turns, and an unused tool keeps its full schema', async (t) => {
+  let turn = 0;
+  const requests = [];
+  const modelServer = await jsonServer(t, async (request, response) => {
+    const body = await readJsonBody(request);
+    requests.push(body);
+    turn += 1;
+    if (turn === 1) {
+      return respondAnthropicSSE(response, {
+        id: 'msg_1', stopReason: 'tool_use',
+        content: [{ type: 'tool_use', id: 'call_1', name: 'fs_write', input: { path: 'used.txt', content: 'ok\n' } }],
+        usage: { input_tokens: 100, output_tokens: 10 },
+      });
+    }
+    return respondAnthropicSSE(response, {
+      id: 'msg_2', stopReason: 'end_turn',
+      content: [{ type: 'text', text: 'Done.' }],
+      usage: { input_tokens: 100, output_tokens: 10 },
+    });
+  });
+
+  const project = await createProject(t);
+  const runtime = await runtimeForTest(t, project, {
+    defaultModel: 'fixture-anthropic:fixture-claude',
+    providers: [{
+      id: 'fixture-anthropic', name: 'Fixture Anthropic', type: 'anthropic',
+      baseUrl: modelServer.url, apiKey: 'test-key', enabled: true, autoDiscover: false,
+      models: [{ id: 'fixture-claude' }], timeoutMs: 15_000,
+    }],
+  });
+  const workspace = await runtime.workspaceManager.open(project);
+  const run = await runtime.engine.startRun({ workspaceId: workspace.id, prompt: 'Write used.txt', modelRef: 'fixture-anthropic:fixture-claude' });
+  await waitFor(async () => {
+    const value = runtime.store.getRun(run.id);
+    return ['completed', 'failed', 'cancelled', 'max_steps'].includes(value.status) ? value : null;
+  }, { timeoutMs: 15_000, message: 'run completion' });
+
+  assert.equal(requests.length, 2);
+  const findTool = (request, name) => (request.tools || []).find((tool) => tool.name === name);
+
+  // Turn 1: both tools carry their full schemas.
+  const first = findTool(requests[0], 'fs_write');
+  assert.ok(JSON.stringify(first.input_schema).length > 40, 'first turn carries the full fs_write schema');
+  const firstUnused = findTool(requests[0], 'fs_read');
+  assert.ok(JSON.stringify(firstUnused.input_schema).length > 40, 'first turn carries the full fs_read schema');
+
+  // Turn 2: the tool that was just called successfully drops to a stub; the unused one keeps its schema.
+  const second = findTool(requests[1], 'fs_write');
+  const secondUnused = findTool(requests[1], 'fs_read');
+  assert.ok(JSON.stringify(second.input_schema).length < JSON.stringify(first.input_schema).length,
+    `used tool shrinks on the next turn (${JSON.stringify(first.input_schema).length} -> ${JSON.stringify(second.input_schema).length})`);
+  assert.ok(JSON.stringify(secondUnused.input_schema).length >= JSON.stringify(firstUnused.input_schema).length,
+    'an unused tool keeps its full schema');
+}, { timeout: 30_000 });
+
+test('re-activating a used tool restores its full schema', async (t) => {
+  const project = await createProject(t);
+  const runtime = await runtimeForTest(t, project);
+  const controller = runtime.engine.capabilityController;
+  const state = controller.createState({ runId: 'r', workspaceId: 'w' });
+  await controller.activate(state, ['fs_write'], { kind: 'tool' });
+  const full = (await controller.descriptors(state)).find((tool) => tool.name === 'fs_write');
+  controller.markUsed(state, 'fs_write');
+  const stub = (await controller.descriptors(state)).find((tool) => tool.name === 'fs_write');
+  assert.ok(JSON.stringify(stub.inputSchema).length < JSON.stringify(full.inputSchema).length, 'used tool is stubbed');
+  await controller.activate(state, ['fs_write'], { kind: 'tool' });
+  const restored = (await controller.descriptors(state)).find((tool) => tool.name === 'fs_write');
+  assert.deepEqual(restored.inputSchema, full.inputSchema);
+});
+
+test('compactMcpSchema keeps referenced definitions (transitively) and collapses the rest', async () => {
+  const { compactMcpSchema } = await import('../src/agent/capabilities.mjs');
+  const schema = {
+    type: 'object',
+    properties: { item: { $ref: '#/$defs/Item' } },
+    $defs: {
+      Item: { type: 'object', properties: { tag: { $ref: '#/$defs/Tag' }, n: { type: 'number' } } },
+      Tag: { type: 'string', enum: ['a', 'b'] },
+      Unused: { type: 'object', properties: { x: { type: 'string' } } },
+    },
+  };
+  const out = compactMcpSchema(schema);
+  assert.deepEqual(out.$defs.Item, schema.$defs.Item, 'a referenced definition keeps its shape');
+  assert.deepEqual(out.$defs.Tag, schema.$defs.Tag, 'a transitively referenced definition keeps its shape');
+  assert.equal(out.$defs.Unused, undefined);
+  assert.match(out.$defs['…'], /1 unreferenced definitions omitted: Unused/);
+});
+
+test('a failed call restores the full schema of a stubbed tool', async (t) => {
+  const project = await createProject(t);
+  const runtime = await runtimeForTest(t, project);
+  const controller = runtime.engine.capabilityController;
+  const state = controller.createState({ runId: 'r', workspaceId: 'w' });
+  await controller.activate(state, ['fs_write'], { kind: 'tool' });
+  const size = async () => JSON.stringify((await controller.descriptors(state)).find((tool) => tool.name === 'fs_write').inputSchema).length;
+  const full = await size();
+  controller.markUsed(state, 'fs_write');
+  assert.ok(await size() < full);
+  controller.markFailed(state, 'fs_write');
+  assert.equal(await size(), full);
+});

@@ -3,8 +3,8 @@ import path from 'node:path';
 import { nowIso, runCommand, sha256, truncate } from '../core/utils.mjs';
 import { estimateUsageCost, summarizeCosts } from '../core/pricing.mjs';
 import { repairPrompt } from './tool-protocol.mjs';
-import { elideStaleToolResults, estimateHistoryTokens, fitHistory, groupTurns, historyBudget } from './context-budget.mjs';
 import { compactTurns } from './compaction.mjs';
+import { compressStaleToolResults, elideStaleToolResults, estimateHistoryTokens, fitHistory, groupTurns, historyBudget } from './context-budget.mjs';
 import { shapeObservation } from './observation.mjs';
 import { EditFeedback, EDIT_TOOLS } from './feedback.mjs';
 import { CapabilityRegistry } from './capability-profile.mjs';
@@ -565,9 +565,15 @@ export class AgentEngine {
             await resetContext();
           }
           // Old tool output is the cheapest thing to give up: shrink it before dropping turns.
-          const candidate = estimateHistoryTokens(history) > historyBudget(sizes) * 0.5
-            ? elideStaleToolResults(history, { onReplace: (original, replacement) => messageIds.set(replacement, messageIds.get(original)) })
-            : history;
+          // The pipeline is keep → compress (structure kept) → elide (stub) → drop (whole turns),
+          // so a result that still answers the question costs a fraction of its size and only the
+          // payloads that resist compression are reduced to stubs.
+          const messageIdsTracker = (original, replacement) => messageIds.set(replacement, messageIds.get(original));
+          const halfBudget = estimateHistoryTokens(history) > historyBudget(sizes) * 0.5;
+          const compressed = compressStaleToolResults(history, { onReplace: messageIdsTracker });
+          const candidate = halfBudget
+            ? elideStaleToolResults(compressed, { onReplace: messageIdsTracker })
+            : compressed;
           const fitted = fitHistory({ history: candidate, ...sizes });
           outboundHistory = fitted.history;
           if (fitted.omitted) {
@@ -987,14 +993,17 @@ export class AgentEngine {
           checkProblems = check.problems;
           this.#event(run.id, 'edit-check', { tool: name, problems: check.problems }, scope);
         }
+        this.capabilityController.markUsed(capabilityState, name);
         return { call, content, isError: false, name, args, value, repaired, checkProblems };
       }
       if (name.startsWith('mcp__')) {
         const value = await this.mcpManager.callQualified(name, args, { workspaceId: run.workspace_id, signal });
+        this.capabilityController.markUsed(capabilityState, name);
         return { call, content: await this.#observe(value, context), isError: false, name, args, value };
       }
       throw new Error(unknownToolMessage(name, []));
     } catch (error) {
+      this.capabilityController.markFailed(capabilityState, call.name);
       return { call, content: renderToolResult({ error: error.message, tool: call.name }, this.config.get().maxToolOutputChars), isError: true };
     }
   }
