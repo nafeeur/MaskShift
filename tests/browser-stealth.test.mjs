@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
+import fsp from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 import { stealthArgs, stealthIdentity, stealthInitScript } from '../src/browser/stealth.mjs';
-import { BrowserManager } from '../src/browser/manager.mjs';
 import { createProject, runtimeForTest } from './helpers.mjs';
 
 test('stealthArgs removes automation and headless tells', () => {
@@ -21,10 +23,16 @@ test('stealthIdentity stays internally consistent per platform', () => {
   assert.match(stealthIdentity('darwin').ua, /Macintosh/);
   assert.equal(stealthIdentity('win32').platform, 'Win32');
   assert.match(stealthIdentity('win32').ua, /Windows NT/);
+  // Linux UA carries the real CPU arch: x86_64 by default, aarch64 on arm64.
+  assert.match(stealthIdentity('linux', { arch: 'x64' }).ua, /X11; Linux x86_64/);
+  assert.match(stealthIdentity('linux', { arch: 'arm64' }).ua, /X11; Linux aarch64/);
   assert.equal(stealthIdentity('linux').platform, 'Linux x86_64');
-  assert.match(stealthIdentity('linux').ua, /X11; Linux x86_64/);
+  // UA, client-hint platform and brand tell one story.
+  const id = stealthIdentity('linux', { arch: 'arm64' });
+  assert.equal(id.uaPlatform, 'Linux');
+  assert.match(id.ua, new RegExp(`Chrome/${id.major}\\.0\\.0\\.0`));
   // Unknown platforms fall back to linux rather than producing nothing.
-  assert.deepEqual(stealthIdentity('freebsd'), stealthIdentity('linux'));
+  assert.equal(stealthIdentity('freebsd').platform, stealthIdentity('linux').platform);
 });
 
 test('stealthInitScript patches the navigator surface a page can probe', () => {
@@ -38,8 +46,13 @@ test('stealthInitScript patches the navigator surface a page can probe', () => {
 });
 
 test('stealth launch config defaults on and can be disabled per launch', async (t) => {
+  // The browser writes its profile into home/browser/profiles and Chrome keeps
+  // flushing to it briefly after close; point profilesDir at a directory outside
+  // the auto-deleted temp home (via the config override) so teardown never races it.
+  const browserProfiles = await fsp.mkdtemp(path.join(os.tmpdir(), 'maskshift-stealth-browser-'));
+  t.after(() => fsp.rm(browserProfiles, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 }).catch(() => {}));
   const project = await createProject(t);
-  const runtime = await runtimeForTest(t, project);
+  const runtime = await runtimeForTest(t, project, { browser: { profilesDir: browserProfiles, stealth: true } });
 
   assert.equal(runtime.config.get().browser.stealth, true, 'stealth defaults on in config');
 
@@ -54,7 +67,10 @@ test('stealth launch config defaults on and can be disabled per launch', async (
     ua: navigator.userAgent,
     languages: navigator.languages,
     plugins: navigator.plugins.length,
+    pluginsIsPluginArray: navigator.plugins instanceof PluginArray,
     hasChrome: Boolean(window.chrome),
+    hardwareConcurrency: navigator.hardwareConcurrency,
+    deviceMemory: navigator.deviceMemory,
     webglRenderer: (() => {
       try {
         const canvas = document.createElement('canvas');
@@ -74,8 +90,16 @@ test('stealth launch config defaults on and can be disabled per launch', async (
   const instance = await runtime.browserManager.launch({ headless: true, url: 'about:blank', reuse: false });
   await runtime.browserManager.navigate({ instanceId: instance.id, url: 'about:blank' });
   const on = await runtime.browserManager.evaluate({ instanceId: instance.id, expression: probe });
-  assert.equal(on.value.webdriver, undefined, 'navigator.webdriver must be absent');
+  // Real non-automated Chrome reports navigator.webdriver === false.
+  assert.equal(on.value.webdriver, false, 'navigator.webdriver must be false, like real Chrome');
+  assert.equal(on.value.hardwareConcurrency, 8);
+  // deviceMemory is non-configurable on some builds and can't be overridden there;
+  // when the browser reports it, stealth must show a normal desktop value.
+  if (on.value.deviceMemory !== undefined) assert.equal(on.value.deviceMemory, 8);
+  assert.equal(on.value.pluginsIsPluginArray, true, 'navigator.plugins must be a real PluginArray');
+  // UA must be de-headlessed and match the real host arch (never a foreign arch).
   assert.ok(!on.value.ua.includes('HeadlessChrome'), `UA leaked headless: ${on.value.ua}`);
+  assert.match(on.value.ua, /Linux (x86_64|aarch64)/, `UA should carry the host arch: ${on.value.ua}`);
   assert.ok(Array.isArray(on.value.languages) && on.value.languages.length >= 1);
   assert.ok(on.value.plugins >= 1, 'plugins must not be empty');
   assert.equal(on.value.hasChrome, true, 'window.chrome must exist');

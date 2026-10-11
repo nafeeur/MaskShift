@@ -226,18 +226,31 @@ export class BrowserManager {
       connection = new CdpConnection(tab.webSocketDebuggerUrl);
       await connection.connect();
       instance.connections.set(tab.id, connection);
-      // Stealth runs before any page script, so it must be installed before
-      // Page.enable lets us navigate anywhere with it.
+      // Enable CDP domains with stealth in mind: a page can detect an active
+      // Runtime/DOM session (detectors read it as automation), so those stay off
+      // until a method actually needs them. Network and Page are safe — Network
+      // is not part of the CDP tell and is enabled up front so request events are
+      // captured from the start (network() reads requests made before it ran).
+      await Promise.allSettled([connection.send('Page.enable'), connection.send('Network.enable')]);
       if (instance.stealth) {
-        await connection.send('Page.enable').catch(() => {});
         await connection.send('Page.addScriptToEvaluateOnNewDocument', { source: stealthInitScript({ headless: instance.headless }) }).catch(() => {});
       }
-      await Promise.allSettled([
-        connection.send('Page.enable'), connection.send('Runtime.enable'), connection.send('DOM.enable'),
-        connection.send('Network.enable'), connection.send('Log.enable'), connection.send('Console.enable'),
-      ]);
+      connection.enabledDomains = new Set(['Page', 'Network']);
     }
     return { instance, tab, connection };
+  }
+
+  // Turn on a detectable CDP domain (Runtime, DOM, Log, Console) the first time
+  // a method needs its event stream, and remember it so repeat calls are free.
+  // Keeping Runtime/DOM off until needed is what keeps the session invisible to
+  // automation detectors during ordinary navigation and evaluation.
+  async #ensureDomains(connection, ...domains) {
+    connection.enabledDomains = connection.enabledDomains || new Set(['Page', 'Network']);
+    for (const domain of domains) {
+      if (connection.enabledDomains.has(domain)) continue;
+      await connection.send(`${domain}.enable`).catch(() => {});
+      connection.enabledDomains.add(domain);
+    }
   }
 
   async navigate({ instanceId = null, tabId = null, url, waitUntil = 'complete', timeoutMs = 45_000 }) {
@@ -574,12 +587,15 @@ export class BrowserManager {
 
   async console({ instanceId = null, tabId = null, limit = 200 } = {}) {
     const { instance, tab, connection } = await this.target(instanceId, tabId);
+    await this.#ensureDomains(connection, 'Runtime', 'Log');
     const methods = new Set(['Runtime.consoleAPICalled', 'Runtime.exceptionThrown', 'Log.entryAdded']);
     return { instanceId: instance.id, tabId: tab.id, events: connection.recent(null, limit * 4).filter((event) => methods.has(event.method)).slice(-limit) };
   }
 
   async network({ instanceId = null, tabId = null, limit = 300 } = {}) {
     const { instance, tab, connection } = await this.target(instanceId, tabId);
+    // Network is enabled at connect time, so requests made before this call are
+    // already in the event buffer.
     const events = connection.recent(null, limit * 5).filter((event) => event.method.startsWith('Network.')).slice(-limit).map(redactNetworkEvent);
     return { instanceId: instance.id, tabId: tab.id, events };
   }

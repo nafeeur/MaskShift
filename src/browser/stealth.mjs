@@ -17,35 +17,47 @@
 //      the small navigator surface (plugins, languages, permissions,
 //      chrome runtime) that headless Chrome leaves empty.
 
-// Match the Chromium major your users are actually on — a UA claiming an old
-// Chrome while the binary's behavior says otherwise is itself a signal. Bump
-// when the supported floor moves; ideally this tracks the discovered binary
-// (see BrowserManager, which knows the real version from /json/version).
+// The only thing the UA override should change is stripping "Headless" from
+// the product token. Everything else — arch, platform, brand, version — must
+// match what the binary already puts on the wire (Sec-CH-UA) and in JS
+// (userAgentData, navigator.platform), or the mismatch itself is the signal.
+// So identity is derived from the host arch, not hardcoded to a desktop guess.
 const CHROME_MAJOR = '151';
 
-// Consistent desktop identities, keyed by platform. UA, Sec-CH-UA headers,
+// process.arch -> the CPU token Chrome bakes into its User-Agent string.
+const ARCH_TOKEN = { arm64: 'aarch64', x64: 'x86_64' };
+
+// Consistent identities, keyed by platform. UA, Sec-CH-UA headers,
 // navigator.platform and navigator.userAgentData must all tell the same
 // story or the mismatch itself becomes the signal.
 const IDENTITIES = {
   darwin: {
     platform: 'MacIntel',
-    uaPlatform: '"macOS"',
-    ua: `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${CHROME_MAJOR}.0.0.0 Safari/537.36`,
+    uaPlatform: 'macOS',
+    ua: (major) => `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${major}.0.0.0 Safari/537.36`,
   },
   win32: {
     platform: 'Win32',
-    uaPlatform: '"Windows"',
-    ua: `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${CHROME_MAJOR}.0.0.0 Safari/537.36`,
+    uaPlatform: 'Windows',
+    ua: (major) => `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${major}.0.0.0 Safari/537.36`,
   },
   linux: {
     platform: 'Linux x86_64',
-    uaPlatform: '"Linux"',
-    ua: `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${CHROME_MAJOR}.0.0.0 Safari/537.36`,
+    uaPlatform: 'Linux',
+    // Chrome's linux UA carries the real CPU arch; aarch64 stays aarch64.
+    ua: (major, arch = 'x86_64') => `Mozilla/5.0 (X11; Linux ${arch}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${major}.0.0.0 Safari/537.36`,
   },
 };
 
-export function stealthIdentity(platform = process.platform) {
-  return IDENTITIES[platform] || IDENTITIES.linux;
+export function stealthIdentity(platform = process.platform, { arch = process.arch, major = CHROME_MAJOR } = {}) {
+  const base = IDENTITIES[platform] || IDENTITIES.linux;
+  const archToken = platform === 'linux' || (!IDENTITIES[platform]) ? (ARCH_TOKEN[arch] || 'x86_64') : undefined;
+  return {
+    platform: base.platform,
+    uaPlatform: base.uaPlatform,
+    ua: base.ua(major, archToken),
+    major,
+  };
 }
 
 /**
@@ -79,8 +91,8 @@ export function stealthArgs({ platform = process.platform, headless = true } = {
  * function of the identity so tests can assert the exact strings a page
  * would see.
  */
-export function stealthInitScript({ platform = process.platform, headless = true, languages = ['en-US', 'en'] } = {}) {
-  const identity = stealthIdentity(platform);
+export function stealthInitScript({ platform = process.platform, headless = true, languages = ['en-US', 'en'], arch = process.arch } = {}) {
+  const identity = stealthIdentity(platform, { arch });
   return `(() => {
   'use strict';
   const define = (obj, key, value) => {
@@ -93,50 +105,95 @@ export function stealthInitScript({ platform = process.platform, headless = true
     } catch { /* leave the platform default */ }
   };
 
-  // The single highest-signal tell: true only under automation. Delete the
-  // prototype descriptor outright so the property is absent, not false —
-  // detectors check for undefined, and blink leaves it defined-but-false
-  // once AutomationControlled strips the automation-controlled true.
-  define(Navigator.prototype, 'webdriver', undefined);
+  // The single highest-signal tell: true only under automation. Real Chrome
+  // reports false, so report false — and report it identically in workers
+  // (which otherwise leave the property absent, a cross-thread mismatch).
+  define(Navigator.prototype, 'webdriver', false);
 
   define(Navigator.prototype, 'platform', ${JSON.stringify(identity.platform)});
   define(Navigator.prototype, 'languages', ${JSON.stringify(languages)});
   define(Navigator.prototype, 'hardwareConcurrency', 8);
+  // deviceMemory is non-configurable on some builds, so define may no-op; fall
+  // back to setting it straight on navigator itself when the prototype patch
+  // didn't take.
   define(Navigator.prototype, 'deviceMemory', 8);
+  try { if (navigator.deviceMemory !== 8) Object.defineProperty(navigator, 'deviceMemory', { get: () => 8, configurable: true }); } catch { /* leave default */ }
 
-  // clientHint headers say one platform; userAgentData must agree.
+  // Page.addScriptToEvaluateOnNewDocument does NOT run inside Web Workers, so a
+  // worker's WorkerNavigator would show default (headless) values while the main
+  // thread shows patched ones — that mismatch is itself a detector signal. Wrap
+  // the Worker constructor to prepend the navigator patch into every worker's
+  // source, so the worker's own values agree with the main thread.
+  const workerPatch = '(function(){var d=function(o,k,v){try{delete o[k];Object.defineProperty(o,k,{get:function(){return v},configurable:true})}catch(e){}};'
+    + 'try{var np=Object.getPrototypeOf(navigator);'
+    // Match the main thread: with AutomationControlled off, navigator.webdriver is
+    // defined-but-false there, so the worker must report false too (not absent).
+    + 'd(np,"webdriver",false);'
+    + 'd(np,"hardwareConcurrency",8);d(np,"deviceMemory",8);'
+    + 'd(np,"languages",' + JSON.stringify(JSON.stringify(languages)) + ');'
+    + 'd(np,"platform",' + JSON.stringify(JSON.stringify(identity.platform)) + ');}catch(e){}})();';
+  if (typeof Worker === 'function' && !Worker.__stealthWrapped) {
+    const OriginalWorker = Worker;
+    const WrappedWorker = function (scriptURL, options) {
+      try {
+        const url = String(scriptURL);
+        // Only same-origin / blob / data URLs can be fetched and rewritten here.
+        if (/^(blob:|data:)/i.test(url)) {
+          return new OriginalWorker(scriptURL, options); // already our own or opaque; leave
+        }
+        const request = new XMLHttpRequest();
+        request.open('GET', url, false); // synchronous so the constructor stays synchronous
+        request.send(null);
+        if (request.status >= 200 && request.status < 400 || request.status === 0) {
+          const combined = workerPatch + ';\n' + request.responseText;
+          const blob = new Blob([combined], { type: 'application/javascript' });
+          return new OriginalWorker(URL.createObjectURL(blob), options);
+        }
+      } catch { /* fall through to unmodified construction */ }
+      return new OriginalWorker(scriptURL, options);
+    };
+    WrappedWorker.prototype = OriginalWorker.prototype;
+    Object.setPrototypeOf(WrappedWorker, OriginalWorker);
+    WrappedWorker.__stealthWrapped = true;
+    window.Worker = WrappedWorker;
+  }
+
+  // userAgentData must agree with the wire client hints (Sec-CH-UA), which the
+  // binary sets from its real brand: Chromium, the real major, Not=A?Brand 99.
+  // Claiming "Google Chrome" here while Sec-Ch-Ua says "Chromium" is a tell.
+  const major = ${JSON.stringify(identity.major)};
   define(Navigator.prototype, 'userAgentData', {
     brands: [
-      { brand: 'Google Chrome', version: ${JSON.stringify(CHROME_MAJOR)} },
-      { brand: 'Chromium', version: ${JSON.stringify(CHROME_MAJOR)} },
-      { brand: 'Not_A Brand', version: '24' },
+      { brand: 'Chromium', version: major },
+      { brand: 'Not=A?Brand', version: '99' },
     ],
     mobile: false,
-    platform: ${JSON.stringify(identity.uaPlatform.replace(/"/g, ''))},
+    platform: ${JSON.stringify(identity.uaPlatform)},
     getHighEntropyValues: (hints) => Promise.resolve({
-      architecture: 'x86',
+      architecture: ${JSON.stringify((ARCH_TOKEN[arch] === 'aarch64') ? 'arm' : 'x86')},
       bitness: '64',
       brands: [
-        { brand: 'Google Chrome', version: ${JSON.stringify(CHROME_MAJOR)} },
-        { brand: 'Chromium', version: ${JSON.stringify(CHROME_MAJOR)} },
-        { brand: 'Not_A Brand', version: '24' },
+        { brand: 'Chromium', version: major },
+        { brand: 'Not=A?Brand', version: '99' },
       ],
       fullVersionList: [
-        { brand: 'Google Chrome', version: ${JSON.stringify(`${CHROME_MAJOR}.0.0.0`)} },
-        { brand: 'Chromium', version: ${JSON.stringify(`${CHROME_MAJOR}.0.0.0`)} },
-        { brand: 'Not_A Brand', version: '24.0.0.0' },
+        { brand: 'Chromium', version: major + '.0.0.0' },
+        { brand: 'Not=A?Brand', version: '99.0.0.0' },
       ],
       mobile: false,
       model: '',
-      platform: ${JSON.stringify(identity.uaPlatform.replace(/"/g, ''))},
+      platform: ${JSON.stringify(identity.uaPlatform)},
       platformVersion: '15.0.0',
-      uaFullVersion: ${JSON.stringify(`${CHROME_MAJOR}.0.0.0`)},
+      uaFullVersion: major + '.0.0.0',
+      wow64: false,
     }),
     toJSON: () => ({}),
   });
 
   // Headless Chrome ships zero plugins and zero mimeTypes; a desktop
-  // browser always reports the PDF viewer set.
+  // browser always reports the PDF viewer set. Each object must sit on its
+  // real prototype: navigator.plugins instanceof PluginArray and each entry
+  // instanceof Plugin are checks a plain array of objects fails.
   const pluginData = [
     { name: 'PDF Viewer', filename: 'internal-pdf-viewer', description: 'Portable Document Format' },
     { name: 'Chrome PDF Viewer', filename: 'internal-pdf-viewer', description: 'Portable Document Format' },
@@ -148,16 +205,32 @@ export function stealthInitScript({ platform = process.platform, headless = true
     { type: 'application/pdf', suffixes: 'pdf', description: 'Portable Document Format' },
     { type: 'text/pdf', suffixes: 'pdf', description: 'Portable Document Format' },
   ];
-  const makeNamedArray = (items) => {
-    const arr = [...items];
-    for (const item of items) arr[item.name || item.type] = item;
-    arr.item = (i) => items[i] || null;
-    arr.namedItem = (name) => arr[name] || null;
-    arr.refresh = () => {};
-    return arr;
+  // Instantiate against the real prototypes when present (any real Chromium);
+  // fall back to plain objects only where the constructor is unavailable.
+  const onProto = (proto, props) => {
+    const obj = proto ? Object.create(proto) : {};
+    for (const [k, v] of Object.entries(props)) {
+      try { Object.defineProperty(obj, k, { get: () => v, enumerable: true, configurable: true }); } catch { obj[k] = v; }
+    }
+    return obj;
   };
-  const mimeTypes = makeNamedArray(mimeTypeData.map((m) => ({ ...m, enabledPlugin: null })));
-  const plugins = makeNamedArray(pluginData.map((p) => ({ ...p })));
+  const makeList = (Ctor, items) => {
+    const list = Ctor ? Object.create(Ctor.prototype) : [];
+    items.forEach((item, i) => {
+      Object.defineProperty(list, i, { get: () => item, enumerable: true, configurable: true });
+      const key = item.name || item.type;
+      if (key) Object.defineProperty(list, key, { get: () => item, configurable: true });
+    });
+    Object.defineProperty(list, 'length', { get: () => items.length, configurable: true });
+    if (!list.item) list.item = (i) => items[i] || null;
+    if (!list.namedItem) list.namedItem = (name) => items.find((x) => (x.name || x.type) === name) || null;
+    if (Ctor && Ctor.prototype && 'refresh' in Ctor.prototype && !list.refresh) list.refresh = () => {};
+    return list;
+  };
+  const MimeTypeCtor = window.MimeType;
+  const PluginCtor = window.Plugin;
+  const mimeTypes = makeList(window.MimeTypeArray, mimeTypeData.map((m) => onProto(MimeTypeCtor && MimeTypeCtor.prototype, { ...m, enabledPlugin: null })));
+  const plugins = makeList(window.PluginArray, pluginData.map((p) => onProto(PluginCtor && PluginCtor.prototype, { ...p, length: 1 })));
   define(Navigator.prototype, 'plugins', plugins);
   define(Navigator.prototype, 'mimeTypes', mimeTypes);
 
@@ -203,6 +276,15 @@ export function stealthInitScript({ platform = process.platform, headless = true
     };
     patchContext(window.WebGLRenderingContext && window.WebGLRenderingContext.prototype);
     patchContext(window.WebGL2RenderingContext && window.WebGL2RenderingContext.prototype);
+
+    // Headless clamps performance.now() to a coarse 100µs grid; a desktop
+    // browser returns sub-microsecond floats. Add a tiny jitter so successive
+    // reads aren't suspiciously rounded. Kept small so timing logic still works.
+    const origNow = performance.now.bind(performance);
+    performance.now = function () { const t = origNow(); return t + (t % 0.001 ? 0 : Math.random() * 0.0009); };
+    if (window.Performance && window.Performance.prototype) {
+      try { Object.defineProperty(window.Performance.prototype, 'now', { value: performance.now, configurable: true, writable: true }); } catch { /* leave */ }
+    }
   }
 })();`;
 }
