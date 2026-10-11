@@ -542,9 +542,11 @@ export class MaskShiftTui {
 
   async refreshModelProfile() {
     const ref = this.modelRef;
+    const ticket = (this.modelProfileTicket = (this.modelProfileTicket || 0) + 1);
     const profile = await this.runtime.providerManager.modelProfile(ref).catch(() => null);
-    // A slower lookup for a model the user has since switched away from must not win.
-    if (ref !== this.modelRef) return;
+    // A slower lookup for a model the user has since switched away from must not win, and neither
+    // may an older lookup that finishes after a newer one for the same model.
+    if (ref !== this.modelRef || ticket !== this.modelProfileTicket) return;
     this.modelProfile = profile;
     this.requestRender();
   }
