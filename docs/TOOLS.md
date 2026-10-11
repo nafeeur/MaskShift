@@ -51,7 +51,7 @@ Only activated descriptors enter a model request; this document is the complete 
 | `browser_extract` | read | normal | Describe the current page as selectable options (restaurants, products, results), forms, blockers (login wall, CAPTCHA, cookie notice) and actions, each with a short ref such as e12 for browser_act. Far smaller than the raw page; prefer it to browser_snapshot for web tasks. |
 | `browser_handoff` | write | external-action | Ask the person to do something in the live browser view that you should not (solve a CAPTCHA, approve a bank prompt, enter payment details) and wait until they say they are done. |
 | `browser_instances` | read | normal | List browser processes launched by MaskShift. |
-| `browser_launch` | write | process | Launch a persistent-profile Chromium browser with DevTools automation. Headless by default; visible mode supports interactive logins. |
+| `browser_launch` | write | process | Launch a persistent-profile Chromium browser with DevTools automation. Headless by default; visible mode supports interactive logins. Anti-fingerprint stealth is on unless config browser.stealth is false. |
 | `browser_login` | write | external-action | Sign in to the site open in the browser. The person is asked for their username, password and any verification code in the terminal; the values are typed into the page directly and never shown to you. CAPTCHAs are handed to the person in the live browser view. Returns only the outcome. |
 | `browser_navigate` | write | network | Navigate a browser tab and wait for the document to load. |
 | `browser_network` | read | normal | Read recent Chrome DevTools Network events for the page. |

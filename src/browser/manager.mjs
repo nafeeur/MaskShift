@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { CdpConnection } from './cdp.mjs';
+import { stealthArgs, stealthInitScript } from './stealth.mjs';
 import { pageModelExpression } from '../web/page-model.mjs';
 import { absolutePath, commandExists, ensureDir, id, nowIso, truncate } from '../core/utils.mjs';
 
@@ -130,7 +131,7 @@ export class BrowserManager {
 
   list() { return [...this.instances.values()].map((item) => this.publicInstance(item)); }
 
-  async launch({ headless = true, profile = 'default', url = 'about:blank', extraArgs = [], executable = null, reuse = true } = {}) {
+  async launch({ headless = true, profile = 'default', url = 'about:blank', extraArgs = [], executable = null, reuse = true, stealth = null } = {}) {
     if (reuse) {
       const existing = [...this.instances.values()].find((item) => !item.closed && item.profile === profile && item.headless === headless);
       if (existing) {
@@ -144,6 +145,7 @@ export class BrowserManager {
     const instanceId = id('browser');
     const port = await freePort();
     const profileName = sanitizeProfile(profile);
+    const stealthEnabled = stealth !== null ? Boolean(stealth) : this.config.get().browser?.stealth !== false;
     const base = this.config.get().browser?.profilesDir || path.join(this.config.get().home, 'browser', 'profiles');
     const userDataDir = absolutePath(path.join(base, profileName));
     await ensureDir(userDataDir);
@@ -152,6 +154,7 @@ export class BrowserManager {
       '--remote-debugging-address=127.0.0.1',
       `--user-data-dir=${userDataDir}`,
       '--no-first-run', '--no-default-browser-check', '--disable-background-networking',
+      ...(stealthEnabled ? stealthArgs({ headless }) : []),
       '--disable-component-update', '--disable-sync', '--disable-features=Translate,OptimizationHints',
       '--window-size=1440,1000',
       ...(headless ? ['--headless=new', '--hide-scrollbars'] : []),
@@ -164,6 +167,7 @@ export class BrowserManager {
     const instance = {
       id: instanceId, process: child, port, headless, profile: profileName, userDataDir,
       executable: this.executable, startedAt: nowIso(), connections: new Map(), closed: false, stderr: '',
+      stealth: stealthEnabled,
     };
     this.instances.set(instanceId, instance);
     child.stderr.on('data', (chunk) => { instance.stderr = (instance.stderr + chunk.toString()).slice(-40_000); });
@@ -222,6 +226,12 @@ export class BrowserManager {
       connection = new CdpConnection(tab.webSocketDebuggerUrl);
       await connection.connect();
       instance.connections.set(tab.id, connection);
+      // Stealth runs before any page script, so it must be installed before
+      // Page.enable lets us navigate anywhere with it.
+      if (instance.stealth) {
+        await connection.send('Page.enable').catch(() => {});
+        await connection.send('Page.addScriptToEvaluateOnNewDocument', { source: stealthInitScript({ headless: instance.headless }) }).catch(() => {});
+      }
       await Promise.allSettled([
         connection.send('Page.enable'), connection.send('Runtime.enable'), connection.send('DOM.enable'),
         connection.send('Network.enable'), connection.send('Log.enable'), connection.send('Console.enable'),

@@ -158,6 +158,10 @@ export function defaultConfig() {
       executable: null,
       profilesDir: path.join(home, 'browser', 'profiles'),
       args: [],
+      // Anti-fingerprint hardening: launch args + a pre-page init script that
+      // remove the headless/automation tells (navigator.webdriver, HeadlessChrome
+      // UA, SwiftShader WebGL, empty plugins). Set false to opt out.
+      stealth: true,
     },
     indexing: {
       embeddings: true,

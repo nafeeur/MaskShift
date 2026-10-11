@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-11T02:37:16.622Z",
+  "generatedAt": "2026-10-11T18:47:49.718Z",
   "version": "2.0.0",
   "nativeToolCount": 202,
   "bundledSkillCount": 51,
@@ -260,7 +260,7 @@
     {
       "name": "browser_launch",
       "title": "Launch browser",
-      "description": "Launch a persistent-profile Chromium browser with DevTools automation. Headless by default; visible mode supports interactive logins.",
+      "description": "Launch a persistent-profile Chromium browser with DevTools automation. Headless by default; visible mode supports interactive logins. Anti-fingerprint stealth is on unless config browser.stealth is false.",
       "category": "browser",
       "readOnly": false,
       "risk": "process",

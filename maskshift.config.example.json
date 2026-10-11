@@ -163,7 +163,8 @@
   "browser": {
     "executable": null,
     "profilesDir": "~/.maskshift/browser/profiles",
-    "args": []
+    "args": [],
+    "stealth": true
   },
   "indexing": {
     "embeddings": true,

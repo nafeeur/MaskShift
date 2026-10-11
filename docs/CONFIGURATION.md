@@ -530,6 +530,27 @@ mode for an initial interactive login, then reuse the same named profile in head
 }
 ```
 
+## Browser stealth
+
+Anti-fingerprint hardening is on by default. Each launch adds flags and a pre-page init script
+that remove the signals bot scores key on before a challenge is ever considered:
+`navigator.webdriver`, the `HeadlessChrome` user-agent, the SwiftShader WebGL renderer, empty
+`plugins`/`mimeTypes`, and the `AutomationControlled` blink feature.
+
+Stealth keeps the browser from *triggering* detection; it does not solve a challenge that is
+actually presented. When a site still shows a CAPTCHA, `browser_handoff` passes it to you rather
+than attempting it.
+
+Set it off globally, or per launch, if a site misbehaves under the patched surface:
+
+```json
+{ "browser": { "stealth": false } }
+```
+
+or `browser_launch({ "stealth": false })`. A reused instance keeps whatever mode it launched
+with — pass `reuse: false` to force a fresh instance under a different stealth setting.
+
+
 ## Remembered sign-ins
 
 `browser_login` can remember a password after you sign in. The default keeps it in memory until
